@@ -82,3 +82,31 @@ func _touch(pressed: bool) -> void:
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = pressed
 	Input.parse_input_event(touch)
+
+
+func test_한_프레임_안에_누르고_뗀_짧은_탭도_점프와_다시_시작으로_받는다() -> void:
+	const PATH := "user://test_main_tap.cfg"
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.record_path = PATH
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	await wait_frames(3)
+	# 느린 휴대폰: 누름과 뗌이 다음 프레임 전에 함께 들어옴
+	_touch(true)
+	_touch(false)
+	await wait_frames(3)
+	assert_false(world.sim.on_ground, "짧은 탭으로 점프")
+
+	world.sim.on_ground = false
+	world.sim.y = Balance.FALL_LIMIT + 1.0
+	world.sim.vy = -1000.0
+	await wait_frames(3)
+	assert_true(world.sim.game_over)
+	await get_tree().create_timer(Balance.RESTART_DELAY + 0.1).timeout
+	_touch(true)
+	_touch(false)
+	await wait_frames(3)
+	assert_false(world.sim.game_over, "짧은 탭으로 다시 시작")
+	assert_true(world.sim.on_ground, "다시 시작한 탭으로는 점프하지 않음")
+	main.queue_free()
+	DirAccess.remove_absolute(PATH)

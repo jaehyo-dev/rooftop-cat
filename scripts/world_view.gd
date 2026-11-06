@@ -29,6 +29,8 @@ var _accumulator := 0.0
 var _over_time := 0.0        # 게임 끝 뒤 지난 시간
 var _was_pressed := false
 var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프로 치지 않음
+## 누른 신호를 로직이 한 번 볼 때까지 남겨 둔다: 한 프레임 안에 누르고 뗀 짧은 탭(느린 휴대폰)도 놓치지 않게
+var _tap_pending := false
 
 
 func _process(delta: float) -> void:
@@ -37,6 +39,7 @@ func _process(delta: float) -> void:
 	_was_pressed = pressed
 	if sim.game_over:
 		_over_time += delta
+		_tap_pending = false
 		if press_started and _over_time >= Balance.RESTART_DELAY:
 			restart()
 		return
@@ -44,6 +47,8 @@ func _process(delta: float) -> void:
 	_accumulator = minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
 		sim.step(STEP, pressed and not _wait_release)
+		_tap_pending = false
+		pressed = is_pressed()
 		_accumulator -= STEP
 		if sim.game_over:
 			_over_time = 0.0
@@ -66,8 +71,11 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		if event.pressed:
 			_touches[event.index] = true
+			_tap_pending = true
 		else:
 			_touches.erase(event.index)
+	elif event is InputEventKey and event.physical_keycode == KEY_SPACE and event.pressed and not event.echo:
+		_tap_pending = true
 
 
 func _notification(what: int) -> void:
@@ -78,7 +86,7 @@ func _notification(what: int) -> void:
 
 ## 지금 누르고 있는지 (화면 어디든 터치, 마우스 클릭, 스페이스바)
 func is_pressed() -> bool:
-	return not _touches.is_empty() or Input.is_physical_key_pressed(KEY_SPACE)
+	return _tap_pending or not _touches.is_empty() or Input.is_physical_key_pressed(KEY_SPACE)
 
 
 func _draw() -> void:
