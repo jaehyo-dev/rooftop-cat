@@ -1,6 +1,7 @@
 extends Node2D
 ## 게임 화면: 입력을 모아 RunnerSim을 고정 간격으로 진행시키고, 옥상과 임시 고양이(타원)를 그린다.
-## 임시 그림은 3단계에서 진짜 그림으로 바뀐다. 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE로 한다.
+## 임시 그림은 3단계에서 진짜 그림으로 바뀐다. 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE·CAT_FOOT_HALF로 하고,
+## 여기서는 같은 크기로 그리기만 한다.
 
 ## 로직을 진행시키는 고정 간격 (화면 주사율과 상관없이 같은 손맛)
 const STEP := 1.0 / 120.0

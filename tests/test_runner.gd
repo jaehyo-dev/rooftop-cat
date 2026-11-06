@@ -51,18 +51,68 @@ func test_옥상_끝을_지나면_떨어지고_앞_옥상에서_다시_달린다
 	assert_false(sim.roof_at(sim.x).is_empty(), "옥상 위에 있음")
 
 
-func test_옆_벽에_부딪히면_위로_올라서지_못한다() -> void:
-	var sim := RunnerSim.new(1)
-	sim.roofs.clear()
-	sim.roofs.append({"left": -100.0, "right": 100.0, "top": 100.0})
-	sim.roofs.append({"left": 150.0, "right": 5000.0, "top": 300.0})
-	sim.x = 140.0
-	sim.y = 120.0  # 벽보다 낮은 곳에서 떨어지는 중
+func test_옆_벽에_부딪히면_몸이_벽을_뚫지_않고_위로_올라서지_못한다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": -100.0, "top": 100.0}, {"left": 150.0, "right": 5000.0, "top": 300.0}])
+	sim.x = 70.0  # 발은 어느 옥상에도 안 걸치고, 몸 앞쪽(145)은 벽(150) 바로 앞
+	sim.y = 120.0  # 높은 옥상보다 낮은 곳에서 떨어지는 중
 	sim.vy = -10.0
 	sim.on_ground = false
-	for i in 30:
+	for i in 60:
 		sim.step(DT, false)
-		assert_false(sim.landed, "벽 안에서 옥상 위로 순간 이동하면 안 됨")
+		assert_false(sim.landed, "벽 안에서 옥상 위로 올라서면 안 됨")
+		if sim.fell:
+			break
+		assert_true(sim.front() <= 150.0 + 0.001, "몸 앞쪽이 벽을 넘으면 안 됨 (%.1f)" % sim.front())
+
+
+func test_옥상_위에서_높은_벽에_막히면_점프로_넘어간다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": 300.0, "top": 100.0}, {"left": 300.0, "right": 5000.0, "top": 200.0}])
+	for i in 240:
+		sim.step(DT, false)
+	assert_true(sim.on_ground, "아래 옥상 위")
+	assert_true(absf(sim.front() - 300.0) < 0.001, "벽 앞에서 멈춤")
+	sim.step(DT, true)
+	for i in 120:
+		sim.step(DT, i < 30)
+	assert_true(sim.front() > 300.0, "넘어감")
+	assert_eq(sim.y, 200.0, "높은 옥상 위에 착지")
+
+
+func test_발_범위가_걸치면_옥상에_서_있다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": 100.0, "top": 100.0}, {"left": 2000.0, "right": 5000.0, "top": 100.0}])
+	sim.x = 100.0 + Balance.CAT_FOOT_HALF - 1.0  # 몸 가운데는 옥상 밖, 뒷발은 아직 위
+	sim.step(0.0001, false)
+	assert_true(sim.on_ground, "뒷발이 걸쳐 있으면 서 있음")
+	sim.x = 100.0 + Balance.CAT_FOOT_HALF + 1.0
+	sim.step(0.0001, false)
+	assert_false(sim.on_ground, "발 범위가 다 지나면 떨어지기 시작")
+
+
+func test_몸_가운데가_못_미쳐도_앞발이_걸치면_착지() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": 0.0, "top": 100.0}, {"left": 400.0, "right": 5000.0, "top": 100.0}])
+	sim.x = 400.0 - Balance.CAT_FOOT_HALF + 5.0  # 가운데는 옥상 왼쪽 끝보다 앞쪽(왼쪽)
+	sim.y = 100.5  # 다음 진행에서 옥상 높이(100)를 지나 내려옴
+	sim.vy = -100.0
+	sim.on_ground = false
+	sim.speed = 0.0
+	sim.step(DT, false)
+	assert_true(sim.landed, "앞발이 옥상 위면 착지")
+	assert_true(sim.x < 400.0, "가운데는 옥상 밖")
+
+
+## 정해 둔 옥상만 있는 시뮬레이션 (새 옥상이 생기지 않게 마지막 옥상을 아주 길게 둔다)
+func _custom_roofs(list: Array) -> RunnerSim:
+	var sim := RunnerSim.new(1)
+	sim.roofs.clear()
+	for roof in list:
+		sim.roofs.append(roof)
+	sim.roofs[-1].right = 100000.0
+	sim.x = -300.0 if list[0].left < -300.0 else list[0].left + 50.0
+	sim.y = list[0].top
+	sim.vy = 0.0
+	sim.on_ground = true
+	sim.set("_ground_roof", sim.roofs[0])
+	return sim
 
 
 func test_착지_직전에_누른_입력은_착지하자마자_점프() -> void:

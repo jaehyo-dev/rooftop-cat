@@ -37,15 +37,14 @@ func test_가장_높이_올라가는_간격도_최소_간격보다_넓게_닿음
 
 
 func test_잘하는_플레이어면_속도별로_한_번도_안_떨어짐() -> void:
-	# 옥상 끝에서 다음 옥상 가운데에 내려앉을 만큼 누르는 봇으로 실제 물리 진행을 60초씩 돌린다
+	# 최대로 눌러 다음 옥상 앞쪽에 내려앉는 지점에서 뛰는 봇으로 실제 물리 진행을 60초씩 돌린다
 	for speed in SPEEDS:
 		var sim := RunnerSim.new(7, speed)
 		var falls := 0
 		var hold_left := 0.0
 		for i in 120 * 60:
-			var roof := sim.roof_at(sim.x)
-			if sim.on_ground and not roof.is_empty() and roof.right - sim.x <= speed / 120.0 * 1.5:
-				hold_left = _hold_to_land_middle(sim, roof) + 1.0 / 120.0
+			if sim.on_ground and _should_jump(sim):
+				hold_left = JumpModel.max_hold_time() + 1.0 / 120.0
 			sim.step(1.0 / 120.0, hold_left > 0.0)
 			hold_left -= 1.0 / 120.0
 			if sim.fell:
@@ -53,21 +52,28 @@ func test_잘하는_플레이어면_속도별로_한_번도_안_떨어짐() -> v
 		assert_eq(falls, 0, "속도 %d에서 떨어진 횟수" % speed)
 
 
-## 다음 옥상 가운데에 내려앉으려면 누를 시간 (이분 탐색)
-func _hold_to_land_middle(sim: RunnerSim, roof: Dictionary) -> float:
-	var next: Dictionary = sim.roofs[sim.roofs.find(roof) + 1]
-	var target: float = (next.left + next.right) * 0.5 - sim.x
-	var rise: float = next.top - roof.top
-	var low := 0.0
-	var high := JumpModel.max_hold_time()
-	for i in 30:
-		var mid := (low + high) * 0.5
-		var t := JumpModel.air_time(mid, rise)
-		if t < 0.0 or sim.speed * t < target:
-			low = mid
-		else:
-			high = mid
-	return high
+func test_높은_옥상도_벽에_막히지_않고_넘을_수_있다() -> void:
+	# 가장 높이 올라가는 옥상에서, 최대 점프가 그 높이 위에 머무는 동안 가는 거리가
+	# 몸 앞쪽~발 범위 차이(벽을 넘은 뒤 내려앉을 여유)보다 넉넉해야 한다
+	var v := JumpModel.jump_speed()
+	var rise := Balance.ROOF_TOP_STEP
+	var t_up := rise / v  # 누르고 있는 동안 같은 속도로 올라가므로 (최소 높이보다 높을 때)
+	for speed in SPEEDS:
+		var above: float = speed * (JumpModel.max_air_time(rise) - t_up)
+		assert_true(above > Balance.CAT_BODY_SIZE.x * 0.5 - Balance.CAT_FOOT_HALF + 30.0, "속도 %d: %.0f" % [speed, above])
+
+
+## 지금 최대로 뛰면 다음 옥상 앞쪽(앞발이 막 걸치는 곳보다 조금 안)에 내려앉는지
+func _should_jump(sim: RunnerSim) -> bool:
+	var here := sim.roofs.find(sim.get("_ground_roof"))
+	if here < 0 or here + 1 >= sim.roofs.size():
+		return false
+	var roof: Dictionary = sim.roofs[here]
+	var next: Dictionary = sim.roofs[here + 1]
+	var land_x := sim.x + sim.speed * JumpModel.max_air_time(next.top - roof.top)
+	# 너무 늦으면(발이 끝을 지나기 직전) 바로 뛴다
+	var last_chance: bool = sim.x + Balance.CAT_FOOT_HALF - roof.right > -sim.speed / 120.0 * 2.0
+	return land_x >= next.left + 20.0 or last_chance
 
 
 func _roofs(seed_value: int, speed: float, count: int) -> Array:
