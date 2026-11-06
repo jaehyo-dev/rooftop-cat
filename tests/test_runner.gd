@@ -134,6 +134,23 @@ func test_투명화는_정해진_시간_뒤에_끝나고_그동안_다시_시작
 	assert_eq(sim.y, 290.0, "두 벽을 다 넘어 가장 높은 옥상 위")
 
 
+func test_투명화가_남아_있어도_점프_없이_틈에_떨어지면_구제되지_않는다() -> void:
+	# 좁은 높은 옥상으로 투명화 통과 → 투명화가 끝나기 전에 끝을 지나 틈으로 떨어짐 → 다음 옥상 벽
+	var sim := _custom_roofs([{"left": -500.0, "right": 300.0, "top": 100.0}, {"left": 300.0, "right": 500.0, "top": 200.0}, {"left": 700.0, "right": 5000.0, "top": 250.0}])
+	var fell := false
+	var ghost_left_at_gap := false
+	for i in 600:
+		sim.step(DT, false)
+		if sim.fell:
+			fell = true
+			break
+		if not sim.on_ground and sim.x > 545.0:
+			ghost_left_at_gap = ghost_left_at_gap or sim.ghost_time > 0.0
+			assert_true(sim.front() <= 700.0 + 0.001, "틈에서 다음 옥상 벽을 뚫지 않음 (x=%.0f, y=%.0f)" % [sim.x, sim.y])
+	assert_true(ghost_left_at_gap, "틈에 떨어질 때 투명화가 남아 있는 상황을 확인함")
+	assert_true(fell, "점프 없이 틈으로 떨어졌으면 투명화가 남아 있어도 떨어짐")
+
+
 func test_발_범위가_걸치면_옥상에_서_있다() -> void:
 	var sim := _custom_roofs([{"left": -500.0, "right": 100.0, "top": 100.0}, {"left": 2000.0, "right": 5000.0, "top": 100.0}])
 	sim.x = 100.0 + Balance.CAT_FOOT_HALF - 1.0  # 몸 가운데는 옥상 밖, 뒷발은 아직 위
