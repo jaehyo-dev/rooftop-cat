@@ -122,7 +122,9 @@ godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
 ## Codex 협업 (ChatGPT 구독)
 
 - codex나 /ponytail-review를 쓸 수 없는 환경이면 건너뛰고 보고에 적어.
-- 이 맥북에서 Homebrew의 `codex`가 시작하자마자 멈추면 ChatGPT 앱에 들어 있는 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`를 써.
+- codex는 기본으로 Homebrew의 `codex`(PATH)를 써. 설치·업데이트 직후 첫 실행은 macOS 보안 검사 때문에 몇 분 멈춰 있을 수 있어 (`--version`으로 먼저 깨워 두고, 끝나면 그다음부터는 바로 실행됨).
+  - 그래도 안 되면 ChatGPT 앱에 들어 있는 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`를 써. 경로에 버전 번호가 없어 앱이 업데이트돼도 그대로야.
+- `codex exec`의 `--image`는 파일을 여러 개 받으니, 요청문을 `--image`보다 앞에 둬: `codex exec --sandbox read-only "<요청>" --image <기준 그림>`
 - 배경 제거는 `rembg i -m isnet-general-use -a <원본> <결과>`로 해 (rembg 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음). rembg는 `~/.local/venvs/rembg`에 설치돼 있어.
 - 이미지: 그림이 필요하면 `codex exec --sandbox read-only "<요청>"`로 Codex의 내장 이미지 생성을 써. 요청 끝에 항상 "내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"를 붙여. API 키는 절대 쓰지 마.
   - 결과는 `~/.codex/generated_images/`의 가장 최근 파일을 찾아 `assets/raw/`로 복사해.

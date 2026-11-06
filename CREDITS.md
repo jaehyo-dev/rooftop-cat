@@ -30,8 +30,10 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | 파일 | 만든 날 | 도구 | 쓰는 곳 | 수정 |
 |---|---|---|---|---|
 | `assets/raw/cat_concept_a~d.png` | 2026-11-06 | Codex 내장 이미지 생성 | 기준 고양이 시안 (원본, 게임에 포함 안 됨) | 없음 |
-| `assets/sprites/cat_concept_a~d.png` | 2026-11-06 | 위 원본 + rembg | 배경을 지운 시안 (게임 내보내기에서 제외) | rembg(isnet-general-use)로 배경 제거 |
+| `assets/raw/cat_concept_e.png` | 2026-11-06 | Codex 내장 이미지 생성 (시안 C를 기준 그림으로 첨부) | 기준 고양이 시안 E: C + 수채 질감 (원본, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/cat_concept_a~e.png` | 2026-11-06 | 위 원본 + rembg | 배경을 지운 시안 (게임 내보내기에서 제외) | rembg(isnet-general-use)로 배경 제거 |
 | `assets/concept/cat_options.png` | 2026-11-06 | 위 시안 4장 | 시안 비교용 (게임에 포함 안 됨) | 4장을 잘라 나란히 붙이고 글자(macOS 기본 글꼴 Apple SD Gothic Neo)를 넣음 |
+| `assets/concept/cat_c_vs_e.png` | 2026-11-06 | 시안 C, E | C와 E 비교용 (게임에 포함 안 됨) | 2장을 잘라 나란히 붙이고 글자를 넣음 |
 
 ## 직접 만든 것
 
