@@ -19,8 +19,8 @@
 |---|---|---|
 | GitHub Actions: actions/checkout, actions/cache, actions/configure-pages, actions/upload-pages-artifact, actions/deploy-pages | MIT | `.github/` 자동 테스트·배포 |
 | Python 3 표준 라이브러리 | PSF License | `tools/` 변경 기록·버전 도구 |
-| rembg | MIT | 그림 배경 제거 (개발 PC에서만 실행) |
-| Pillow | MIT-CMU (HPND) | 비교 이미지 만들기 `tools/make_contact_sheet.py` |
+| rembg 2.x + isnet-general-use 모델 | MIT (rembg), Apache-2.0 (IS-Net) | 그림 배경 제거 (개발 PC에서만 실행). 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음 |
+| Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기 (개발 PC에서만 실행) |
 
 ## AI로 만든 그림
 
@@ -30,8 +30,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | 파일 | 만든 날 | 도구 | 쓰는 곳 | 수정 |
 |---|---|---|---|---|
 | `assets/raw/cat_concept_a~d.png` | 2026-11-06 | Codex 내장 이미지 생성 | 기준 고양이 시안 (원본, 게임에 포함 안 됨) | 없음 |
-| `assets/sprites/cat_concept_a~d.png` | 2026-11-06 | 위 원본 + rembg | 배경을 지운 시안 | rembg로 배경 제거 |
-| `assets/concept/cat_options.png` | 2026-11-06 | 위 시안 4장 | 시안 비교용 (게임에 포함 안 됨) | 4장을 나란히 붙임 |
+| `assets/sprites/cat_concept_a~d.png` | 2026-11-06 | 위 원본 + rembg | 배경을 지운 시안 (게임 내보내기에서 제외) | rembg(isnet-general-use)로 배경 제거 |
+| `assets/concept/cat_options.png` | 2026-11-06 | 위 시안 4장 | 시안 비교용 (게임에 포함 안 됨) | 4장을 잘라 나란히 붙이고 글자(macOS 기본 글꼴 Apple SD Gothic Neo)를 넣음 |
 
 ## 직접 만든 것
 

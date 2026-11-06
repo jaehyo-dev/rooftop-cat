@@ -26,7 +26,7 @@ func test_웹_내보내기는_스레드_없이_설정됨() -> void:
 	assert_eq(presets.get_value(web_section + ".options", "variant/thread_support", true), false, "스레드 지원 끔")
 	assert_eq(presets.get_value(web_section, "export_path", ""), "build/web/index.html", "내보내기 위치")
 	var excluded := str(presets.get_value(web_section, "exclude_filter", ""))
-	for folder in ["tests/*", "tools/*", "build/*", "_site/*", "assets/raw/*", "assets/concept/*"]:
+	for folder in ["tests/*", "tools/*", "build/*", "_site/*", "assets/raw/*", "assets/concept/*", "assets/sprites/cat_concept_*"]:
 		assert_true(excluded.contains(folder), "내보내기 제외: " + folder)
 
 
