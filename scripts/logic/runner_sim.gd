@@ -28,7 +28,9 @@ var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
 var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 남은 시간
 
 
-func _init(seed_value: int) -> void:
+## start_speed: 처음 달리는 속도. 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
+func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
+	speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	y = roofs[0].top

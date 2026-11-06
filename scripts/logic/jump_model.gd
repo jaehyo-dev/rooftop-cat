@@ -21,18 +21,22 @@ static func height_for_hold(hold: float) -> float:
 	return Balance.JUMP_MIN_HEIGHT + jump_speed() * clampf(hold, 0.0, max_hold_time())
 
 
-## 최대 점프로 출발 높이보다 rise만큼 높은(음수면 낮은) 곳에 내려앉을 때까지 걸리는 시간.
+## hold초 누른 점프로 출발 높이보다 rise만큼 높은(음수면 낮은) 곳에 내려앉을 때까지 걸리는 시간.
 ## 닿을 수 없는 높이면 -1.
-static func max_air_time(rise: float) -> float:
-	if rise > Balance.JUMP_MAX_HEIGHT:
+static func air_time(hold: float, rise: float) -> float:
+	if rise > height_for_hold(hold):
 		return -1.0
 	var v := jump_speed()
-	var hold := max_hold_time()
+	hold = clampf(hold, 0.0, max_hold_time())
 	var top_of_hold := v * hold
 	# 손을 뗀 뒤: 높이 = top_of_hold + v t - g t^2 / 2 = rise 의 큰 근 (내려오는 쪽)
 	var g := Balance.GRAVITY
-	var t := (v + sqrt(v * v + 2.0 * g * (top_of_hold - rise))) / g
-	return hold + t
+	return hold + (v + sqrt(v * v + 2.0 * g * (top_of_hold - rise))) / g
+
+
+## 최대 점프의 체공 시간 (닿을 수 없는 높이면 -1)
+static func max_air_time(rise: float) -> float:
+	return air_time(max_hold_time(), rise)
 
 
 ## 최대 점프로 넘을 수 있는 가로 거리 (속도 speed, 높이 차 rise)

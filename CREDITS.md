@@ -37,6 +37,10 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/cat_mascot_i~k.png` | 2026-11-06 | Codex 내장 이미지 생성 | 마스코트 시안 I·J·K: 고양이 모티브 단순 캐릭터 (원본, 게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_mascot_i~k.png` | 2026-11-06 | 위 원본 | 배경을 지운 마스코트 시안 (게임 내보내기에서 제외) | 연두 배경을 초록 우세도(G - max(R, B))로 지움 (rembg는 닫힌 틈에 배경이 남고 몸이 반투명해져 쓰지 않음) |
 | `assets/concept/cat_mascot.png` | 2026-11-06 | 시안 I·J·K | 마스코트 비교용 (게임에 포함 안 됨) | 3장을 잘라 나란히 붙이고 글자를 넣음 |
+| `assets/concept/cat_reference_sheet.png` | 2026-11-06 | 사용자가 다른 세션에서 AI로 만들어 제공 (요청문 기록 없음) | 기준 캐릭터 참고 시트, 6가지 동작 (게임에 포함 안 됨) | 없음 |
+| `assets/concept/poses/walk·crouch·run·jump·land·dash.png` | 2026-11-06 | 위 참고 시트 | 모션 참고용 동작 6장 (게임에 포함 안 됨) | 시트에서 잘라 남색 배경을 색 거리로 지움 |
+| `assets/raw/cat_base_run.png` | 2026-11-06 | Codex 내장 이미지 생성 (참고 시트와 run 동작을 기준 그림으로 첨부) | 기준 캐릭터 달리는 옆모습 원본 (게임에 포함 안 됨) | 없음 |
+| `assets/sprites/cat_base_run.png` | 2026-11-06 | 위 원본 | 기준 그림 (3단계에서 고양이 그림의 기준) | 마젠타 배경을 마젠타 우세도(min(R, B) - G)로 지우고 1024x1024로 줄임 |
 
 ## 직접 만든 것
 

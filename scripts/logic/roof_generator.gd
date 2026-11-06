@@ -22,7 +22,14 @@ func next_roof(prev: Dictionary, speed: float) -> Dictionary:
 			Balance.ROOF_TOP_MIN, Balance.ROOF_TOP_MAX)
 	var gap := _rng.randf_range(Balance.ROOF_GAP_MIN, max_gap(speed, top - prev.top))
 	var left: float = prev.right + gap
-	return {"left": left, "right": left + _rng.randf_range(Balance.ROOF_WIDTH_MIN, Balance.ROOF_WIDTH_MAX), "top": top}
+	var width_min := min_width(speed)
+	return {"left": left, "right": left + _rng.randf_range(width_min, maxf(Balance.ROOF_WIDTH_MAX, width_min * 1.5)), "top": top}
+
+
+## 가장 짧게 뛰어도(톡 누름) 이 옥상을 지나쳐 버리지 않는 최소 너비.
+## 가장 높은 곳에서 내려오는 짧은 점프가 가장 멀리 가므로 그 거리를 기준으로 한다.
+static func min_width(speed: float) -> float:
+	return maxf(Balance.ROOF_WIDTH_MIN, speed * JumpModel.air_time(0.0, -Balance.ROOF_TOP_STEP))
 
 
 ## 높이 차 rise일 때 허용하는 최대 간격 (최대 점프 거리 x 여유, 최소 간격보다 작아지지 않음)
