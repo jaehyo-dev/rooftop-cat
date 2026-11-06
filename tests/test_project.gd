@@ -56,3 +56,14 @@ func test_시작_화면에_게임_버전이_보임() -> void:
 	var version := str(ProjectSettings.get_setting("application/config/version"))
 	assert_eq(main.get_node("VersionLabel").text, "v" + version)
 	main.queue_free()
+
+
+func test_휴대폰을_세로로_들어도_가로_화면으로_고정() -> void:
+	# 캔버스 크기는 엔진이 아니라 페이지 스크립트가 정하고(0 = 없음), 세로면 90도 돌린다
+	var presets := ConfigFile.new()
+	assert_eq(presets.load("res://export_presets.cfg"), OK)
+	assert_eq(presets.get_value("preset.0.options", "html/canvas_resize_policy", -1), 0, "캔버스 크기 조절을 페이지 스크립트가 맡음")
+	var head := str(presets.get_value("preset.0.options", "html/head_include", ""))
+	assert_true(head.contains("rotate(90deg)"), "세로면 90도 회전")
+	assert_true(head.contains("pointer: coarse"), "터치 화면에서만 회전")
+	assert_true(head.contains("addEventListener('resize'"), "화면 크기가 바뀌면 다시 맞춤")

@@ -79,12 +79,16 @@ func _draw_cat(feet: Vector2) -> void:
 	var scale_xy := Squash.body_scale(sim.on_ground, sim.vy, sim.time_since_land)
 	# 발끝을 기준으로 늘이고 줄여서 착지할 때 옥상에 붙어 있게 한다
 	draw_set_transform(feet, 0.0, scale_xy)
+	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
+	var alpha := 1.0
+	if sim.ghost_time > 0.0:
+		alpha = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
 	var center := Vector2(0.0, -body.y * 0.5)
-	_draw_ellipse(center, body * 0.5 + Vector2(4.0, 4.0), CAT_OUTLINE)
-	_draw_ellipse(center, body * 0.5, CAT_FILL)
+	_draw_ellipse(center, body * 0.5 + Vector2(4.0, 4.0), Color(CAT_OUTLINE, alpha))
+	_draw_ellipse(center, body * 0.5, Color(CAT_FILL, alpha))
 	# 목도리와 눈: 머리(오른쪽 앞)가 어느 쪽인지 보이게 하는 표시
-	draw_rect(Rect2(body.x * 0.12, -body.y * 0.82, body.x * 0.1, body.y * 0.72), CAT_SCARF)
-	draw_circle(Vector2(body.x * 0.36, -body.y * 0.6), 4.0, CAT_LINE)
+	draw_rect(Rect2(body.x * 0.12, -body.y * 0.82, body.x * 0.1, body.y * 0.72), Color(CAT_SCARF, alpha))
+	draw_circle(Vector2(body.x * 0.36, -body.y * 0.6), 4.0, Color(CAT_LINE, alpha))
 	draw_set_transform(Vector2.ZERO)
 
 

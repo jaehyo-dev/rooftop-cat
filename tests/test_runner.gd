@@ -51,31 +51,87 @@ func test_옥상_끝을_지나면_떨어지고_앞_옥상에서_다시_달린다
 	assert_false(sim.roof_at(sim.x).is_empty(), "옥상 위에 있음")
 
 
-func test_옆_벽에_부딪히면_몸이_벽을_뚫지_않고_위로_올라서지_못한다() -> void:
+func test_공중에서_벽에_부딪히면_투명해져_통과하고_옥상_위로_올라선다() -> void:
 	var sim := _custom_roofs([{"left": -500.0, "right": -100.0, "top": 100.0}, {"left": 150.0, "right": 5000.0, "top": 300.0}])
 	sim.x = 70.0  # 발은 어느 옥상에도 안 걸치고, 몸 앞쪽(145)은 벽(150) 바로 앞
-	sim.y = 120.0  # 높은 옥상보다 낮은 곳에서 떨어지는 중
+	sim.y = 260.0  # 옥상 높이(300)보다 40 낮음: 몸이 모서리에 걸린 상태
 	sim.vy = -10.0
 	sim.on_ground = false
-	for i in 60:
+	sim.set("_jumped", true)  # 점프했는데 살짝 모자란 경우
+	var ghosted := false
+	var landed := false
+	for i in 120:
 		sim.step(DT, false)
-		assert_false(sim.landed, "벽 안에서 옥상 위로 올라서면 안 됨")
+		ghosted = ghosted or sim.ghosted
+		landed = landed or sim.landed
+		assert_false(sim.fell, "떨어지면 안 됨")
+	assert_true(ghosted, "부딪히면 투명화 시작")
+	assert_true(landed and sim.on_ground, "높은 옥상 위에 올라섬")
+	assert_eq(sim.y, 300.0)
+	assert_true(sim.front() > 150.0, "벽을 통과함")
+
+
+func test_점프_없이_틈으로_떨어지다_벽에_닿으면_막혀서_떨어진다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": -100.0, "top": 100.0}, {"left": 150.0, "right": 5000.0, "top": 300.0}])
+	sim.x = 70.0
+	sim.y = 280.0  # 몸이 모서리에 걸릴 높이지만 점프하지 않고 떨어지는 중
+	sim.vy = -10.0
+	sim.on_ground = false
+	var fell := false
+	for i in 120:
+		sim.step(DT, false)
+		assert_false(sim.ghosted, "투명화하지 않음")
 		if sim.fell:
+			fell = true
 			break
-		assert_true(sim.front() <= 150.0 + 0.001, "몸 앞쪽이 벽을 넘으면 안 됨 (%.1f)" % sim.front())
+		assert_true(sim.front() <= 150.0 + 0.001, "벽을 뚫지 않음")
+	assert_true(fell, "떨어짐")
 
 
-func test_옥상_위에서_높은_벽에_막히면_점프로_넘어간다() -> void:
+func test_너무_낮게_부딪히면_막혀서_떨어진다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": -100.0, "top": 100.0}, {"left": 150.0, "right": 5000.0, "top": 300.0}])
+	sim.x = 70.0
+	sim.y = 300.0 - Balance.CAT_BODY_SIZE.y - 20.0  # 몸 전체가 옥상 높이보다 아래
+	sim.vy = -10.0
+	sim.on_ground = false
+	sim.set("_jumped", true)
+	var fell := false
+	for i in 120:
+		sim.step(DT, false)
+		assert_false(sim.ghosted, "투명화하지 않음")
+		if sim.fell:
+			fell = true
+			break
+	assert_true(fell, "떨어짐")
+
+
+func test_옥상_위에서_높은_벽에_부딪혀도_멈추지_않고_넘어간다() -> void:
 	var sim := _custom_roofs([{"left": -500.0, "right": 300.0, "top": 100.0}, {"left": 300.0, "right": 5000.0, "top": 200.0}])
+	var start_x := sim.x
 	for i in 240:
 		sim.step(DT, false)
-	assert_true(sim.on_ground, "아래 옥상 위")
-	assert_true(absf(sim.front() - 300.0) < 0.001, "벽 앞에서 멈춤")
-	sim.step(DT, true)
-	for i in 120:
-		sim.step(DT, i < 30)
-	assert_true(sim.front() > 300.0, "넘어감")
-	assert_eq(sim.y, 200.0, "높은 옥상 위에 착지")
+	assert_true(absf(sim.x - start_x - Balance.RUN_SPEED * 2.0) < 0.01, "속도 그대로 달림")
+	assert_true(sim.on_ground)
+	assert_eq(sim.y, 200.0, "높은 옥상 위")
+
+
+func test_투명화는_정해진_시간_뒤에_끝나고_그동안_다시_시작되지_않는다() -> void:
+	var sim := _custom_roofs([{"left": -500.0, "right": 300.0, "top": 100.0}, {"left": 300.0, "right": 340.0, "top": 200.0}, {"left": 345.0, "right": 5000.0, "top": 290.0}])
+	var starts := 0
+	var steps := 0
+	while sim.ghost_time == 0.0 and steps < 600:
+		sim.step(DT, false)
+		steps += 1
+	starts = 1
+	var ghost_steps := 0
+	while sim.ghost_time > 0.0 and ghost_steps < 600:
+		sim.step(DT, false)
+		ghost_steps += 1
+		if sim.ghosted:
+			starts += 1
+	assert_eq(starts, 1, "투명화 중에 다른 벽에 닿아도 다시 시작하지 않음")
+	assert_true(absf(ghost_steps * DT - Balance.GHOST_TIME) <= DT * 1.5, "%.3f초 동안 투명" % (ghost_steps * DT))
+	assert_eq(sim.y, 290.0, "두 벽을 다 넘어 가장 높은 옥상 위")
 
 
 func test_발_범위가_걸치면_옥상에_서_있다() -> void:

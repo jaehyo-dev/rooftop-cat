@@ -45,6 +45,14 @@ jobs:
           godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
           for f in index.html index.js index.wasm index.pck; do test -s "build/web/$f"; done
 
+      # 작업 브랜치에서도 웹 빌드를 내려받아 실제 화면(PC·휴대폰 크기)을 확인할 수 있게 올려 둔다
+      - name: 웹 빌드 올리기 (화면 확인용)
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 3
+
   publish:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

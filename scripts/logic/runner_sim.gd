@@ -6,12 +6,16 @@ extends RefCounted
 ## 좌표: x는 고양이 몸 가운데의 가로 위치(앞으로 갈수록 커짐), y는 고양이 발끝 높이(위로 커짐).
 ## 충돌 판정은 몸 크기(Balance.CAT_BODY_SIZE) 기준:
 ## - 서기·착지: 발 범위(x ± Balance.CAT_FOOT_HALF)가 옥상에 걸치면 된다.
-## - 벽: 몸 앞쪽(x + 몸 너비의 절반)이 자기보다 높은 옥상 벽에 닿으면 앞으로 못 간다.
+## - 벽: 몸 앞쪽(x + 몸 너비의 절반)이 자기보다 높은 옥상 벽에 닿았을 때
+##   - 달리다 부딪혔거나, 점프했는데 살짝 모자라 몸이 모서리에 걸렸으면(몸 높이 안쪽) 잠시 투명해져(ghost_time)
+##     벽을 통과하고, 발 범위가 그 옥상에 걸치면 옥상 위로 떠올라 올라선다.
+##   - 점프 없이 틈으로 떨어지는 중이거나 너무 낮게 부딪혔으면 벽에 막혀 그대로 떨어진다.
 
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
 var jumped := false
 var landed := false
 var fell := false
+var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
 
 var x := 0.0
 var y := 0.0
@@ -19,12 +23,15 @@ var vy := 0.0
 var on_ground := true
 var speed := Balance.RUN_SPEED
 var roofs: Array[Dictionary] = []
+## 투명화 남은 시간 (0이면 보통 상태)
+var ghost_time := 0.0
 ## 착지한 뒤 지난 시간 (납작해짐 연출용). 착지 전이면 큰 값
 var time_since_land := 99.0
 
 var _generator: RoofGenerator
 var _ground_roof := {}      # 지금 서 있는 옥상
 var _was_pressed := false
+var _jumped := false        # 마지막으로 옥상에 선 뒤 점프했는지
 var _holding := false       # 점프 중 아직 누르고 있어 속도를 유지하는 중
 var _hold_time := 0.0
 var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
@@ -46,6 +53,8 @@ func step(dt: float, pressed: bool) -> void:
 	jumped = false
 	landed = false
 	fell = false
+	ghosted = false
+	ghost_time = maxf(0.0, ghost_time - dt)
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
 	time_since_land += dt
@@ -60,6 +69,9 @@ func step(dt: float, pressed: bool) -> void:
 
 	if (on_ground or _coyote > 0.0) and _buffer > 0.0:
 		_start_jump(pressed)
+
+	if ghost_time > 0.0 and _ghost_rise(dt):
+		return
 
 	if on_ground:
 		if not _feet_over(_ground_roof):
@@ -102,14 +114,35 @@ func front() -> float:
 	return x + Balance.CAT_BODY_SIZE.x * 0.5
 
 
-## 앞으로 distance만큼 간다. 몸 앞쪽이 자기 발보다 높은 옥상 벽에 닿으면 거기서 멈춘다
+## 앞으로 distance만큼 간다. 몸 앞쪽이 자기 발보다 높은 옥상 벽에 닿으면 투명화가 시작된다
 func _move_forward(distance: float) -> void:
 	var old_front := front()
 	x += distance
+	if ghost_time > 0.0:
+		return
 	for roof in roofs:
 		if roof.top > y and roof.left >= old_front - 0.001 and roof.left < front():
-			x = roof.left - Balance.CAT_BODY_SIZE.x * 0.5
+			var near_miss: bool = _jumped and roof.top - y <= Balance.CAT_BODY_SIZE.y
+			if on_ground or near_miss:
+				ghost_time = Balance.GHOST_TIME
+				ghosted = true
+			else:
+				x = roof.left - Balance.CAT_BODY_SIZE.x * 0.5
 			return
+
+
+## 투명화 중 발 범위가 자기보다 높은 옥상에 걸치면 그 옥상 위로 떠오른다. 떠오르는 중이면 true
+func _ghost_rise(dt: float) -> bool:
+	for roof in roofs:
+		if _feet_over(roof) and roof.top > y:
+			on_ground = false
+			_holding = false
+			vy = 0.0
+			y = minf(roof.top, y + Balance.GHOST_RISE_SPEED * dt)
+			if y >= roof.top:
+				_land_on(roof)
+			return true
+	return false
 
 
 ## 발 범위가 옥상에 걸쳐 있는지
@@ -122,6 +155,7 @@ func _start_jump(pressed: bool) -> void:
 	_coyote = 0.0
 	_buffer = 0.0
 	vy = JumpModel.jump_speed()
+	_jumped = true
 	# 눌렀다 이미 뗀 입력(버퍼)이면 최소 높이로 뛴다
 	_holding = pressed
 	_hold_time = 0.0
@@ -134,14 +168,19 @@ func _check_landing(prev_y: float) -> void:
 	for roof in roofs:
 		# 위에서 옥상 높이를 지나 내려왔을 때만 선다 (아래에서 벽에 부딪힌 경우는 계속 떨어짐)
 		if _feet_over(roof) and prev_y >= roof.top and y <= roof.top:
-			y = roof.top
-			vy = 0.0
-			on_ground = true
-			_ground_roof = roof
-			_holding = false
-			landed = true
-			time_since_land = 0.0
+			_land_on(roof)
 			return
+
+
+func _land_on(roof: Dictionary) -> void:
+	y = roof.top
+	vy = 0.0
+	on_ground = true
+	_ground_roof = roof
+	_holding = false
+	_jumped = false
+	landed = true
+	time_since_land = 0.0
 
 
 ## 1단계 임시 처리: 떨어지면 앞쪽 옥상 위에서 다시 달린다 (2단계에서 게임 끝으로 바뀜)
@@ -157,6 +196,8 @@ func _respawn() -> void:
 	_holding = false
 	_coyote = 0.0
 	_buffer = 0.0
+	ghost_time = 0.0
+	_jumped = false
 	time_since_land = 99.0
 	_fill_roofs()
 
