@@ -1,5 +1,5 @@
 extends Control
-## 시작 화면 (0단계: 빈 화면 + 버전 표시).
+## 시작 화면: 게임 화면(World)과 버전 표시.
 
 
 func _ready() -> void:
