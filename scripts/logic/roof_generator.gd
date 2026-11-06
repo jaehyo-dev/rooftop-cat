@@ -34,4 +34,10 @@ static func min_width(speed: float) -> float:
 
 ## 높이 차 rise일 때 허용하는 최대 간격 (최대 점프 거리 x 여유, 최소 간격보다 작아지지 않음)
 static func max_gap(speed: float, rise: float) -> float:
-	return maxf(Balance.ROOF_GAP_MIN, JumpModel.max_reach(speed, rise) * Balance.ROOF_GAP_SAFETY)
+	return maxf(Balance.ROOF_GAP_MIN, JumpModel.max_reach(speed, rise) * gap_safety(speed))
+
+
+## 속도에 따른 간격 여유: 처음 속도에서 ROOF_GAP_SAFETY_START, 최대 속도에서 ROOF_GAP_SAFETY
+static func gap_safety(speed: float) -> float:
+	var t := inverse_lerp(Balance.RUN_SPEED, Balance.SPEED_MAX, speed)
+	return lerpf(Balance.ROOF_GAP_SAFETY_START, Balance.ROOF_GAP_SAFETY, clampf(t, 0.0, 1.0))

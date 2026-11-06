@@ -1,16 +1,28 @@
 extends TestCase
-## 자동 달리기, 착지, 벽, 떨어짐, 입력 여유(버퍼·코요테), 늘어남·납작해짐.
+## 자동 달리기, 착지, 벽, 떨어짐(게임 끝), 거리 점수, 빨라짐, 입력 여유(버퍼·코요테), 늘어남·납작해짐.
 
 const DT := 1.0 / 120.0
 
 
-func test_누르지_않아도_일정한_속도로_달린다() -> void:
+func test_누르지_않아도_달리고_시간이_갈수록_빨라진다() -> void:
 	var sim := RunnerSim.new(1)
 	var start := sim.x
 	for i in 120:
 		sim.step(DT, false)
-	assert_true(absf(sim.x - start - Balance.RUN_SPEED) < 0.01, "1초에 RUN_SPEED만큼")
+	# 첫 1초: 처음 속도에서 SPEED_GAIN만큼 빨라지며 달린 거리 (등가속도: 평균 속도 x 1초)
+	var expected := Balance.RUN_SPEED + Balance.SPEED_GAIN * 0.5
+	assert_true(absf(sim.x - start - expected) < 0.5, "1초에 %.1f만큼 (실제 %.1f)" % [expected, sim.x - start])
+	assert_true(absf(sim.speed - SpeedCurve.speed_at(1.0)) < 0.001, "지금 속도는 속도 곡선을 따름")
 	assert_true(sim.on_ground)
+
+
+func test_속도_고정이면_일정한_속도로_달린다() -> void:
+	var sim := RunnerSim.new(1)
+	sim.accelerate = false
+	var start := sim.x
+	for i in 120:
+		sim.step(DT, false)
+	assert_true(absf(sim.x - start - Balance.RUN_SPEED) < 0.01, "1초에 RUN_SPEED만큼")
 
 
 func test_점프하면_다시_옥상에_착지() -> void:
@@ -38,17 +50,35 @@ func test_계속_누르고_있어도_한_번만_뛴다() -> void:
 	assert_eq(jumps, 1)
 
 
-func test_옥상_끝을_지나면_떨어지고_앞_옥상에서_다시_달린다() -> void:
+func test_옥상_끝을_지나_떨어지면_게임_끝() -> void:
 	var sim := RunnerSim.new(1)
-	var fell := false
+	var falls := 0
 	for i in 120 * 10:
 		sim.step(DT, false)
 		if sim.fell:
-			fell = true
-			break
-	assert_true(fell, "안 뛰면 떨어짐")
-	assert_true(sim.on_ground, "다시 옥상 위")
-	assert_false(sim.roof_at(sim.x).is_empty(), "옥상 위에 있음")
+			falls += 1
+	assert_eq(falls, 1, "안 뛰면 떨어지고, 떨어짐 신호는 한 번만")
+	assert_true(sim.game_over, "게임 끝")
+	assert_true(sim.y < Balance.FALL_LIMIT, "화면 아래로 떨어진 뒤에 끝남")
+	# 게임이 끝나면 더 진행하지 않는다 (거리·시간이 그대로)
+	var x := sim.x
+	var meters := sim.distance()
+	var elapsed := sim.elapsed
+	for i in 120:
+		sim.step(DT, true)
+	assert_eq(sim.x, x)
+	assert_eq(sim.distance(), meters)
+	assert_eq(sim.elapsed, elapsed)
+	assert_false(sim.jumped, "끝난 뒤 눌러도 점프하지 않음")
+
+
+func test_거리_점수는_앞으로_간_거리를_미터로_버림() -> void:
+	var sim := RunnerSim.new(1)
+	assert_eq(sim.distance(), 0, "시작은 0 m")
+	sim.x += Balance.PX_PER_METER * 12.0 - 0.01
+	assert_eq(sim.distance(), 11, "12 m에 조금 못 미치면 11 m")
+	sim.x += 0.01
+	assert_eq(sim.distance(), 12)
 
 
 func test_공중에서_벽에_부딪히면_투명해져_통과하고_옥상_위로_올라선다() -> void:
@@ -176,6 +206,7 @@ func test_몸_가운데가_못_미쳐도_앞발이_걸치면_착지() -> void:
 ## 정해 둔 옥상만 있는 시뮬레이션 (새 옥상이 생기지 않게 마지막 옥상을 아주 길게 둔다)
 func _custom_roofs(list: Array) -> RunnerSim:
 	var sim := RunnerSim.new(1)
+	sim.accelerate = false  # 직접 만든 옥상은 속도 고정으로 확인한다
 	sim.roofs.clear()
 	for roof in list:
 		sim.roofs.append(roof)

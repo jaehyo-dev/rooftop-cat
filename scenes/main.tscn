@@ -31,3 +31,48 @@ grow_vertical = 0
 theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 1)
 theme_override_font_sizes/font_size = 24
 horizontal_alignment = 2
+
+[node name="DistanceLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 16.0
+offset_right = 424.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 1)
+theme_override_font_sizes/font_size = 44
+text = "0 m"
+
+[node name="BestLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 26.0
+offset_top = 72.0
+offset_right = 426.0
+offset_bottom = 104.0
+theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 0.8)
+theme_override_font_sizes/font_size = 24
+text = "BEST 0 m"
+
+[node name="GameOver" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.243, 0.169, 0.122, 0.45)
+
+[node name="Label" type="Label" parent="GameOver"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 0.98, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0.353, 0.275, 0.212, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 40
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -1,6 +1,6 @@
 class_name RunnerSim
 extends RefCounted
-## 자동 달리기 + 누르는 만큼 점프 + 옥상 생성 (화면과 분리된 로직).
+## 자동 달리기(점점 빨라짐) + 누르는 만큼 점프 + 옥상 생성 + 떨어지면 게임 끝 (화면과 분리된 로직).
 ## step(dt, pressed)를 고정 시간 간격으로 부른다. 같은 시드·같은 입력이면 결과가 항상 같다.
 ##
 ## 좌표: x는 고양이 몸 가운데의 가로 위치(앞으로 갈수록 커짐), y는 고양이 발끝 높이(위로 커짐).
@@ -14,7 +14,7 @@ extends RefCounted
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
 var jumped := false
 var landed := false
-var fell := false
+var fell := false             # 떨어져서 이번 step에 게임이 끝남
 var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
 
 var x := 0.0
@@ -22,6 +22,12 @@ var y := 0.0
 var vy := 0.0
 var on_ground := true
 var speed := Balance.RUN_SPEED
+## false면 속도가 그대로 (속도별 테스트용)
+var accelerate := true
+## 떨어져서 게임이 끝났는지. 끝나면 step은 아무것도 하지 않는다
+var game_over := false
+## 달린 시간 (초)
+var elapsed := 0.0
 var roofs: Array[Dictionary] = []
 ## 투명화 남은 시간 (0이면 보통 상태)
 var ghost_time := 0.0
@@ -29,6 +35,8 @@ var ghost_time := 0.0
 var time_since_land := 99.0
 
 var _generator: RoofGenerator
+var _start_speed := Balance.RUN_SPEED
+var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
 var _ghost_roof := {}       # 투명화로 통과해 올라설 옥상 (부딪힌 벽의 옥상)
 var _was_pressed := false
@@ -42,10 +50,12 @@ var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 �
 ## start_speed: 처음 달리는 속도. 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
 func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
 	speed = start_speed
+	_start_speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	_ground_roof = roofs[0]
 	y = roofs[0].top
+	_start_x = x
 	_fill_roofs()
 
 
@@ -55,6 +65,11 @@ func step(dt: float, pressed: bool) -> void:
 	landed = false
 	fell = false
 	ghosted = false
+	if game_over:
+		return
+	elapsed += dt
+	if accelerate:
+		speed = SpeedCurve.speed_at(elapsed, _start_speed)
 	ghost_time = maxf(0.0, ghost_time - dt)
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
@@ -99,7 +114,7 @@ func step(dt: float, pressed: bool) -> void:
 
 	if y < Balance.FALL_LIMIT:
 		fell = true
-		_respawn()
+		game_over = true
 
 
 ## 가로 위치 at_x 아래에 있는 옥상. 없으면 빈 Dictionary
@@ -108,6 +123,11 @@ func roof_at(at_x: float) -> Dictionary:
 		if at_x >= roof.left and at_x <= roof.right:
 			return roof
 	return {}
+
+
+## 거리 점수 (미터, 소수점 버림): 시작 위치에서 앞으로 간 거리
+func distance() -> int:
+	return int(maxf(0.0, x - _start_x) / Balance.PX_PER_METER)
 
 
 ## 몸 앞쪽 끝의 가로 위치
@@ -187,25 +207,6 @@ func _land_on(roof: Dictionary) -> void:
 	_jumped = false
 	landed = true
 	time_since_land = 0.0
-
-
-## 1단계 임시 처리: 떨어지면 앞쪽 옥상 위에서 다시 달린다 (2단계에서 게임 끝으로 바뀜)
-func _respawn() -> void:
-	for roof in roofs:
-		if roof.right > x + 200.0:
-			x = maxf(x, roof.left + 80.0)
-			y = roof.top
-			_ground_roof = roof
-			break
-	vy = 0.0
-	on_ground = true
-	_holding = false
-	_coyote = 0.0
-	_buffer = 0.0
-	ghost_time = 0.0
-	_jumped = false
-	time_since_land = 99.0
-	_fill_roofs()
 
 
 ## 고양이 앞쪽까지 옥상을 만들고, 지나간 옥상은 지운다

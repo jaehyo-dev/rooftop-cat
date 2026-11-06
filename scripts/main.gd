@@ -1,7 +1,37 @@
 extends Control
-## 시작 화면: 게임 화면(World)과 버전 표시.
+## 시작 화면: 게임 화면(World), 거리·최고 기록 표시, 게임 끝 화면, 버전 표시.
+## 글자는 영어·숫자만 쓴다: 웹에서는 기본 글꼴에 한글이 없다 (한글 글꼴은 그림 작업 때 함께 고른다).
+
+## 최고 기록 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
+var record_path := BestRecord.DEFAULT_PATH
+
+var _best := 0
+
+@onready var _world: Node2D = $World
 
 
 func _ready() -> void:
 	# 버전은 project.godot 한 곳에서 읽는다.
 	$VersionLabel.text = "v" + str(ProjectSettings.get_setting("application/config/version"))
+	_best = BestRecord.load_best(record_path)
+	_world.game_over.connect(_on_game_over)
+	_world.restarted.connect(_on_restarted)
+	_on_restarted()
+
+
+func _process(_delta: float) -> void:
+	$DistanceLabel.text = "%d m" % _world.sim.distance()
+
+
+func _on_game_over(meters: int) -> void:
+	var new_best := BestRecord.submit(meters, record_path)
+	_best = maxi(_best, meters)
+	$GameOver/Label.text = "GAME OVER\n\n%d m\n%s\n\nTAP TO RUN AGAIN" % [
+		meters, "NEW BEST!" if new_best else "BEST %d m" % _best]
+	$GameOver.visible = true
+	$BestLabel.text = "BEST %d m" % _best
+
+
+func _on_restarted() -> void:
+	$GameOver.visible = false
+	$BestLabel.text = "BEST %d m" % _best

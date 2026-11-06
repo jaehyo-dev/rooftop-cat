@@ -20,7 +20,7 @@ func test_간격과_높이와_너비가_범위_안() -> void:
 				var rise: float = roof.top - prev.top
 				var where := "속도 %d, 시드 %d, %d번째" % [speed, seed_value, i]
 				assert_true(gap >= Balance.ROOF_GAP_MIN, where + " 최소 간격")
-				assert_true(gap <= JumpModel.max_reach(speed, rise) * Balance.ROOF_GAP_SAFETY + 0.001, where + " 최대 점프로 닿음")
+				assert_true(gap <= JumpModel.max_reach(speed, rise) * RoofGenerator.gap_safety(speed) + 0.001, where + " 최대 점프로 닿음 (속도별 여유)")
 				assert_true(absf(rise) <= Balance.ROOF_TOP_STEP + 0.001, where + " 높이 차")
 				assert_true(roof.top >= Balance.ROOF_TOP_MIN and roof.top <= Balance.ROOF_TOP_MAX, where + " 높이")
 				var width: float = roof.right - roof.left
@@ -30,16 +30,25 @@ func test_간격과_높이와_너비가_범위_안() -> void:
 					return
 
 
+func test_간격_여유는_처음엔_좁고_빨라질수록_넓어진다() -> void:
+	assert_eq(RoofGenerator.gap_safety(Balance.RUN_SPEED), Balance.ROOF_GAP_SAFETY_START, "처음 속도")
+	assert_eq(RoofGenerator.gap_safety(Balance.SPEED_MAX), Balance.ROOF_GAP_SAFETY, "최대 속도")
+	assert_eq(RoofGenerator.gap_safety(Balance.SPEED_MAX + 500.0), Balance.ROOF_GAP_SAFETY, "최대 속도보다 빨라도 그대로")
+	var middle := RoofGenerator.gap_safety((Balance.RUN_SPEED + Balance.SPEED_MAX) * 0.5)
+	assert_true(middle > Balance.ROOF_GAP_SAFETY_START and middle < Balance.ROOF_GAP_SAFETY, "가운데 속도는 그 사이")
+
+
 func test_가장_높이_올라가는_간격도_최소_간격보다_넓게_닿음() -> void:
 	# 최대 거리 x 여유가 최소 간격보다 작으면 max_gap이 최소 간격으로 올려져 못 넘는 간격이 생길 수 있다
 	for speed in SPEEDS:
-		assert_true(JumpModel.max_reach(speed, Balance.ROOF_TOP_STEP) * Balance.ROOF_GAP_SAFETY > Balance.ROOF_GAP_MIN, "속도 %d" % speed)
+		assert_true(JumpModel.max_reach(speed, Balance.ROOF_TOP_STEP) * RoofGenerator.gap_safety(speed) > Balance.ROOF_GAP_MIN, "속도 %d" % speed)
 
 
 func test_잘하는_플레이어면_속도별로_한_번도_안_떨어짐() -> void:
 	# 최대로 눌러 다음 옥상 앞쪽에 내려앉는 지점에서 뛰는 봇으로 실제 물리 진행을 60초씩 돌린다
 	for speed in SPEEDS:
 		var sim := RunnerSim.new(7, speed)
+		sim.accelerate = false
 		var falls := 0
 		var hold_left := 0.0
 		for i in 120 * 60:

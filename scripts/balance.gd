@@ -14,7 +14,15 @@ const CAT_FOOT_HALF := CAT_BODY_SIZE.x * 0.3
 const CAT_SCREEN_X := 340.0
 
 # --- 달리기 ---
-const RUN_SPEED := 430.0  # 초당 픽셀. 1단계는 일정 (빨라지는 건 2단계)
+const RUN_SPEED := 430.0  # 처음 속도 (초당 픽셀)
+## 시간이 갈수록 빨라짐: 속도 = RUN_SPEED + SPEED_GAIN x 지난 시간(초), 최대 SPEED_MAX
+const SPEED_GAIN := 1.5
+const SPEED_MAX := 950.0
+
+# --- 점수 ---
+const PX_PER_METER := 100.0  # 거리 점수: 100픽셀 = 1미터
+## 게임 끝 뒤 이 시간이 지나야 다시 시작 (떨어지며 누르던 손가락으로 바로 다시 시작되지 않게)
+const RESTART_DELAY := 0.8
 
 # --- 점프: 누르는 시간만큼 높이 ---
 ## 누르고 있는 동안(최대 JUMP_MAX_HOLD) 같은 속도로 올라가고, 떼면 중력으로 떨어진다.
@@ -36,12 +44,14 @@ const ROOF_TOP_MAX := 330.0
 const ROOF_TOP_STEP := 110.0       # 옆 옥상과의 높이 차 최대
 const ROOF_GAP_MIN := 70.0
 ## 최대 점프로 닿을 수 있는 거리에 곱하는 여유. 1보다 작을수록 쉬움
+## 처음 속도에서는 ROOF_GAP_SAFETY_START, 최대 속도로 갈수록 ROOF_GAP_SAFETY까지 넓어진다 (처음은 쉽게)
+const ROOF_GAP_SAFETY_START := 0.5
 const ROOF_GAP_SAFETY := 0.8
 ## 옥상을 미리 만들어 두는 거리 (고양이 앞쪽)
 const ROOF_LOOKAHEAD := 2200.0
 
-# --- 떨어짐 (1단계: 다음 옥상에서 다시 시작. 게임 끝은 2단계) ---
-const FALL_LIMIT := -160.0  # 이 높이보다 아래로 떨어지면 떨어진 것으로 본다
+# --- 떨어짐 → 게임 끝 ---
+const FALL_LIMIT := -160.0  # 이 높이(화면 아래 밖)보다 아래로 떨어지면 게임 끝
 
 # --- 부딪힘 → 투명화 ---
 ## 높은 옥상 벽에 부딪히면 이 시간 동안 깜빡이며 투명해지고, 벽을 통과해 그 옥상 위로 떠오른다

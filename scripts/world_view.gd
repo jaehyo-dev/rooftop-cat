@@ -2,6 +2,12 @@ extends Node2D
 ## 게임 화면: 입력을 모아 RunnerSim을 고정 간격으로 진행시키고, 옥상과 임시 고양이(타원)를 그린다.
 ## 임시 그림은 3단계에서 진짜 그림으로 바뀐다. 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE·CAT_FOOT_HALF로 하고,
 ## 여기서는 같은 크기로 그리기만 한다.
+## 떨어지면 game_over를 알리고, 잠시(Balance.RESTART_DELAY) 뒤 새로 누르면 새 판을 시작한다.
+
+## 떨어져서 게임이 끝남 (meters = 이번 거리 점수)
+signal game_over(meters: int)
+## 새 판을 시작함
+signal restarted
 
 ## 로직을 진행시키는 고정 간격 (화면 주사율과 상관없이 같은 손맛)
 const STEP := 1.0 / 120.0
@@ -20,14 +26,38 @@ const CAT_SCARF := Color("#7fbf9a")    # 초록 목도리
 var sim := RunnerSim.new(randi())
 var _touches := {}
 var _accumulator := 0.0
+var _over_time := 0.0        # 게임 끝 뒤 지난 시간
+var _was_pressed := false
+var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프로 치지 않음
 
 
 func _process(delta: float) -> void:
-	_accumulator = minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	var pressed := is_pressed()
+	var press_started := pressed and not _was_pressed
+	_was_pressed = pressed
+	if sim.game_over:
+		_over_time += delta
+		if press_started and _over_time >= Balance.RESTART_DELAY:
+			restart()
+		return
+	_wait_release = _wait_release and pressed
+	_accumulator = minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
-		sim.step(STEP, pressed)
+		sim.step(STEP, pressed and not _wait_release)
 		_accumulator -= STEP
+		if sim.game_over:
+			_over_time = 0.0
+			game_over.emit(sim.distance())
+			break
+	queue_redraw()
+
+
+## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다
+func restart() -> void:
+	sim = RunnerSim.new(randi())
+	_accumulator = 0.0
+	_wait_release = true
+	restarted.emit()
 	queue_redraw()
 
 
