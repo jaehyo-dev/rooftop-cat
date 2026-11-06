@@ -126,6 +126,7 @@ godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
   - 그래도 안 되면 ChatGPT 앱에 들어 있는 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`를 써. 경로에 버전 번호가 없어 앱이 업데이트돼도 그대로야.
 - `codex exec`의 `--image`는 파일을 여러 개 받으니, 요청문을 `--image`보다 앞에 둬: `codex exec --sandbox read-only "<요청>" --image <기준 그림>`
 - 배경 제거는 `rembg i -m isnet-general-use -a <원본> <결과>`로 해 (rembg 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음). rembg는 `~/.local/venvs/rembg`에 설치돼 있어.
+- 단색 면 그림(마스코트 등)은 rembg 대신 연두 배경을 초록 우세도(G - max(R, B))로 지우는 게 더 깨끗해 (rembg는 닫힌 틈에 배경을 남기고 밝은 몸을 반투명하게 만들 수 있음). 어두운 배경에 올려 초록 테두리가 없는지 확인해.
 - 이미지: 그림이 필요하면 `codex exec --sandbox read-only "<요청>"`로 Codex의 내장 이미지 생성을 써. 요청 끝에 항상 "내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"를 붙여. API 키는 절대 쓰지 마.
   - 결과는 `~/.codex/generated_images/`의 가장 최근 파일을 찾아 `assets/raw/`로 복사해.
   - 투명 배경이 안 되니 단색 배경으로 만들게 하고 rembg로 배경을 지워 `assets/sprites/`에 저장해.

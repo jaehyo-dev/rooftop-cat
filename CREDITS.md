@@ -34,6 +34,9 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/cat_concept_a~e.png` | 2026-11-06 | 위 원본 + rembg | 배경을 지운 시안 (게임 내보내기에서 제외) | rembg(isnet-general-use)로 배경 제거 |
 | `assets/concept/cat_options.png` | 2026-11-06 | 위 시안 4장 | 시안 비교용 (게임에 포함 안 됨) | 4장을 잘라 나란히 붙이고 글자(macOS 기본 글꼴 Apple SD Gothic Neo)를 넣음 |
 | `assets/concept/cat_c_vs_e.png` | 2026-11-06 | 시안 C, E | C와 E 비교용 (게임에 포함 안 됨) | 2장을 잘라 나란히 붙이고 글자를 넣음 |
+| `assets/raw/cat_mascot_i~k.png` | 2026-11-06 | Codex 내장 이미지 생성 | 마스코트 시안 I·J·K: 고양이 모티브 단순 캐릭터 (원본, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/cat_mascot_i~k.png` | 2026-11-06 | 위 원본 | 배경을 지운 마스코트 시안 | 연두 배경을 초록 우세도(G - max(R, B))로 지움 (rembg는 닫힌 틈에 배경이 남고 몸이 반투명해져 쓰지 않음) |
+| `assets/concept/cat_mascot.png` | 2026-11-06 | 시안 I·J·K | 마스코트 비교용 (게임에 포함 안 됨) | 3장을 잘라 나란히 붙이고 글자를 넣음 |
 
 ## 직접 만든 것
 
