@@ -143,6 +143,7 @@ func step(dt: float, pressed: bool) -> void:
 		rescuing = true
 		rescued = true
 		_holding = false
+		_buffer = 0.0  # 구제 중에는 입력을 받지 않으니, 직전에 누른 입력이 복귀 뒤 점프로 남지 않게 지운다
 		vy = 0.0
 		ghost_time = 0.0
 	elif y < Balance.FALL_LIMIT:

@@ -193,3 +193,26 @@ func test_생선은_판마다_더해서_저장하고_다른_기록은_지우지_
 	file.close()
 	assert_eq(BestRecord.load_fish(PATH), 0, "깨진 값은 0")
 	DirAccess.remove_absolute(PATH)
+
+
+func test_구제_직전에_누른_입력으로_복귀_뒤_점프하지_않는다() -> void:
+	var sim := RunnerSim.new(1)
+	sim.items.clear()
+	sim.has_box = true
+	# 구제가 시작되기 직전까지 안 누르고 떨어진다
+	var guard := 0
+	while not (not sim.on_ground and sim.vy < 0.0 and sim.y < Balance.RESCUE_HEIGHT + 30.0) and guard < 120 * 30:
+		sim.step(DT, false)
+		guard += 1
+	# 구제 시작 즈음 톡 누르고 뗀다
+	sim.step(DT, true)
+	sim.step(DT, true)
+	var jumped_after := false
+	for i in 120 * 2:
+		var was_rescuing := sim.rescuing
+		sim.step(DT, false)
+		if was_rescuing and not sim.rescuing:
+			sim.step(DT, false)
+			jumped_after = sim.jumped or not sim.on_ground
+			break
+	assert_false(jumped_after, "복귀하자마자 저절로 점프하지 않음")
