@@ -59,14 +59,23 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_발끝이_원점() 
 	# 그림 가로 가운데와 발끝이 노드 원점에 온다
 	assert_true(absf(skeleton.position.x + (CatView.ART_LEFT + CatView.ART_RIGHT) * 0.5 * scale_factor) < 0.001)
 	assert_true(absf(skeleton.position.y + CatView.ART_FEET * scale_factor) < 0.001)
-	# 부품 그림이 모두 있고, 가장 아래 발끝이 ART_FEET 근처
-	var lowest := -INF
+	# 부품 그림의 실제 불투명 범위(꼬리 제외)를 재서 ART_* 범위와 충돌 판정 크기에 맞는지 확인한다
+	var art := Rect2()
 	for part in CatView.PARTS:
 		var texture: Texture2D = load("res://assets/sprites/cat_parts/%s.png" % part.file)
 		assert_not_null(texture, part.file)
-		if texture != null:
-			lowest = maxf(lowest, part.top_left.y + texture.get_height())
-	assert_true(absf(lowest - CatView.ART_FEET) <= 10.0, "발끝 위치 %.0f" % lowest)
+		if texture == null or part.name == "tail":
+			continue
+		var used := texture.get_image().get_used_rect()
+		var rect := Rect2(part.top_left + Vector2(used.position), Vector2(used.size))
+		art = rect if art.size == Vector2.ZERO else art.merge(rect)
+	assert_true(absf(art.position.x - CatView.ART_LEFT) <= 3.0, "왼쪽 끝 %.0f" % art.position.x)
+	assert_true(absf(art.end.x - CatView.ART_RIGHT) <= 3.0, "오른쪽 끝 %.0f" % art.end.x)
+	assert_true(absf(art.position.y - CatView.ART_TOP) <= 3.0, "머리 위 %.0f" % art.position.y)
+	assert_true(absf(art.end.y - CatView.ART_FEET) <= 3.0, "발끝 %.0f" % art.end.y)
+	var drawn := art.size * scale_factor
+	assert_true(absf(drawn.x - Balance.CAT_BODY_SIZE.x) <= 3.0, "그림 너비 %.1f = 판정 너비" % drawn.x)
+	assert_true(absf(drawn.y - Balance.CAT_BODY_SIZE.y) <= 3.0, "그림 높이 %.1f = 판정 높이" % drawn.y)
 	cat.queue_free()
 
 

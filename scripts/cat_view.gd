@@ -6,21 +6,23 @@ extends Node2D
 
 ## 부품 배치 (부품 시트 픽셀 단위, 몸통 그림의 왼쪽 위가 원점). 그리는 순서대로.
 ## top_left = 부품 그림의 왼쪽 위 위치, pivot = 부품 그림 안에서 도는 중심(어깨·엉덩이·목·꼬리 뿌리), dark = 몸 뒤쪽 부품
+## 앞다리는 둘 다 몸 뒤에 그려서 목도리 매듭이 가려지지 않게 한다 (가슴 아래에서 다리가 나온 모습)
 const PARTS := [
-	{"name": "back_back", "file": "back_leg_back", "top_left": Vector2(95, 170), "pivot": Vector2(90, 60), "dark": true},
-	{"name": "front_back", "file": "front_leg_back", "top_left": Vector2(395, 215), "pivot": Vector2(65, 45), "dark": true},
-	{"name": "tail", "file": "tail", "top_left": Vector2(-215, -120), "pivot": Vector2(290, 250), "dark": false},
+	{"name": "back_back", "file": "back_leg_back", "top_left": Vector2(95, 136), "pivot": Vector2(90, 60), "dark": true},
+	{"name": "front_back", "file": "front_leg_back", "top_left": Vector2(395, 181), "pivot": Vector2(65, 45), "dark": true},
+	{"name": "front", "file": "front_leg", "top_left": Vector2(455, 186), "pivot": Vector2(65, 45), "dark": false},
+	{"name": "tail", "file": "tail", "top_left": Vector2(-215, -110), "pivot": Vector2(290, 250), "dark": false},
 	{"name": "body", "file": "body", "top_left": Vector2(0, 0), "pivot": Vector2.ZERO, "dark": false},
-	{"name": "back", "file": "back_leg", "top_left": Vector2(30, 175), "pivot": Vector2(90, 60), "dark": false},
-	{"name": "front", "file": "front_leg", "top_left": Vector2(455, 220), "pivot": Vector2(65, 45), "dark": false},
-	{"name": "head", "file": "head", "top_left": Vector2(390, -75), "pivot": Vector2(120, 260), "dark": false},
+	{"name": "back", "file": "back_leg", "top_left": Vector2(30, 141), "pivot": Vector2(90, 60), "dark": false},
+	{"name": "head", "file": "head", "top_left": Vector2(390, -11), "pivot": Vector2(120, 260), "dark": false},
 ]
-## 꼬리를 뺀 고양이 전체(엉덩이~얼굴 끝, 머리 위~발끝)의 범위 (부품 시트 픽셀)
+## 꼬리를 뺀 고양이 전체(엉덩이~얼굴 끝, 머리 위~발끝)의 범위 (부품 시트 픽셀). 이 범위가 충돌 판정 크기에 맞는다
 const ART_LEFT := 6.0
 const ART_RIGHT := 712.0
-const ART_FEET := 465.0
-## 몸 뒤쪽 다리를 어둡게 해서 앞쪽 다리와 구분한다
-const DARK := Color(0.8, 0.76, 0.74)
+const ART_TOP := -5.0
+const ART_FEET := 431.0
+## 몸 뒤쪽 다리를 조금 어둡고 따뜻하게 칠해 앞쪽 다리와 구분한다 (털색이 회색으로 보이지 않게)
+const DARK := Color(0.88, 0.8, 0.72)
 ## 목표 자세로 다가가는 빠르기 (클수록 빨리 바뀜)
 const SMOOTH := 18.0
 

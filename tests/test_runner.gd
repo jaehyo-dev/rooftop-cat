@@ -254,7 +254,7 @@ func test_늘어남과_납작해짐() -> void:
 	assert_eq(Squash.body_scale(true, 0.0, Balance.SQUASH_TIME), Vector2.ONE, "시간이 지나면 원래 모양")
 
 
-func test_임시_고양이는_기준_그림과_같은_비율() -> void:
+func test_충돌_판정은_기준_그림과_같은_비율() -> void:
 	# 기준 그림의 몸 영역 711x438 (꼬리 제외, 머리 위~발끝)
 	var ratio := Balance.CAT_BODY_SIZE.x / Balance.CAT_BODY_SIZE.y
 	assert_true(absf(ratio - 711.0 / 438.0) < 0.02, "비율 %.3f" % ratio)
