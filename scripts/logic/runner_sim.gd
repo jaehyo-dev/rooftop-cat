@@ -10,12 +10,17 @@ extends RefCounted
 ##   - 달리다 부딪혔거나, 점프했는데 살짝 모자라 몸이 모서리에 걸렸으면(몸 높이 안쪽) 잠시 투명해져(ghost_time)
 ##     벽을 통과하고, 발 범위가 그 옥상에 걸치면 옥상 위로 떠올라 올라선다.
 ##   - 점프 없이 틈으로 떨어지는 중이거나 너무 낮게 부딪혔으면 벽에 막혀 그대로 떨어진다 (투명화가 남아 있어도).
+## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
+## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
 
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
 var jumped := false
 var landed := false
 var fell := false             # 떨어져서 이번 step에 게임이 끝남
 var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
+var rescued := false  # 종이상자로 구제가 시작됨
+## 이번 step에 먹은 아이템들 (먹는 연출용)
+var picked: Array[Dictionary] = []
 
 var x := 0.0
 var y := 0.0
@@ -29,6 +34,14 @@ var game_over := false
 ## 달린 시간 (초)
 var elapsed := 0.0
 var roofs: Array[Dictionary] = []
+## 아직 먹지 않은 아이템 (ItemPlacer 형식). 먹거나 지나간 아이템은 지운다
+var items: Array[Dictionary] = []
+## 이번 판에 먹은 생선 수
+var fish := 0
+## 종이상자를 가지고 있는지 (한 번에 1개만)
+var has_box := false
+## 종이상자로 구제되어 올라가는 중인지
+var rescuing := false
 ## 투명화 남은 시간 (0이면 보통 상태)
 var ghost_time := 0.0
 ## 착지한 뒤 지난 시간 (납작해짐 연출용). 착지 전이면 큰 값
@@ -37,6 +50,7 @@ var time_since_land := 99.0
 var time_since_jump := 99.0
 
 var _generator: RoofGenerator
+var _placer: ItemPlacer
 var _start_speed := Balance.RUN_SPEED
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
@@ -54,6 +68,7 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
 	speed = start_speed
 	_start_speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
+	_placer = ItemPlacer.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	_ground_roof = roofs[0]
 	y = roofs[0].top
@@ -67,6 +82,8 @@ func step(dt: float, pressed: bool) -> void:
 	landed = false
 	fell = false
 	ghosted = false
+	rescued = false
+	picked.clear()
 	if game_over:
 		return
 	elapsed += dt
@@ -80,6 +97,11 @@ func step(dt: float, pressed: bool) -> void:
 
 	_move_forward(speed * dt)
 	_fill_roofs()
+	_pick_items()
+
+	if rescuing:
+		_rescue_rise(dt)
+		return
 
 	if press_started:
 		_buffer = Balance.JUMP_BUFFER_TIME
@@ -115,7 +137,15 @@ func step(dt: float, pressed: bool) -> void:
 		vy -= Balance.GRAVITY * dt
 		_check_landing(prev_y)
 
-	if y < Balance.FALL_LIMIT:
+	if has_box and y < Balance.RESCUE_HEIGHT:
+		# 종이상자가 받쳐 준다 (한 번만)
+		has_box = false
+		rescuing = true
+		rescued = true
+		_holding = false
+		vy = 0.0
+		ghost_time = 0.0
+	elif y < Balance.FALL_LIMIT:
 		fell = true
 		game_over = true
 
@@ -146,7 +176,7 @@ func hold_ratio() -> float:
 ## 이제 어떤 옥상에도 올라설 수 없이 떨어지는 중인지 (허우적거리는 연출용).
 ## 발밑이나 바로 앞 옥상보다 아래로 내려가 착지도, 투명화 통과(몸 높이 안쪽)도 못 하는 경우.
 func is_doomed() -> bool:
-	if on_ground or vy >= 0.0:
+	if on_ground or rescuing or vy >= 0.0:
 		return false
 	for roof in roofs:
 		if roof.right < x - Balance.CAT_FOOT_HALF:
@@ -167,6 +197,8 @@ func front() -> float:
 func _move_forward(distance: float) -> void:
 	var old_front := front()
 	x += distance
+	if rescuing:
+		return  # 구제 중에는 벽을 통과한다
 	for roof in roofs:
 		if roof.top > y and roof.left >= old_front - 0.001 and roof.left < front():
 			var near_miss: bool = _jumped and roof.top - y <= Balance.CAT_BODY_SIZE.y
@@ -197,6 +229,38 @@ func _ghost_rise(dt: float) -> bool:
 	if y >= roof.top:
 		_land_on(roof)
 	return true
+
+
+## 구제 중: 발 범위가 아직 다 지나가지 않은 가장 가까운 옥상 높이로 올라가, 발이 그 옥상에 걸치면 올라선다
+func _rescue_rise(dt: float) -> void:
+	for roof in roofs:
+		if roof.right < x + Balance.CAT_FOOT_HALF:
+			continue
+		y = move_toward(y, roof.top, Balance.RESCUE_RISE_SPEED * dt)
+		if y == roof.top and _feet_over(roof):
+			rescuing = false
+			_land_on(roof)
+		return
+
+
+## 몸(타원)에 닿은 아이템을 먹는다. 상자를 이미 가지고 있으면 상자는 그대로 둔다
+func _pick_items() -> void:
+	var center_y := y + Balance.CAT_BODY_SIZE.y * 0.5
+	var radius := Balance.CAT_BODY_SIZE * 0.5 + Vector2.ONE * Balance.ITEM_RADIUS
+	for i in range(items.size() - 1, -1, -1):
+		var item := items[i]
+		if item.x < x - 1000.0:
+			items.remove_at(i)  # 지나간 아이템
+			continue
+		var d := Vector2((item.x - x) / radius.x, (item.y - center_y) / radius.y)
+		if d.length_squared() > 1.0 or (item.kind == "box" and has_box):
+			continue
+		if item.kind == "fish":
+			fish += 1
+		else:
+			has_box = true
+		picked.append(item)
+		items.remove_at(i)
 
 
 ## 발 범위가 옥상에 걸쳐 있는지
@@ -241,6 +305,8 @@ func _land_on(roof: Dictionary) -> void:
 ## 고양이 앞쪽까지 옥상을 만들고, 지나간 옥상은 지운다
 func _fill_roofs() -> void:
 	while roofs[-1].right < x + Balance.ROOF_LOOKAHEAD:
-		roofs.append(_generator.next_roof(roofs[-1], speed))
+		var roof := _generator.next_roof(roofs[-1], speed)
+		items.append_array(_placer.items_for(roofs[-1], roof))
+		roofs.append(roof)
 	while roofs.size() > 1 and roofs[0].right < x - 1000.0:
 		roofs.pop_front()

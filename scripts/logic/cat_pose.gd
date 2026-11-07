@@ -16,6 +16,9 @@ static func pose(sim: RunnerSim) -> Dictionary:
 		# 떨어져서 끝나는 중: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
 		var wobble := sin(sim.elapsed * TAU * 5.0)
 		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
+	if sim.rescuing:
+		# 종이상자에 실려 올라가는 중: 올라가는 자세로 코를 살짝 든다
+		return {"frame": "rise", "scale": Vector2.ONE, "tilt": -6.0}
 	if sim.on_ground:
 		if sim.time_since_land < Balance.CAT_LAND_TIME:
 			# 착지: 앞발부터 닿고 몸이 푹 눌렸다가 돌아온다 (납작함은 Squash와 같은 곡선)

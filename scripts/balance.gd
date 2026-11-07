@@ -58,6 +58,25 @@ const FALL_LIMIT := -160.0  # 이 높이(화면 아래 밖)보다 아래로 떨�
 const GHOST_TIME := 1.2
 const GHOST_RISE_SPEED := 700.0  # 투명화 중 옥상 위로 떠오르는 속도 (초당 픽셀)
 
+# --- 아이템: 생선, 종이상자 ---
+## 아이템 가운데를 옥상 위 이 높이에 둔다 (고양이 몸 가운데 높이: 달리기만 해도 몸에 닿음)
+const ITEM_LIFT := CAT_BODY_SIZE.y * 0.5
+## 아이템을 먹는 거리: 몸 타원을 이만큼 넓혀서 아이템 가운데가 그 안에 들어오면 먹는다
+const ITEM_RADIUS := 24.0
+const FISH_SPACING := 70.0      # 생선 사이 간격
+const FISH_ROW_CHANCE := 0.45   # 옥상 위에 생선 줄을 놓을 확률
+const FISH_ROW_MIN := 3
+const FISH_ROW_MAX := 6
+const FISH_ARC_CHANCE := 0.35   # 틈 위에 생선 무지개를 놓을 확률
+## 생선 무지개 가운데가 양 끝보다 높은 정도. 중간쯤 눌러 뛰어야 닿는다 (최대 점프 높이 JUMP_MAX_HEIGHT보다 낮게)
+const FISH_ARC_HEIGHT := 120.0
+## 종이상자는 옥상 BOX_EVERY_MIN~MAX개마다 하나 (한 번에 1개만 가질 수 있음)
+const BOX_EVERY_MIN := 40
+const BOX_EVERY_MAX := 60
+## 종이상자 구제: 발이 이 높이(화면 맨 아래)까지 떨어지면 상자가 받쳐서 가까운 앞 옥상 위로 올려 준다
+const RESCUE_HEIGHT := 0.0
+const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
+
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)
 const CAT_CROUCH_TIME := 0.06  # 뛰는 순간 웅크린 그림을 보여 주는 시간 (초)

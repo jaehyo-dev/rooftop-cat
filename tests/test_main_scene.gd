@@ -110,3 +110,38 @@ func test_한_프레임_안에_누르고_뗀_짧은_탭도_점프와_다시_시�
 	assert_true(world.sim.on_ground, "다시 시작한 탭으로는 점프하지 않음")
 	main.queue_free()
 	DirAccess.remove_absolute(PATH)
+
+
+func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장한다() -> void:
+	const PATH := "user://test_main_fish.cfg"
+	DirAccess.remove_absolute(PATH)
+	BestRecord.add_fish(10, PATH)
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.record_path = PATH
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	await wait_frames(3)
+	assert_false(main.get_node("BoxIcon").visible, "처음엔 상자 없음")
+	# 고양이 몸 앞에 생선 2마리와 상자를 놓는다
+	var sim: RunnerSim = world.sim
+	sim.items.clear()
+	for dx in [100.0, 170.0]:
+		sim.items.append({"kind": "fish", "x": sim.x + dx, "y": sim.y + Balance.ITEM_LIFT})
+	sim.items.append({"kind": "box", "x": sim.x + 240.0, "y": sim.y + Balance.ITEM_LIFT})
+	await get_tree().create_timer(0.8).timeout
+	assert_eq(sim.fish, 2)
+	assert_eq(main.get_node("FishLabel").text, "2", "이번 판 생선 수")
+	assert_true(main.get_node("BoxIcon").visible, "상자를 가지면 상자 표시")
+
+	# 상자를 쓰고 떨어져 게임 끝 (FALL_LIMIT 아래로 바로 보내 구제 높이를 건너뜀)
+	sim.has_box = false
+	sim.on_ground = false
+	sim.y = Balance.FALL_LIMIT + 1.0
+	sim.vy = -1000.0
+	await wait_frames(3)
+	assert_true(sim.game_over)
+	assert_false(main.get_node("BoxIcon").visible, "상자 표시 꺼짐")
+	assert_true(main.get_node("GameOver/Label").text.contains("FISH +2  (TOTAL 12)"), main.get_node("GameOver/Label").text)
+	assert_eq(BestRecord.load_fish(PATH), 12, "모은 생선 저장")
+	main.queue_free()
+	DirAccess.remove_absolute(PATH)

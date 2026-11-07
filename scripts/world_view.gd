@@ -1,5 +1,5 @@
 extends Node2D
-## 게임 화면: 입력을 모아 RunnerSim을 고정 간격으로 진행시키고, 옥상(임시 그림)을 그리고 고양이(CatView)를 움직인다.
+## 게임 화면: 입력을 모아 RunnerSim을 고정 간격으로 진행시키고, 옥상(임시 그림)·아이템을 그리고 고양이(CatView)를 움직인다.
 ## 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE·CAT_FOOT_HALF로 하고, 고양이 그림은 같은 크기로 그리기만 한다.
 ## 떨어지면 game_over를 알리고, 잠시(Balance.RESTART_DELAY) 뒤 새로 누르면 새 판을 시작한다.
 
@@ -17,6 +17,13 @@ const SKY_BOTTOM := Color("#fbe9d4")
 const ROOF_FILL := Color("#b98b6e")
 const ROOF_EDGE := Color("#8a5f4a")
 const ROOF_WALL := Color("#d7b49a")
+## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
+const FISH_TEXTURE := preload("res://assets/sprites/items/fish.png")
+const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
+const FISH_WIDTH := 56.0
+const BOX_WIDTH := 60.0
+const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
+const POP_TIME := 0.3            # 먹은 아이템이 떠오르며 사라지는 시간
 
 var sim := RunnerSim.new(randi())
 var cat := CatView.new()
@@ -27,9 +34,12 @@ var _was_pressed := false
 var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프로 치지 않음
 ## 누른 신호를 로직이 한 번 볼 때까지 남겨 둔다: 한 프레임 안에 누르고 뗀 짧은 탭(느린 휴대폰)도 놓치지 않게
 var _tap_pending := false
+var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", "t"}
+var _was_rescuing := false
 
 
 func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 아이템 그림을 크게 줄여 그려도 거칠지 않게
 	cat.name = "Cat"
 	add_child(cat)
 	_place_cat(0.0)
@@ -49,6 +59,12 @@ func _process(delta: float) -> void:
 	_accumulator = minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
 		sim.step(STEP, pressed and not _wait_release)
+		for item in sim.picked:
+			_pops.append({"kind": item.kind, "x": item.x, "y": item.y, "t": 0.0})
+		if _was_rescuing and not sim.rescuing:
+			# 구제 끝: 받쳐 준 상자가 고양이 발밑에서 사라진다
+			_pops.append({"kind": "box", "x": sim.x, "y": sim.y, "t": 0.0})
+		_was_rescuing = sim.rescuing
 		_tap_pending = false
 		pressed = is_pressed()
 		_accumulator -= STEP
@@ -56,6 +72,9 @@ func _process(delta: float) -> void:
 			_over_time = 0.0
 			game_over.emit(sim.distance())
 			break
+	for pop in _pops:
+		pop.t += delta
+	_pops = _pops.filter(func(pop: Dictionary) -> bool: return pop.t < POP_TIME)
 	_place_cat(delta)
 	queue_redraw()
 
@@ -70,6 +89,8 @@ func _place_cat(delta: float) -> void:
 func restart() -> void:
 	sim = RunnerSim.new(randi())
 	_accumulator = 0.0
+	_pops.clear()
+	_was_rescuing = false
 	_wait_release = true
 	_place_cat(0.0)
 	restarted.emit()
@@ -117,3 +138,26 @@ func _draw() -> void:
 		draw_rect(Rect2(left, top, right - left, ground - top), ROOF_WALL)
 		draw_rect(Rect2(left - 6.0, top, right - left + 12.0, 18.0), ROOF_FILL)
 		draw_rect(Rect2(left - 6.0, top + 18.0, right - left + 12.0, 4.0), ROOF_EDGE)
+
+	for item in sim.items:
+		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
+		var bob := 4.0 * sin(sim.elapsed * 4.0 + item.x * 0.01)
+		_draw_item(item.kind, Vector2(item.x + offset, ground - item.y + bob), 1.0, 1.0)
+	for pop in _pops:
+		var k: float = pop.t / POP_TIME
+		_draw_item(pop.kind, Vector2(pop.x + offset, ground - pop.y - 40.0 * k), 1.0 + 0.5 * k, 1.0 - k)
+	if sim.rescuing:
+		# 고양이 발밑에서 상자가 받쳐 올린다 (고양이는 자식 노드라 상자 위에 그려짐)
+		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
+		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y - h * 0.35,
+				RESCUE_BOX_WIDTH, h), false)
+
+
+## 아이템 그림을 가운데 pos에 그린다 (zoom 배율, alpha 투명도)
+func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
+	if pos.x < -100.0 or pos.x > get_viewport_rect().size.x + 100.0:
+		return
+	var texture: Texture2D = FISH_TEXTURE if kind == "fish" else BOX_TEXTURE
+	var w := (FISH_WIDTH if kind == "fish" else BOX_WIDTH) * zoom
+	var h := w * texture.get_height() / texture.get_width()
+	draw_texture_rect(texture, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, Color(1, 1, 1, alpha))

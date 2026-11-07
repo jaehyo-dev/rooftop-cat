@@ -48,6 +48,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/cat_frames_run.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 동작 참고 6장을 첨부) | 달리기 4자세 시트 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/raw/cat_frames_jump.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 동작 참고 6장을 첨부) | 점프·떨어짐 6자세 시트 원본: 웅크리기, 도약, 올라감, 내려옴, 착지, 떨어짐 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_frames/*.png` | 2026-11-07 | 위 원본 2장 | 게임 속 고양이 그림 (프레임 애니메이션 10장) | `tools/cut_parts.py`로 마젠타 배경을 지우고 자세를 잘라 냄 → `tools/align_frames.py`로 크기(시트별 배율)·발끝·몸 중심을 맞춰 640x512 캔버스에 놓음 |
+| `assets/raw/items_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림을 그림체 참고로 첨부) | 아이템 시트 원본: 생선, 종이상자 (게임에 포함 안 됨) | 없음 |
+| `assets/sprites/items/fish.png`, `box.png` | 2026-11-07 | 위 원본 | 게임 속 생선·종이상자 그림, 왼쪽 위 생선·상자 표시 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 너비 240픽셀로 줄임 |
 
 ## 직접 만든 것
 
