@@ -33,6 +33,8 @@ var roofs: Array[Dictionary] = []
 var ghost_time := 0.0
 ## 착지한 뒤 지난 시간 (납작해짐 연출용). 착지 전이면 큰 값
 var time_since_land := 99.0
+## 점프한 뒤 지난 시간 (웅크림·도약 연출용). 점프 전이면 큰 값
+var time_since_jump := 99.0
 
 var _generator: RoofGenerator
 var _start_speed := Balance.RUN_SPEED
@@ -74,6 +76,7 @@ func step(dt: float, pressed: bool) -> void:
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
 	time_since_land += dt
+	time_since_jump += dt
 
 	_move_forward(speed * dt)
 	_fill_roofs()
@@ -128,6 +131,31 @@ func roof_at(at_x: float) -> Dictionary:
 ## 거리 점수 (미터, 소수점 버림): 시작 위치에서 앞으로 간 거리
 func distance() -> int:
 	return int(maxf(0.0, x - _start_x) / Balance.PX_PER_METER)
+
+
+## 점프 중 아직 누르고 있어 올라가는 중인지 (화면 연출용)
+func is_holding() -> bool:
+	return _holding and not on_ground
+
+
+## 지금 점프에서 누른 시간의 비율 (0 = 톡, 1 = 최대로 누름)
+func hold_ratio() -> float:
+	return clampf(_hold_time / JumpModel.max_hold_time(), 0.0, 1.0)
+
+
+## 이제 어떤 옥상에도 올라설 수 없이 떨어지는 중인지 (허우적거리는 연출용).
+## 발밑이나 바로 앞 옥상보다 아래로 내려가 착지도, 투명화 통과(몸 높이 안쪽)도 못 하는 경우.
+func is_doomed() -> bool:
+	if on_ground or vy >= 0.0:
+		return false
+	for roof in roofs:
+		if roof.right < x - Balance.CAT_FOOT_HALF:
+			continue
+		# 발이 옥상에 걸쳐 있는데 옥상보다 아래면 아래에서 올라설 수 없다.
+		# 앞 옥상이면 점프했을 때만 투명화로 오를 수 있는 높이(몸 높이)까지 괜찮다 (점프 없이 떨어지면 벽에 막힘)
+		var margin: float = Balance.CAT_BODY_SIZE.y if _jumped and not _feet_over(roof) else 0.0
+		return y < roof.top - margin
+	return true
 
 
 ## 몸 앞쪽 끝의 가로 위치
@@ -185,6 +213,7 @@ func _start_jump(pressed: bool) -> void:
 	# 눌렀다 이미 뗀 입력(버퍼)이면 최소 높이로 뛴다
 	_holding = pressed
 	_hold_time = 0.0
+	time_since_jump = 0.0
 	jumped = true
 
 

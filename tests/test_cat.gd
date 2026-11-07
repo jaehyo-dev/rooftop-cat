@@ -1,124 +1,173 @@
 extends TestCase
-## 고양이 그림과 동작: 부품 자세(달리기·점프·착지), 그림 크기·위치가 충돌 판정과 맞는지.
+## 고양이 프레임 애니메이션: 상태별 프레임 고르기, 떨어짐 판정, 그림 크기·기준점, 프레임 정렬(떨림 없음).
 
-const DT := 1.0 / 60.0
-
-
-func test_달릴_때_앞다리_두_개와_뒷다리_두_개가_서로_엇갈린다() -> void:
-	for x in [37.0, 90.0, 260.0]:
-		var pose := CatPose.target(true, 0.0, x, 99.0)
-		assert_true(absf(pose.front + pose.front_back) < 0.001, "앞다리끼리 반대 (x=%d)" % x)
-		assert_true(absf(pose.back + pose.back_back) < 0.001, "뒷다리끼리 반대")
-		assert_true(absf(pose.front + pose.back) < 0.001, "같은 쪽 앞뒤 다리도 엇갈림")
-		for leg in CatPose.LEGS:
-			assert_true(absf(pose[leg]) <= Balance.CAT_LEG_SWING + 0.001, "%s 흔들림 범위" % leg)
+const DT := 1.0 / 120.0
 
 
-func test_달리기_박자는_달린_거리로_정해져_한_박자에_CAT_STRIDE만큼_간다() -> void:
-	var a := CatPose.target(true, 0.0, 40.0, 99.0)
-	var b := CatPose.target(true, 0.0, 40.0 + Balance.CAT_STRIDE, 99.0)
-	for key in a:
-		assert_true(absf(a[key] - b[key]) < 0.001, "%s: 한 박자 뒤 같은 자세" % key)
-	var half := CatPose.target(true, 0.0, 40.0 + Balance.CAT_STRIDE * 0.5, 99.0)
-	assert_true(absf(a.front + half.front) < 0.001, "반 박자 뒤 다리가 반대쪽")
+func _sim_on_roofs(list: Array) -> RunnerSim:
+	var sim := RunnerSim.new(1)
+	sim.accelerate = false
+	sim.roofs.clear()
+	for roof in list:
+		sim.roofs.append(roof)
+	sim.x = list[0].left + 100.0
+	sim.y = list[0].top
+	sim.on_ground = true
+	sim.set("_ground_roof", sim.roofs[0])
+	return sim
 
 
-func test_올라갈_때는_앞다리를_앞으로_뒷다리를_뒤로_뻗는다() -> void:
-	var pose := CatPose.target(false, JumpModel.jump_speed(), 0.0, 99.0)
-	assert_true(pose.front < -30.0 and pose.front_back < -20.0, "앞다리 앞으로 (음수)")
-	assert_true(pose.back > 25.0 and pose.back_back > 15.0, "뒷다리 뒤로 (양수)")
+func test_달리기는_달린_거리로_4프레임을_차례로_돈다() -> void:
+	var sim := RunnerSim.new(1)
+	var seen: Array[String] = []
+	for i in 8:
+		sim.x = Balance.CAT_STRIDE * (i + 0.5) / 4.0
+		seen.append(CatPose.pose(sim).frame)
+	assert_eq(seen, ["run_0", "run_1", "run_2", "run_3", "run_0", "run_1", "run_2", "run_3"] as Array[String])
+	sim.x = -Balance.CAT_STRIDE * 0.1
+	assert_eq(CatPose.pose(sim).frame, "run_3", "음수 거리도 순서대로")
+	for i in 4:
+		sim.x = Balance.CAT_STRIDE * (i + 0.5) / 4.0
+		assert_eq(CatPose.pose(sim).tilt, 0.0, "달릴 때 기울지 않음")
 
 
-func test_내려올_때는_다리를_아래로_모은다() -> void:
-	var rising := CatPose.target(false, JumpModel.jump_speed(), 0.0, 99.0)
-	var falling := CatPose.target(false, -JumpModel.jump_speed(), 0.0, 99.0)
-	assert_true(absf(falling.back) < absf(rising.back), "뒷다리를 뒤로 덜 뻗음")
-	assert_true(falling.front < 0.0 and falling.front > rising.front, "앞다리는 착지하려고 살짝 앞 아래로")
-	var top := CatPose.target(false, 0.0, 0.0, 99.0)
-	for leg in CatPose.LEGS:
-		assert_eq(top[leg], 0.0, "가장 높은 곳에서는 바로 선 다리 (%s)" % leg)
+func test_점프는_웅크림_도약_올라감_내려옴_착지_순서() -> void:
+	var sim := RunnerSim.new(1)
+	var order: Array[String] = []
+	var hold := JumpModel.max_hold_time() * 0.6
+	var t := 0.0
+	for i in 240:
+		sim.step(DT, t < hold)
+		t += DT
+		var frame: String = CatPose.pose(sim).frame
+		if order.is_empty() or order[-1] != frame:
+			order.append(frame)
+		if sim.on_ground and sim.time_since_land > Balance.CAT_LAND_TIME and t > 0.2:
+			break
+	assert_eq(order.slice(0, 5), ["crouch", "takeoff", "rise", "fall", "land"] as Array[String])
+	assert_true(order.size() > 5 and order[5].begins_with("run_"), "착지 뒤 달리기로 %s" % str(order))
 
 
-func test_착지_순간에는_다리를_벌려_버티고_곧_달리기로_돌아온다() -> void:
-	var land := CatPose.target(true, 0.0, 0.0, 0.0)
-	assert_true(land.front < -17.0 and land.back > 17.0, "착지 순간 다리를 앞뒤로 벌림")
-	var later := CatPose.target(true, 0.0, 0.0, Balance.SQUASH_TIME)
-	var run := CatPose.target(true, 0.0, 0.0, 99.0)
-	assert_eq(later, run, "납작해짐이 끝나면 달리기 자세")
+func test_길게_누를수록_도약할_때_몸이_더_늘어난다() -> void:
+	var stretch := []
+	for hold in [0.3, 1.0]:
+		var sim := RunnerSim.new(1)
+		var max_x := 0.0
+		for i in 120:
+			sim.step(DT, i * DT < JumpModel.max_hold_time() * hold)
+			var pose := CatPose.pose(sim)
+			if pose.frame == "takeoff":
+				max_x = maxf(max_x, pose.scale.x)
+		stretch.append(max_x)
+	assert_true(stretch[1] > stretch[0] and stretch[0] > 1.0, "가로 늘어남 %s" % str(stretch))
 
 
-func test_고양이_그림은_충돌_판정_크기에_맞고_발끝이_원점() -> void:
+func test_올라갈_때는_코가_위로_내려올_때는_코가_아래로() -> void:
+	var sim := RunnerSim.new(1)
+	sim.on_ground = false
+	sim.time_since_jump = 1.0
+	sim.vy = JumpModel.jump_speed()
+	assert_true(CatPose.pose(sim).tilt < 0.0)
+	sim.vy = -JumpModel.jump_speed()
+	sim.y = 1000.0  # 높은 곳: 아직 떨어지는 중이 아님
+	var pose := CatPose.pose(sim)
+	assert_eq(pose.frame, "fall")
+	assert_true(pose.tilt > 0.0)
+
+
+func test_더는_올라설_수_없으면_허우적거린다() -> void:
+	var roofs := [{"left": -500.0, "right": 0.0, "top": 200.0}, {"left": 300.0, "right": 5000.0, "top": 250.0}]
+	var sim := _sim_on_roofs(roofs)
+	sim.on_ground = false
+	sim.x = 100.0  # 틈 위
+	sim.vy = -100.0
+	sim.y = 260.0
+	assert_false(sim.is_doomed(), "앞 옥상보다 높으면 아직 내려앉을 수 있음")
+	sim.y = 249.0
+	assert_true(sim.is_doomed(), "점프 없이 앞 옥상 높이보다 낮아지면 벽에 막혀 끝")
+	assert_eq(CatPose.pose(sim).frame, "flail")
+	sim.set("_jumped", true)
+	sim.y = 250.0 - Balance.CAT_BODY_SIZE.y + 1.0
+	assert_false(sim.is_doomed(), "점프했고 몸 높이 안쪽이면 투명화로 오를 수 있음")
+	sim.y = 250.0 - Balance.CAT_BODY_SIZE.y - 1.0
+	assert_true(sim.is_doomed(), "몸 높이보다 더 낮으면 끝")
+	sim.vy = 10.0
+	assert_false(sim.is_doomed(), "올라가는 중이면 아님")
+	sim.vy = -10.0
+	sim.x = 2000.0
+	sim.y = 240.0
+	assert_true(sim.is_doomed(), "발이 옥상 위인데 옥상보다 아래면 끝")
+	sim.y = 260.0
+	assert_false(sim.is_doomed(), "옥상보다 위면 내려앉음")
+
+
+func test_실제로_틈에_떨어지면_허우적거리고_그전에는_아니다() -> void:
+	var sim := RunnerSim.new(1)
+	var flailed_at := -1.0
+	var t := 0.0
+	while not sim.game_over and t < 10.0:
+		sim.step(DT, false)
+		t += DT
+		if CatPose.pose(sim).frame == "flail" and flailed_at < 0.0:
+			flailed_at = t
+			assert_false(sim.on_ground)
+	assert_true(sim.game_over)
+	assert_true(flailed_at > 0.0, "떨어지는 동안 허우적거림")
+	# 허우적거림: 시간에 따라 몸이 앞뒤로 흔들린다
+	var tilts := {}
+	for i in 12:
+		sim.elapsed = i * 0.03
+		tilts[snappedf(CatPose.pose(sim).tilt, 1.0)] = true
+	assert_true(tilts.size() >= 5, "흔들림 %s" % str(tilts.keys()))
+
+
+func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝() -> void:
 	var cat := CatView.new()
 	add_child(cat)
 	await wait_frames(1)
-	var scale_factor := CatView.art_scale()
-	assert_true(absf((CatView.ART_RIGHT - CatView.ART_LEFT) * scale_factor - Balance.CAT_BODY_SIZE.x) < 0.001, "가로 = 충돌 판정 너비")
-	var skeleton: Node2D = cat.get_node("Skeleton")
-	# 그림 가로 가운데와 발끝이 노드 원점에 온다
-	assert_true(absf(skeleton.position.x + (CatView.ART_LEFT + CatView.ART_RIGHT) * 0.5 * scale_factor) < 0.001)
-	assert_true(absf(skeleton.position.y + CatView.ART_FEET * scale_factor) < 0.001)
-	# 부품 그림의 실제 불투명 범위(꼬리 제외)를 재서 ART_* 범위와 충돌 판정 크기에 맞는지 확인한다
-	var art := Rect2()
-	for part in CatView.PARTS:
-		var texture: Texture2D = load("res://assets/sprites/cat_parts/%s.png" % part.file)
-		assert_not_null(texture, part.file)
-		if texture == null or part.name == "tail":
+	var sprite: Sprite2D = cat.get_node("Sprite")
+	assert_eq(sprite.offset, -CatView.ANCHOR, "그림의 기준점이 노드 원점(발끝)")
+	for frame in CatPose.ALL_FRAMES:
+		var texture: Texture2D = load(CatView.FRAME_DIR + frame + ".png")
+		assert_not_null(texture, frame)
+		if texture == null:
 			continue
 		var used := texture.get_image().get_used_rect()
-		var rect := Rect2(part.top_left + Vector2(used.position), Vector2(used.size))
-		art = rect if art.size == Vector2.ZERO else art.merge(rect)
-	assert_true(absf(art.position.x - CatView.ART_LEFT) <= 3.0, "왼쪽 끝 %.0f" % art.position.x)
-	assert_true(absf(art.end.x - CatView.ART_RIGHT) <= 3.0, "오른쪽 끝 %.0f" % art.end.x)
-	assert_true(absf(art.position.y - CatView.ART_TOP) <= 3.0, "머리 위 %.0f" % art.position.y)
-	assert_true(absf(art.end.y - CatView.ART_FEET) <= 3.0, "발끝 %.0f" % art.end.y)
-	var drawn := art.size * scale_factor
-	assert_true(absf(drawn.x - Balance.CAT_BODY_SIZE.x) <= 3.0, "그림 너비 %.1f = 판정 너비" % drawn.x)
-	assert_true(absf(drawn.y - Balance.CAT_BODY_SIZE.y) <= 3.0, "그림 높이 %.1f = 판정 높이" % drawn.y)
+		# 모든 프레임의 가장 아랫줄(발끝)이 기준점 높이에 있다 (정렬 도구가 맞춤, 반투명 가장자리 1~2픽셀 허용)
+		assert_true(absf(used.end.y - CatView.ANCHOR.y) <= 3.0, "%s 발끝 %d" % [frame, used.end.y])
 	cat.queue_free()
 
 
-func test_달리면_부품이_움직이고_투명화면_반투명() -> void:
+func test_달리기_프레임은_몸_중심이_흔들리지_않는다() -> void:
+	# 꼬리 쪽(왼쪽 30%)을 뺀 불투명 픽셀의 가로 무게중심이 프레임마다 거의 같아야 화면이 떨리지 않는다
+	for frame in CatPose.ALL_FRAMES:
+		var image: Image = load(CatView.FRAME_DIR + frame + ".png").get_image()
+		var used := image.get_used_rect()
+		var left := used.position.x + used.size.x * 0.3
+		var sum := 0.0
+		var count := 0
+		for y in range(used.position.y, used.end.y, 2):
+			for x in range(int(left), used.end.x, 2):
+				if image.get_pixel(x, y).a > 0.5:
+					sum += x
+					count += 1
+		var center := sum / maxf(count, 1.0)
+		assert_true(absf(center - CatView.ANCHOR.x) <= 3.0, "%s 몸 중심 %.1f" % [frame, center])
+
+
+func test_상태에_맞는_그림과_투명화() -> void:
 	var cat := CatView.new()
 	add_child(cat)
 	await wait_frames(1)
 	var sim := RunnerSim.new(3)
-	var seen := {}
-	for i in 60:
+	var frames := {}
+	for i in 120:
 		sim.step(DT, false)
 		cat.show_state(sim, DT)
-		seen[snappedf(cat.angle_of("front"), 1.0)] = true
-	assert_true(seen.size() > 10, "앞다리가 계속 움직임")
+		frames[cat.frame_name] = true
+	assert_eq(frames.size(), 4, "달리며 4프레임을 모두 씀")
 	assert_eq(cat.modulate.a, 1.0)
 	sim.ghost_time = 1.0
 	cat.show_state(sim, DT)
 	assert_true(cat.modulate.a < 0.6, "투명화 중 반투명")
-	cat.queue_free()
-
-
-func test_달리는_동안_가장_낮은_발이_늘_옥상에_닿고_몸은_들썩인다() -> void:
-	var cat := CatView.new()
-	add_child(cat)
-	await wait_frames(1)
-	var sim := RunnerSim.new(5)
-	var body: Node2D = cat.get_node("Skeleton/body")
-	var body_heights := {}
-	for i in 240:
-		sim.step(DT, false)
-		if not sim.on_ground:
-			break
-		cat.show_state(sim, DT)
-		var lowest := -INF
-		for part in CatView.PARTS:
-			if not part.name in CatPose.LEGS:
-				continue
-			var bone: Node2D = cat.get_node("Skeleton/body/" + part.name)
-			var texture: Texture2D = load("res://assets/sprites/cat_parts/%s.png" % part.file)
-			# 발끝 = 부품 그림의 불투명한 가장 아랫줄, 다리 뼈대 기준 (도는 중심이 원점)
-			var foot := Vector2(0.0, texture.get_image().get_used_rect().end.y - part.pivot.y)
-			lowest = maxf(lowest, cat.to_local(bone.to_global(foot)).y)
-		assert_true(absf(lowest) <= 0.5, "%d번째 프레임: 가장 낮은 발 %.2f (0이면 옥상에 닿음)" % [i, lowest])
-		body_heights[snappedf(body.position.y, 0.5)] = true
-		if not failures.is_empty():
-			break
-	assert_true(body_heights.size() > 5, "다리가 움직이며 몸이 들썩임")
 	cat.queue_free()

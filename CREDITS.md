@@ -20,9 +20,9 @@
 | GitHub Actions: actions/checkout, actions/cache, actions/upload-artifact, actions/configure-pages, actions/upload-pages-artifact, actions/deploy-pages | MIT | `.github/` 자동 테스트·배포 |
 | Python 3 표준 라이브러리 | PSF License | `tools/` 변경 기록·버전 도구 |
 | rembg 2.x + isnet-general-use 모델 | MIT (rembg), Apache-2.0 (IS-Net) | 그림 배경 제거 (개발 PC에서만 실행). 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음 |
-| Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기, 부품 자르기 (개발 PC에서만 실행) |
-| NumPy | BSD-3-Clause | `tools/cut_parts.py` 부품 시트 배경 제거 (개발 PC에서만 실행) |
-| SciPy | BSD-3-Clause | `tools/cut_parts.py` 부품 찾기 (개발 PC에서만 실행) |
+| Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기, 자세 자르기·정렬 (개발 PC에서만 실행) |
+| NumPy | BSD-3-Clause | `tools/cut_parts.py` 시트 배경 제거, `tools/align_frames.py` 프레임 정렬 (개발 PC에서만 실행) |
+| SciPy | BSD-3-Clause | `tools/cut_parts.py` 시트에서 자세 찾기 (개발 PC에서만 실행) |
 
 ## AI로 만든 그림
 
@@ -44,7 +44,10 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/cat_base_run.png` | 2026-11-06 | Codex 내장 이미지 생성 (참고 시트와 run 동작을 기준 그림으로 첨부) | 기준 캐릭터 달리는 옆모습 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_base_run.png` | 2026-11-06 | 위 원본 | 기준 그림 (3단계에서 고양이 그림의 기준) | 마젠타 배경을 마젠타 우세도(min(R, B) - G)로 지우고 1024x1024로 줄임 |
 | `assets/raw/cat_parts_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 참고 시트를 첨부) | 고양이 부품 시트 원본: 머리, 몸통(초록 목도리), 꼬리, 앞다리 2, 뒷다리 2 (게임에 포함 안 됨) | 없음 |
-| `assets/sprites/cat_parts/*.png` | 2026-11-07 | 위 원본 | 게임 속 고양이 그림 (Skeleton2D 뼈대로 움직임) | `tools/cut_parts.py`로 마젠타 배경을 지우고 부품 7개를 잘라 냄. 몸 뒤쪽 다리는 게임 안에서 어둡게 칠함 |
+| `assets/sprites/cat_parts/*.png` | 2026-11-07 | 위 원본 | v0.1.0의 고양이 그림 (Skeleton2D 뼈대). v0.1.1부터 쓰지 않고 내보내기에서 제외, 기록용으로 보관 | `tools/cut_parts.py`로 마젠타 배경을 지우고 부품 7개를 잘라 냄 |
+| `assets/raw/cat_frames_run.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 동작 참고 6장을 첨부) | 달리기 4자세 시트 원본 (게임에 포함 안 됨) | 없음 |
+| `assets/raw/cat_frames_jump.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 동작 참고 6장을 첨부) | 점프·떨어짐 6자세 시트 원본: 웅크리기, 도약, 올라감, 내려옴, 착지, 떨어짐 (게임에 포함 안 됨) | 없음 |
+| `assets/sprites/cat_frames/*.png` | 2026-11-07 | 위 원본 2장 | 게임 속 고양이 그림 (프레임 애니메이션 10장) | `tools/cut_parts.py`로 마젠타 배경을 지우고 자세를 잘라 냄 → `tools/align_frames.py`로 크기(시트별 배율)·발끝·몸 중심을 맞춰 640x512 캔버스에 놓음 |
 
 ## 직접 만든 것
 

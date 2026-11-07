@@ -1,48 +1,39 @@
 class_name CatPose
-## 고양이 동작(달리기·점프·착지)에 맞는 부품 각도 (화면과 분리된 순수 계산).
-## 각도는 도 단위, 양수 = 화면에서 시계 방향. 다리는 아래를 향해 있으므로 음수면 발이 앞(오른쪽)으로 간다.
-## 달리기 박자는 달린 거리(x)로 정한다: 빨라지면 다리도 그만큼 빨리 움직여 발이 미끄러져 보이지 않는다.
+## 고양이 동작에 맞는 그림(프레임)과 그 위에 얹을 몸 전체의 늘어남·납작해짐·기울기 (화면과 분리된 순수 계산).
+## 그림은 자세별 통그림이고(다리를 따로 움직이지 않음), 프레임 사이는 몸 전체의 배율·기울기로 부드럽게 잇는다.
+## 배율은 발끝을 기준으로 적용하므로 발이 옥상에서 뜨지 않는다. 기울기는 도 단위, 양수 = 시계 방향(코가 아래로).
 
-const LEGS := ["front", "front_back", "back", "back_back"]
+## 달리기 한 바퀴의 프레임 (모으기 → 박차기 → 앞발 디딤 → 뒷발 들어옴)
+const RUN_FRAMES := ["run_0", "run_1", "run_2", "run_3"]
+## 프레임마다 몸 전체 배율 (가로, 세로): 모을 때 짧고 높게, 박찰 때 길고 낮게
+const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.04, 0.97), Vector2(1.02, 0.99), Vector2(0.98, 1.02)]
+const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail"]
 
 
-## on_ground: 옥상 위인지, vy: 세로 속도(위로 +), x: 달린 거리, since_land: 착지 뒤 지난 시간
-## 돌려주는 값: 다리 4개·머리·꼬리 각도.
-## 몸 높이는 여기서 정하지 않는다: 화면(CatView)이 다리 각도로 가장 낮은 발이 옥상에 닿게 몸을 내려서,
-## 다리가 곧을 때 몸이 가장 높고 벌어질수록 낮아지는 들썩임이 저절로 생긴다.
-static func target(on_ground: bool, vy: float, x: float, since_land: float) -> Dictionary:
-	var pose := {"head": 0.0, "tail": 0.0}
-	if on_ground:
-		var phase := x / Balance.CAT_STRIDE * TAU
-		var swing := Balance.CAT_LEG_SWING
-		# 앞다리 두 개는 서로 반대로, 뒷다리는 앞다리와 반 박자 엇갈려 움직인다
-		pose.front = -sin(phase) * swing
-		pose.front_back = sin(phase) * swing
-		pose.back = sin(phase) * swing
-		pose.back_back = -sin(phase) * swing
-		pose.head = sin(phase * 2.0) * 3.0
-		pose.tail = sin(phase) * 8.0
-		if since_land < Balance.SQUASH_TIME:
-			# 착지 순간: 다리를 앞뒤로 살짝 벌려 버틴다
-			var k := 1.0 - since_land / Balance.SQUASH_TIME
-			for leg in LEGS:
-				pose[leg] = lerpf(pose[leg], -18.0 if leg.begins_with("front") else 18.0, k)
-		return pose
-	# 공중: 올라갈 때는 앞다리를 앞으로 뻗고 뒷다리를 뒤로, 내려올 때는 착지하려고 다리를 아래로 모은다
-	var rising := clampf(vy / JumpModel.jump_speed(), -1.0, 1.0)
-	if rising > 0.0:
-		pose.front = -45.0 * rising
-		pose.front_back = -35.0 * rising
-		pose.back = 40.0 * rising
-		pose.back_back = 30.0 * rising
-		pose.head = -6.0 * rising
-		pose.tail = -10.0 * rising
-	else:
-		var falling := -rising
-		pose.front = -15.0 * falling
-		pose.front_back = -10.0 * falling
-		pose.back = -8.0 * falling
-		pose.back_back = -4.0 * falling
-		pose.head = 4.0 * falling
-		pose.tail = 12.0 * falling
-	return pose
+## sim의 상태로 자세를 정한다. 돌려주는 값: frame(그림 이름), scale(몸 전체 배율), tilt(기울기)
+static func pose(sim: RunnerSim) -> Dictionary:
+	if sim.is_doomed():
+		# 떨어져서 끝나는 중: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
+		var wobble := sin(sim.elapsed * TAU * 5.0)
+		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
+	if sim.on_ground:
+		if sim.time_since_land < Balance.CAT_LAND_TIME:
+			# 착지: 앞발부터 닿고 몸이 푹 눌렸다가 돌아온다 (납작함은 Squash와 같은 곡선)
+			var k := sim.time_since_land / Balance.CAT_LAND_TIME
+			return {"frame": "land", "scale": Squash.body_scale(true, 0.0, sim.time_since_land), "tilt": lerpf(6.0, 0.0, k)}
+		# 달리기: 달린 거리로 프레임을 정해 빨라지면 다리도 그만큼 빨리 움직인다 (발이 미끄러져 보이지 않음)
+		var step := posmod(int(floor(sim.x / Balance.CAT_STRIDE * RUN_FRAMES.size())), RUN_FRAMES.size())
+		return {"frame": RUN_FRAMES[step], "scale": RUN_SCALE[step], "tilt": 0.0}
+	if sim.time_since_jump < Balance.CAT_CROUCH_TIME:
+		# 뛰는 순간: 짧게 웅크려 힘을 모은 모습
+		return {"frame": "crouch", "scale": Vector2(1.06, 0.9), "tilt": 0.0}
+	var jump_speed := JumpModel.jump_speed()
+	if sim.is_holding():
+		# 누르고 있는 동안 박차고 오름: 길게 누를수록 몸이 앞뒤로 더 늘어난다
+		var h := sim.hold_ratio()
+		return {"frame": "takeoff", "scale": Vector2(1.0 + 0.1 * h, 1.0 - 0.05 * h), "tilt": -10.0}
+	if sim.vy > 0.0:
+		var up := clampf(sim.vy / jump_speed, 0.0, 1.0)
+		return {"frame": "rise", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": -8.0 * up}
+	var down := clampf(-sim.vy / jump_speed, 0.0, 1.0)
+	return {"frame": "fall", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 8.0 * down}

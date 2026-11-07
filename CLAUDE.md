@@ -31,7 +31,7 @@
   | 1 | 자동 달리기 + 누르는 만큼 점프 + 옥상 생성 (임시 그림) | v0.0.2 |
   | 1.5 | 휴대폰 가로 화면 고정, 벽에 부딪히면 투명화로 통과 | v0.0.3 |
   | 2 | 떨어지면 게임 끝, 거리 점수, 최고 기록, 점점 빨라짐 | v0.0.4 |
-  | 3 | 고양이 그림(기준 캐릭터 → 부품)과 달리기·점프·착지 모션 | v0.1.0 |
+  | 3 | 고양이 그림과 달리기·점프·착지 모션 (v0.1.1에서 자세별 프레임 애니메이션으로 다시 만듦) | v0.1.0, v0.1.1 |
   | 4 | 아이템: 생선, 종이상자 | v0.2.0 |
   | 5 | 구조물: 빨래줄, 전봇대 | v0.3.0 |
   | 6 | 첫 동네(주택가) 배경과 음악 | v0.4.0 |
@@ -126,6 +126,8 @@ godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
 - codex는 기본으로 Homebrew의 `codex`(PATH)를 써. 설치·업데이트 직후 첫 실행은 macOS 보안 검사 때문에 몇 분 멈춰 있을 수 있어 (`--version`으로 먼저 깨워 두고, 끝나면 그다음부터는 바로 실행됨).
   - 그래도 안 되면 ChatGPT 앱에 들어 있는 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`를 써. 경로에 버전 번호가 없어 앱이 업데이트돼도 그대로야.
 - `codex exec`의 `--image`는 파일을 여러 개 받으니, 요청문을 `--image`보다 앞에 둬: `codex exec --sandbox read-only "<요청>" --image <기준 그림>`
+- 터미널 입력이 없는 곳(Claude Code의 Bash 등)에서 `codex exec`를 부를 때는 끝에 `< /dev/null`을 붙여. 안 붙이면 "Reading additional input from stdin..."에서 계속 기다리며 멈춰 있어.
+- 다른 세션도 Codex로 그림을 만들 수 있으니 "가장 최근 파일" 대신 이번 실행의 그림을 써: `codex exec` 출력의 `session id`와 같은 이름의 `~/.codex/generated_images/<session id>/` 폴더에 있어.
 - 배경 제거는 `rembg i -m isnet-general-use -a <원본> <결과>`로 해 (rembg 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음). rembg는 `~/.local/venvs/rembg`에 설치돼 있어.
 - 단색 면 그림(마스코트 등)은 rembg 대신 연두 배경을 초록 우세도(G - max(R, B))로 지우는 게 더 깨끗해 (rembg는 닫힌 틈에 배경을 남기고 밝은 몸을 반투명하게 만들 수 있음). 어두운 배경에 올려 초록 테두리가 없는지 확인해.
 - 이미지: 그림이 필요하면 `codex exec --sandbox read-only "<요청>"`로 Codex의 내장 이미지 생성을 써. 요청 끝에 항상 "내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"를 붙여. API 키는 절대 쓰지 마.
