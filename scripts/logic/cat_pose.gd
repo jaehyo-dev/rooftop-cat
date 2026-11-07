@@ -33,10 +33,11 @@ static func pose(sim: RunnerSim) -> Dictionary:
 	var jump_speed := JumpModel.jump_speed()
 	if sim.is_holding():
 		# 누르고 있는 동안 박차고 오름: 길게 누를수록 몸이 앞뒤로 더 늘어난다
+		# (그림이 이미 뒷발을 뒤로 뻗은 자세라 몸 전체를 위로 돌리지 않는다: 돌리면 로켓처럼 보임)
 		var h := sim.hold_ratio()
-		return {"frame": "takeoff", "scale": Vector2(1.0 + 0.1 * h, 1.0 - 0.05 * h), "tilt": -10.0}
+		return {"frame": "takeoff", "scale": Vector2(1.0 + 0.1 * h, 1.0 - 0.05 * h), "tilt": 0.0}
 	if sim.vy > 0.0:
-		var up := clampf(sim.vy / jump_speed, 0.0, 1.0)
-		return {"frame": "rise", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": -8.0 * up}
+		# 올라갈 때도 기울이지 않는다 (발끝 기준 회전이 몸을 위로 쳐들어 보이게 함)
+		return {"frame": "rise", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 0.0}
 	var down := clampf(-sim.vy / jump_speed, 0.0, 1.0)
-	return {"frame": "fall", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 8.0 * down}
+	return {"frame": "fall", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 6.0 * down}
