@@ -20,7 +20,9 @@
 | GitHub Actions: actions/checkout, actions/cache, actions/upload-artifact, actions/configure-pages, actions/upload-pages-artifact, actions/deploy-pages | MIT | `.github/` 자동 테스트·배포 |
 | Python 3 표준 라이브러리 | PSF License | `tools/` 변경 기록·버전 도구 |
 | rembg 2.x + isnet-general-use 모델 | MIT (rembg), Apache-2.0 (IS-Net) | 그림 배경 제거 (개발 PC에서만 실행). 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음 |
-| Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기 (개발 PC에서만 실행) |
+| Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기, 부품 자르기 (개발 PC에서만 실행) |
+| NumPy | BSD-3-Clause | `tools/cut_parts.py` 부품 시트 배경 제거 (개발 PC에서만 실행) |
+| SciPy | BSD-3-Clause | `tools/cut_parts.py` 부품 찾기 (개발 PC에서만 실행) |
 
 ## AI로 만든 그림
 
@@ -41,6 +43,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/concept/poses/walk·crouch·run·jump·land·dash.png` | 2026-11-06 | 위 참고 시트 | 모션 참고용 동작 6장 (게임에 포함 안 됨) | 시트에서 잘라 남색 배경을 색 거리로 지움 |
 | `assets/raw/cat_base_run.png` | 2026-11-06 | Codex 내장 이미지 생성 (참고 시트와 run 동작을 기준 그림으로 첨부) | 기준 캐릭터 달리는 옆모습 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_base_run.png` | 2026-11-06 | 위 원본 | 기준 그림 (3단계에서 고양이 그림의 기준) | 마젠타 배경을 마젠타 우세도(min(R, B) - G)로 지우고 1024x1024로 줄임 |
+| `assets/raw/cat_parts_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 참고 시트를 첨부) | 고양이 부품 시트 원본: 머리, 몸통(초록 목도리), 꼬리, 앞다리 2, 뒷다리 2 (게임에 포함 안 됨) | 없음 |
+| `assets/sprites/cat_parts/*.png` | 2026-11-07 | 위 원본 | 게임 속 고양이 그림 (Skeleton2D 뼈대로 움직임) | `tools/cut_parts.py`로 마젠타 배경을 지우고 부품 7개를 잘라 냄. 몸 뒤쪽 다리는 게임 안에서 어둡게 칠함 |
 
 ## 직접 만든 것
 
