@@ -31,6 +31,9 @@ const LINE_POST_BOTTOM := 187.0  # 그림 안에서 기둥 아래 끝
 const POLE_PLATE_WIDTH := 187.0
 const POLE_PLATE_TOP := 7.0
 const POLE_HEAD_ROWS := 209.0
+const POLE_TOP_ROWS := 92.0   # 위 조각(판+받침) 줄 수
+const POLE_BAR_ROW := 125.0   # 아래 조각(애자+가로대) 시작 줄
+const POLE_BAR_AT := 0.5      # 가로대 중심이 판~화면 바닥 사이 어디에 오는지 (0~1)
 const POLE_TRUNK_X := 105.0
 const POLE_TRUNK_W := 56.0
 const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초)
@@ -218,18 +221,24 @@ func _look_of(roof: Dictionary) -> Dictionary:
 
 
 ## 전봇대: 판 옥상(platform) 위에 판이 오게 그리고 기둥은 화면 아래까지 늘린다 (기둥은 그림일 뿐 판정 없음)
+## 판+받침(위 조각)과 가로대+애자(아래 조각)를 떼어, 가로대를 기둥 중간쯤에 둬서 판 아래로 기둥 몸통이 길게 보이게 한다
 func _draw_pole(plate: Dictionary, offset: float, ground: float) -> void:
 	var cx: float = (plate.left + plate.right) * 0.5 + offset
 	if cx < -300.0 or cx > get_viewport_rect().size.x + 300.0:
 		return
 	var k: float = (plate.right - plate.left) / POLE_PLATE_WIDTH
 	var top_y: float = ground - plate.top - POLE_PLATE_TOP * k
-	var head_w := POLE_TEXTURE.get_width() * k
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - head_w * 0.5, top_y, head_w, POLE_HEAD_ROWS * k),
-			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_HEAD_ROWS))
-	var trunk_top := top_y + POLE_HEAD_ROWS * k - 1.0
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - POLE_TRUNK_W * k * 0.5, trunk_top, POLE_TRUNK_W * k, ground - trunk_top + 4.0),
+	var w := POLE_TEXTURE.get_width() * k
+	# 기둥 몸통: 판 아래부터 화면 바닥까지 (먼저 그려 위 조각이 덮음)
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - POLE_TRUNK_W * k * 0.5, top_y + 14.0 * k, POLE_TRUNK_W * k, ground - top_y + 4.0),
 			Rect2(POLE_TRUNK_X, POLE_HEAD_ROWS, POLE_TRUNK_W, 200.0))
+	# 가로대: 원래 자리보다 아래, 판에서 바닥까지의 중간쯤 (원래 자리가 더 아래면 그대로)
+	var bar_h := (POLE_HEAD_ROWS - POLE_BAR_ROW) * k
+	var bar_y := maxf(top_y + POLE_BAR_ROW * k, top_y + (ground - top_y) * POLE_BAR_AT - bar_h * 0.5)
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, bar_y, w, bar_h),
+			Rect2(0, POLE_BAR_ROW, POLE_TEXTURE.get_width(), POLE_HEAD_ROWS - POLE_BAR_ROW))
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, top_y, w, POLE_TOP_ROWS * k),
+			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_TOP_ROWS))
 
 
 ## 빨래줄: 틈 양쪽 옥상 끝에 기둥, 그 사이에 줄과 빨래를 틈 너비만큼 이어 붙인다 (줄이 발판 높이에 오게)

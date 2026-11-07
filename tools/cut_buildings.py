@@ -41,6 +41,7 @@ PROPS = {
 }
 
 
+TOP_FRINGE = 2          # 지붕 턱 맨 위 분홍 잔여물 줄 수 (마젠타 가장자리가 남은 부분): 깎아서 윗면(크림색)이 첫 줄이 되게 함
 SPILL_BAND = 3          # 가장자리 색을 가져올 수 있는 최대 거리 (픽셀)
 
 
@@ -73,7 +74,7 @@ def cut_building(sheet: np.ndarray, spec: dict) -> dict:
     (c0, c1), (r0, r1), source = spec["repair"]
     sheet[r0:r1, c0:c1] = sheet[r0:r1, source:source + (c1 - c0)]
     body = _resize(sheet[CAP_TOP:WALL_BOTTOM, spec["x0"]:spec["x1"]], ART_SCALE)
-    body = body[_top_row(body):]
+    body = body[_top_row(body) + TOP_FRINGE:]
     def x(value):
         return round((value - spec["x0"]) * ART_SCALE)
     pieces = {"l": body[:, :x(spec["left"])], "r": body[:, x(spec["right"]):]}
