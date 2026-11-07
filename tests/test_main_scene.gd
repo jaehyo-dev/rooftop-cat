@@ -145,3 +145,12 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	assert_eq(BestRecord.load_fish(PATH), 12, "모은 생선 저장")
 	main.queue_free()
 	DirAccess.remove_absolute(PATH)
+
+
+func test_배경_음악이_반복_재생으로_붙어_있다() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	await wait_frames(2)
+	var music: AudioStreamPlayer = main.get_node("Music")
+	assert_true(music.stream is AudioStreamOggVorbis and music.stream.loop, "반복 재생")
+	assert_true(music.stream.get_length() > 30.0, "곡 길이")

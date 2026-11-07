@@ -14,6 +14,13 @@ const MAX_STEPS_PER_FRAME := 12
 
 const SKY_TOP := Color("#cfe6f2")
 const SKY_BOTTOM := Color("#fbe9d4")
+## 먼 배경 그림 (assets/sprites/backdrop/)
+const TOWN_TEXTURE := preload("res://assets/sprites/backdrop/far_town.png")
+const CLOUD_TEXTURES := [
+	preload("res://assets/sprites/backdrop/cloud1.png"), preload("res://assets/sprites/backdrop/cloud2.png"),
+	preload("res://assets/sprites/backdrop/cloud3.png"), preload("res://assets/sprites/backdrop/cloud4.png")]
+const TOWN_BOTTOM := 0.70       # 먼 동네 띠 아래 끝 (화면 높이 비율)
+const TOWN_FILL := Color("#fadecf")  # 띠 아래를 이어 채우는 안개색 (그림 맨 아랫줄 색)
 const BELOW_DARKEN := 0.1  # 그림 아래 벽 색이 화면 바닥에서 이만큼 어두워짐
 const WALL_LINE := 0.72  # 건물 옆 테두리: 채움 색을 이만큼 어둡게
 ## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
@@ -147,6 +154,8 @@ func _draw() -> void:
 	draw_polygon([Vector2.ZERO, Vector2(size.x, 0), size, Vector2(0, size.y)],
 			[SKY_TOP, SKY_TOP, SKY_BOTTOM, SKY_BOTTOM])
 
+	_draw_backdrop(size)
+
 	for roof in sim.roofs:
 		if roof.get("platform", false):
 			_draw_pole(roof, offset, ground)  # 전봇대 판은 건물이 아니라 기둥 그림으로
@@ -172,6 +181,22 @@ func _draw() -> void:
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
 		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
+
+
+## 먼 배경: 구름(가장 멀리) → 멀리 보이는 동네 띠. 모두 옥상보다 느리게 지나간다.
+func _draw_backdrop(size: Vector2) -> void:
+	for cloud in Backdrop.CLOUDS:
+		var tex: Texture2D = CLOUD_TEXTURES[cloud[0]]
+		var x := Backdrop.cloud_x(cloud[1], sim.x, sim.elapsed, tex.get_width())
+		draw_texture(tex, Vector2(x, size.y * cloud[2]))
+	var bottom := size.y * TOWN_BOTTOM
+	var tile_w := float(TOWN_TEXTURE.get_width())
+	var top := bottom - TOWN_TEXTURE.get_height()
+	draw_rect(Rect2(0.0, bottom - 1.0, size.x, size.y - bottom + 1.0), TOWN_FILL)
+	for tile in Backdrop.town_tiles(sim.x, tile_w, size.x):
+		# 뒤집은 조각은 너비를 음수로 줘서 좌우로 뒤집어 그린다
+		var rect := Rect2(roundf(tile.x) + (tile_w if tile.flip else 0.0), top, -tile_w if tile.flip else tile_w, TOWN_TEXTURE.get_height())
+		draw_texture_rect(TOWN_TEXTURE, rect, false)
 
 
 ## 옥상의 건물: 왼쪽 캡 + 가운데 조각들(옥상 폭에 맞춰 늘임) + 오른쪽 캡, 그림 아래는 벽 색으로 화면 바닥까지 채움, 그 위에 소품.

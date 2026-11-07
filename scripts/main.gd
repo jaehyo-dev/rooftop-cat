@@ -5,6 +5,10 @@ extends Control
 ## 최고 기록·생선 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
 var record_path := BestRecord.DEFAULT_PATH
 
+## 주택가 배경 음악 (tools/make_music.py로 합성한 루프)
+const MUSIC := preload("res://assets/audio/neighborhood.ogg")
+const MUSIC_VOLUME_DB := -8.0
+
 var _best := 0
 
 @onready var _world: Node2D = $World
@@ -17,6 +21,15 @@ func _ready() -> void:
 	_world.game_over.connect(_on_game_over)
 	_world.restarted.connect(_on_restarted)
 	_on_restarted()
+	# 배경 음악: 끝나면 처음부터 반복. 웹에서는 첫 터치·클릭 뒤부터 소리가 난다 (브라우저 규칙)
+	var music_stream: AudioStreamOggVorbis = MUSIC.duplicate()
+	music_stream.loop = true
+	var player := AudioStreamPlayer.new()
+	player.name = "Music"
+	player.stream = music_stream
+	player.volume_db = MUSIC_VOLUME_DB
+	add_child(player)
+	player.play()
 
 
 func _process(_delta: float) -> void:

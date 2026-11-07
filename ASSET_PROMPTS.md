@@ -195,3 +195,10 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `codex exec --sandbox read-only "<요청문>" --image assets/sprites/cat_base_run.png assets/raw/structures_sheet.png < /dev/null`
 - 결과: `assets/raw/neighborhood_concept.png` (마젠타 배경, 1536x1024)
 - 요청문 요약: 고양이·구조물과 같은 색연필 그림체, 해질녘 주택가 분위기. 위 줄 건물 3종(살구 벽돌 다세대 / 크림 회벽 빌라 / 하늘색 타일 상가주택, 두툼한 지붕 테두리, 가로로 이어 붙일 수 있는 생활 디테일), 아래 줄 소품 6개(굴뚝, 물탱크, 안테나, 화분, 난간, 실외기). 단색 마젠타 배경, 글자·그림자 없음.
+
+## 먼 배경: 동네 띠 + 구름 (6단계, 2026-11-08)
+
+- 계획: 시트 1장 (먼 동네 띠 1 + 구름 4를 한 장에 함께 만들어 그림체를 맞춤). 결과가 깨끗해 다시 만들지 않음
+- 명령: `codex exec --sandbox read-only "<요청문>" --image assets/raw/neighborhood_concept.png assets/sprites/cat_base_run.png < /dev/null`
+- 결과: `assets/raw/far_background.png` (마젠타 배경, 1536x1024) → `python3 tools/cut_parts.py assets/raw/far_background.png assets/sprites/backdrop far_town cloud1 cloud2 cloud3 cloud4` → 동네 띠 위아래 여백 자름 → `python3 tools/clean_edges.py assets/sprites/backdrop/*.png`
+- 요청문 요약: 같은 색연필 그림체, 위쪽에 멀리 보이는 동네 지붕 실루엣 띠(가까운 건물보다 훨씬 흐리고 채도 낮게, 작은 집·굴뚝·물탱크·나무·안테나, 아래 가장자리는 직선, 왼쪽·오른쪽 끝 높이 같게), 아래쪽에 크림색 구름 4개(서로 떨어짐). 단색 마젠타 배경, 글자·그림자 없음, 내장 이미지 생성 도구만 사용.

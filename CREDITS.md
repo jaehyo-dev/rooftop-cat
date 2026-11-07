@@ -20,8 +20,9 @@
 | GitHub Actions: actions/checkout, actions/cache, actions/upload-artifact, actions/configure-pages, actions/upload-pages-artifact, actions/deploy-pages | MIT | `.github/` 자동 테스트·배포 |
 | Python 3 표준 라이브러리 | PSF License | `tools/` 변경 기록·버전 도구 |
 | rembg 2.x + isnet-general-use 모델 | MIT (rembg), Apache-2.0 (IS-Net) | 그림 배경 제거 (개발 PC에서만 실행). 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음 |
+| FFmpeg (libvorbis) | LGPL/GPL 도구 (게임에 포함되지 않고 개발 PC에서 wav→ogg 변환에만 사용, 결과 파일에는 라이선스 영향 없음) | `tools/make_music.py` ogg 변환 (개발 PC에서만 실행) |
 | Pillow | MIT-CMU (HPND) | 시안 비교 이미지 붙이기, 자세 자르기·정렬 (개발 PC에서만 실행) |
-| NumPy | BSD-3-Clause | `tools/cut_parts.py` 시트 배경 제거, `tools/align_frames.py` 프레임 정렬 (개발 PC에서만 실행) |
+| NumPy | BSD-3-Clause | `tools/make_music.py` 배경 음악 합성, `tools/cut_parts.py` 시트 배경 제거, `tools/align_frames.py` 프레임 정렬 (개발 PC에서만 실행) |
 | SciPy | BSD-3-Clause | `tools/cut_parts.py` 시트에서 자세 찾기 (개발 PC에서만 실행) |
 
 ## AI로 만든 그림
@@ -55,7 +56,10 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/structures/clothesline.png`, `pole.png` | 2026-11-07 | 위 원본 | 게임 속 빨래줄·전봇대 그림 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 빨래줄은 너비 500픽셀로 줄이고, 전봇대는 원본 크기(267x767) 그대로 |
 | `assets/raw/neighborhood_concept.png` | 2026-11-08 | Codex 내장 이미지 생성 (고양이·구조물 그림을 `--image`로 첨부해 그림체를 맞춤) | 주택가 건물 3종·옥상 소품 6종 시안·원본(마젠타 배경, 게임에 포함 안 됨) | 없음 |
 | `assets/sprites/buildings/*.png` | 2026-11-08 | 위 원본 | 게임 속 주택가 건물 조각(왼쪽 캡·가운데·오른쪽 캡)과 옥상 소품 | `tools/cut_buildings.py`로 마젠타 배경을 지우고 지붕 위 실외기·화분은 건물에서 지워 소품으로 분리, 건물은 0.8배·소품은 0.7배로 줄임 |
+| `assets/raw/far_background.png` | 2026-11-08 | Codex 내장 이미지 생성 (주택가 시안·고양이 그림을 `--image`로 첨부해 그림체를 맞춤) | 먼 배경 시트 원본: 멀리 보이는 동네 띠 + 구름 4개 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/backdrop/*.png` | 2026-11-08 | 위 원본 | 게임 속 먼 배경: 동네 띠(far_town), 구름(cloud1~4) | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 동네 띠 위아래 투명 여백을 잘라 냄 → `tools/clean_edges.py`로 가장자리 분홍 잔여물 정리 |
 
 ## 직접 만든 것
 
 - 프로젝트 아이콘 `icon.svg`: 이 프로젝트에서 직접 만듦
+- 배경 음악 `assets/audio/neighborhood.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦
