@@ -1,6 +1,7 @@
 extends TestCase
 ## 옥상 생성: 간격이 항상 넘을 수 있는 범위 안인지 (속도별), 시드 고정.
 
+const BalanceBot := preload("res://tests/balance_bot.gd")
 const SPEEDS := [250.0, Balance.RUN_SPEED, 700.0, 1000.0]
 
 
@@ -20,6 +21,8 @@ func test_간격과_높이와_너비가_범위_안() -> void:
 				var rise: float = roof.top - prev.top
 				var where := "속도 %d, 시드 %d, %d번째" % [speed, seed_value, i]
 				assert_true(gap >= Balance.ROOF_GAP_MIN, where + " 최소 간격")
+				if roof.has("line") or roof.get("platform", false) or prev.get("platform", false):
+					continue  # 특수 틈은 tests/test_structures.gd에서 확인 (일반 틈보다 넓고, 판은 너비 제한 없음)
 				assert_true(gap <= JumpModel.max_reach(speed, rise) * RoofGenerator.gap_safety(speed) + 0.001, where + " 최대 점프로 닿음 (속도별 여유)")
 				assert_true(absf(rise) <= Balance.ROOF_TOP_STEP + 0.001, where + " 높이 차")
 				assert_true(roof.top >= Balance.ROOF_TOP_MIN and roof.top <= Balance.ROOF_TOP_MAX, where + " 높이")
@@ -45,20 +48,10 @@ func test_가장_높이_올라가는_간격도_최소_간격보다_넓게_닿음
 
 
 func test_잘하는_플레이어면_속도별로_한_번도_안_떨어짐() -> void:
-	# 최대로 눌러 다음 옥상 앞쪽에 내려앉는 지점에서 뛰는 봇으로 실제 물리 진행을 60초씩 돌린다
+	# 실수 없는 봇(특수 틈 포함)으로 실제 물리 진행을 속도를 고정해 60초씩 돌린다
 	for speed in SPEEDS:
-		var sim := RunnerSim.new(7, speed)
-		sim.accelerate = false
-		var falls := 0
-		var hold_left := 0.0
-		for i in 120 * 60:
-			if sim.on_ground and _should_jump(sim):
-				hold_left = JumpModel.max_hold_time() + 1.0 / 120.0
-			sim.step(1.0 / 120.0, hold_left > 0.0)
-			hold_left -= 1.0 / 120.0
-			if sim.fell:
-				falls += 1
-		assert_eq(falls, 0, "속도 %d에서 떨어진 횟수" % speed)
+		for seed_value in 5:
+			assert_eq(BalanceBot.play({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, 60.0, speed, false), 60.0, "속도 %d, 시드 %d" % [speed, seed_value + 1])
 
 
 func test_높은_옥상도_벽에_막히지_않고_넘을_수_있다() -> void:
@@ -70,19 +63,6 @@ func test_높은_옥상도_벽에_막히지_않고_넘을_수_있다() -> void:
 	for speed in SPEEDS:
 		var above: float = speed * (JumpModel.max_air_time(rise) - t_up)
 		assert_true(above > Balance.CAT_BODY_SIZE.x * 0.5 - Balance.CAT_FOOT_HALF + 30.0, "속도 %d: %.0f" % [speed, above])
-
-
-## 지금 최대로 뛰면 다음 옥상 앞쪽(앞발이 막 걸치는 곳보다 조금 안)에 내려앉는지
-func _should_jump(sim: RunnerSim) -> bool:
-	var here := sim.roofs.find(sim.get("_ground_roof"))
-	if here < 0 or here + 1 >= sim.roofs.size():
-		return false
-	var roof: Dictionary = sim.roofs[here]
-	var next: Dictionary = sim.roofs[here + 1]
-	var land_x := sim.x + sim.speed * JumpModel.max_air_time(next.top - roof.top)
-	# 너무 늦으면(발이 끝을 지나기 직전) 바로 뛴다
-	var last_chance: bool = sim.x + Balance.CAT_FOOT_HALF - roof.right > -sim.speed / 120.0 * 2.0
-	return land_x >= next.left + 20.0 or last_chance
 
 
 func _roofs(seed_value: int, speed: float, count: int) -> Array:

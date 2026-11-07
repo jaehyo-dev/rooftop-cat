@@ -43,3 +43,10 @@ static func max_air_time(rise: float) -> float:
 static func max_reach(speed: float, rise: float) -> float:
 	var t := max_air_time(rise)
 	return speed * t if t >= 0.0 else 0.0
+
+
+## 높이 top에서 위로 v0의 속도로 던져 올려 높이 level까지 내려올 때까지의 시간 (닿을 수 없으면 -1)
+static func fall_time(top: float, v0: float, level: float) -> float:
+	var g := Balance.GRAVITY
+	var disc := v0 * v0 + 2.0 * g * (top - level)
+	return (v0 + sqrt(disc)) / g if disc >= 0.0 else -1.0

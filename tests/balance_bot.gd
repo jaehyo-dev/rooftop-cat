@@ -2,6 +2,8 @@ extends RefCounted
 ## 밸런스 봇: 사람처럼 타이밍이 조금씩 어긋나게 점프하며 한 판을 끝까지 플레이하고, 버틴 시간을 잰다.
 ##
 ## 봇이 노리는 점프: 옥상에 내려설 때마다 "다음 옥상까지 최대로 눌러 닿을 수 있는 구간"의 가운데에서 누르려 한다.
+## 특수 틈: 빨래줄 틈은 옥상 끝에서 마지막에 최대로 뛰어 줄 위에 내리고(튕김은 알아서 건넘),
+## 전봇대 틈은 판 가운데로 뛰어 올라선 뒤 판에서 다음 옥상으로 뛴다. 착지할 때마다 다시 계획한다.
 ## 실력(skill)은 두 가지 실수로 나타낸다 (시드로 고정된 무작위 값):
 ## - timing: 누르는 순간이 어긋나는 정도 (초, 표준편차). 빠를수록 같은 시간 실수가 더 먼 거리가 된다
 ## - short_hold: 손을 일찍 떼는 정도 (최대로 누를 시간에 대한 비율, 표준편차)
@@ -18,8 +20,10 @@ const SKILLS := {
 
 
 ## seed_value로 정해진 옥상에서 한 판 플레이하고 버틴 시간(초)을 돌려준다. max_time초를 버티면 max_time
-static func play(skill: Dictionary, seed_value: int, max_time: float) -> float:
-	var sim := RunnerSim.new(seed_value)
+## start_speed·accelerate: 처음 속도와 빨라지는지 (속도를 고정해 보는 테스트용)
+static func play(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true) -> float:
+	var sim := RunnerSim.new(seed_value, start_speed)
+	sim.accelerate = accelerate
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value * 7919 + 13
 	var planned_roof := {}   # 점프를 계획한 옥상 (내려설 때마다 새로 계획)
@@ -28,10 +32,15 @@ static func play(skill: Dictionary, seed_value: int, max_time: float) -> float:
 	var hold_left := 0.0
 	while not sim.game_over and sim.elapsed < max_time:
 		var ground: Dictionary = sim.get("_ground_roof")
+		if sim.landed:
+			planned_roof = {}  # 착지(같은 옥상에 다시 내려앉은 경우 포함)할 때마다 새로 계획
 		if sim.on_ground and not is_same(ground, planned_roof):
 			planned_roof = ground
 			press_x = _ideal_press_x(sim) + rng.randfn(0.0, skill.timing) * sim.speed
 			hold = JumpModel.max_hold_time() * clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
+			var needed := _plate_hold(sim, press_x)
+			if needed >= 0.0:
+				hold = minf(hold, needed)  # 판으로 뛸 자리를 이미 지났으면 눌러서 뛰는 시간을 줄여 판 가운데에 맞춘다
 		if sim.x >= press_x:
 			press_x = INF
 			hold_left = hold + DT  # 누르는 첫 step은 점프 시작이라 한 칸 더 누른다
@@ -47,8 +56,38 @@ static func _ideal_press_x(sim: RunnerSim) -> float:
 		return INF
 	var roof: Dictionary = sim.roofs[here]
 	var next: Dictionary = sim.roofs[here + 1]
+	if next.has("line"):
+		# 줄 틈: 틈 시작 조금 안쪽 줄 위에 내리도록 최대로 뛴다. 일찍 뛰면 옥상에 다시 내릴 뿐이라 늦는 쪽이 위험하다
+		var land_x: float = roof.right + 90.0
+		return minf(land_x - sim.speed * JumpModel.max_air_time(Balance.LINE_HEIGHT), roof.right + Balance.CAT_FOOT_HALF - 10.0)
+	if next.get("platform", false):
+		# 전봇대 판: 최대로 눌러 판 가운데에 내려앉는 위치 (너무 앞이면 마지막 순간)
+		var center: float = (next.left + next.right) * 0.5
+		return minf(center - sim.speed * JumpModel.max_air_time(next.top - roof.top), roof.right + Balance.CAT_FOOT_HALF - 10.0)
 	# 지금 속도로 계산 (점프하는 동안 빨라지는 건 아주 조금이라 무시)
 	var reach := sim.speed * JumpModel.max_air_time(next.top - roof.top)
 	var earliest: float = next.left - Balance.CAT_FOOT_HALF - reach + 10.0  # 이보다 일찍 누르면 앞발이 못 걸침
 	var latest: float = roof.right + Balance.CAT_FOOT_HALF - 10.0          # 이보다 늦으면 발밑이 빔
-	return (earliest + latest) * 0.5
+	return minf((earliest + latest) * 0.5, latest)
+
+
+## 다음이 전봇대 판이고 뛸 자리를 이미 지났을 때, 판 가운데에 내려앉는 누르는 시간. 해당 없으면 -1
+static func _plate_hold(sim: RunnerSim, press_x: float) -> float:
+	var here := sim.roofs.find(sim.get("_ground_roof"))
+	if here < 0 or here + 1 >= sim.roofs.size() or press_x >= sim.x:
+		return -1.0
+	var plate: Dictionary = sim.roofs[here + 1]
+	if not plate.get("platform", false):
+		return -1.0
+	var rise: float = plate.top - sim.roofs[here].top
+	var target: float = (plate.left + plate.right) * 0.5 - sim.x
+	var lo := 0.0
+	var hi := JumpModel.max_hold_time()
+	for i in 24:
+		var mid := (lo + hi) * 0.5
+		var t := JumpModel.air_time(mid, rise)
+		if t >= 0.0 and sim.speed * t < target:
+			lo = mid
+		else:
+			hi = mid
+	return lo

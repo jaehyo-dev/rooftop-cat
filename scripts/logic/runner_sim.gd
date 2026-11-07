@@ -10,8 +10,10 @@ extends RefCounted
 ##   - 달리다 부딪혔거나, 점프했는데 살짝 모자라 몸이 모서리에 걸렸으면(몸 높이 안쪽) 잠시 투명해져(ghost_time)
 ##     벽을 통과하고, 발 범위가 그 옥상에 걸치면 옥상 위로 떠올라 올라선다.
 ##   - 점프 없이 틈으로 떨어지는 중이거나 너무 낮게 부딪혔으면 벽에 막혀 그대로 떨어진다 (투명화가 남아 있어도).
-## 구조물(structures): 빨래줄은 위에서 내려와 밟으면 튕겨 오르고(밟기 직전에 새로 누르면 더 높이), 전봇대는 꼭대기에 착지한다.
-##   달리다 아래로 지나가는 건 막지 않는다. 구조물 위에 서면 옥상처럼 발이 걸쳐 있는 동안 선다.
+## 구조물(넓은 틈, RoofGenerator): 빨래줄(structures)은 틈을 가로지르는 줄로, 위에서 내려와 밟으면 튕겨 오르고(밟기 직전에
+##   새로 누르면 더 높이) 튕긴 뒤에도 틈 위면 또 밟아 튕긴다. 전봇대는 틈 한가운데 판(roofs에 들어 있는 platform 옥상)으로,
+##   위에서 내려앉으면 서고 올라서면 다시 뛸 수 있다. 판은 벽 판정이 없다(몸이 닿아도 막히지 않음).
+##   특수 틈 다음 옥상(no_ghost)은 벽에 닿아도 투명화 구제가 없다.
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
 ## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
 
@@ -38,7 +40,7 @@ var game_over := false
 ## 달린 시간 (초)
 var elapsed := 0.0
 var roofs: Array[Dictionary] = []
-## 옥상 위 구조물 (StructurePlacer 형식). 지나간 것은 지운다
+## 틈을 가로지르는 빨래줄들 (옥상 생성 때 roof.line에서 꺼내 둠). 지나간 것은 지운다
 var structures: Array[Dictionary] = []
 ## 아직 먹지 않은 아이템 (ItemPlacer 형식). 먹거나 지나간 아이템은 지운다
 var items: Array[Dictionary] = []
@@ -60,7 +62,6 @@ var time_since_bounce := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
-var _structure_placer: StructurePlacer
 var _start_speed := Balance.RUN_SPEED
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
@@ -79,7 +80,6 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
 	_start_speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
-	_structure_placer = StructurePlacer.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	_ground_roof = roofs[0]
 	y = roofs[0].top
@@ -197,7 +197,9 @@ func is_doomed() -> bool:
 			continue
 		# 발이 옥상에 걸쳐 있는데 옥상보다 아래면 아래에서 올라설 수 없다.
 		# 앞 옥상이면 점프했을 때만 투명화로 오를 수 있는 높이(몸 높이)까지 괜찮다 (점프 없이 떨어지면 벽에 막힘)
-		var margin: float = Balance.CAT_BODY_SIZE.y if _jumped and not _feet_over(roof) else 0.0
+		if roof.get("platform", false) and y < roof.top:
+			continue  # 판은 위에서만 서니, 판 높이 아래로 내려왔으면 판은 이제 상관없다 (그 뒤 옥상으로 판단)
+		var margin: float = Balance.CAT_BODY_SIZE.y if _jumped and not _feet_over(roof) and not roof.get("no_ghost", false) else 0.0
 		return y < roof.top - margin
 	return true
 
@@ -214,11 +216,11 @@ func _move_forward(distance: float) -> void:
 	if rescuing:
 		return  # 구제 중에는 벽을 통과한다
 	for roof in roofs:
-		if roof.top > y and roof.left >= old_front - 0.001 and roof.left < front():
+		if roof.top > y and roof.left >= old_front - 0.001 and roof.left < front() and not roof.get("platform", false):
 			var near_miss: bool = _jumped and roof.top - y <= Balance.CAT_BODY_SIZE.y
 			# 투명화로 떠오르는 중(발이 올라설 옥상 위)에 닿은 벽도 통과한다
 			var rising: bool = ghost_time > 0.0 and not _ghost_roof.is_empty() and _feet_over(_ghost_roof)
-			if on_ground or near_miss or rising:
+			if (on_ground or near_miss or rising) and not roof.get("no_ghost", false):
 				# 투명화 중에 또 부딪히면 시간은 그대로 두고 올라설 옥상만 바꾼다
 				if ghost_time == 0.0:
 					ghost_time = Balance.GHOST_TIME
@@ -342,11 +344,8 @@ func _fill_roofs() -> void:
 		var roof := _generator.next_roof(roofs[-1], speed)
 		items.append_array(_placer.items_for(roofs[-1], roof))
 		roofs.append(roof)
-		# 구조물은 다음 옥상이 생겨야 안전한 자리를 알 수 있어서, 한 옥상 늦게 앞 옥상(첫 옥상 제외)에 놓는다
-		if roofs.size() > 2:
-			var structure := _structure_placer.structure_for(roofs[-2], roofs[-1], speed)
-			if not structure.is_empty():
-				structures.append(structure)
+		if roof.has("line"):
+			structures.append(roof.line)
 	while roofs.size() > 1 and roofs[0].right < x - 1000.0:
 		roofs.pop_front()
 	while not structures.is_empty() and structures[0].right < x - 1000.0:

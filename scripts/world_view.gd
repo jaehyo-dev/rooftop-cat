@@ -23,10 +23,17 @@ const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
 ## 구조물 그림 (assets/sprites/structures/, 화면에 그릴 크기)
 const LINE_TEXTURE := preload("res://assets/sprites/structures/clothesline.png")
 const POLE_TEXTURE := preload("res://assets/sprites/structures/pole.png")
-const LINE_DRAW_WIDTH := 216.0   # 빨래줄 그림 너비 (기둥이 옥상에 닿도록 LINE_HEIGHT에 맞춘 크기)
-const LINE_ROPE_FRAC := 0.2      # 빨래줄 그림에서 줄이 있는 높이 (그림 위에서부터 비율)
-const POLE_WIDEN := 1.35         # 전봇대 그림을 가로로 넓혀 꼭대기가 고양이가 서기에 충분해 보이게
-const POLE_EMBED := 8.0          # 기둥 아래가 옥상에 묻히는 정도
+## 빨래줄 그림(500x191)에서: 양쪽 기둥 조각(너비 40)과 가운데(줄과 빨래) 조각. 가운데는 틈 너비에 맞춰 몇 번 늘려 이어 붙인다
+const LINE_POST_SRC := 40.0
+const LINE_ROPE_Y := 38.0     # 그림 안에서 줄의 높이 (위에서부터 픽셀)
+const LINE_TILE_STRETCH := 1.3  # 줄과 빨래 조각을 가로로 이만큼 넓게 펴서 이어 붙임
+const LINE_POST_BOTTOM := 187.0  # 그림 안에서 기둥 아래 끝
+## 전봇대 그림(267x767)에서: 위 조각(판~가로대, 0~209줄)과 기둥 몸통 조각(가로 105~161). 판 너비(187)에 맞춰 크기를 정하고 기둥은 아래로 늘린다
+const POLE_PLATE_WIDTH := 187.0
+const POLE_PLATE_TOP := 7.0
+const POLE_HEAD_ROWS := 209.0
+const POLE_TRUNK_X := 105.0
+const POLE_TRUNK_W := 56.0
 const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초)
 const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
@@ -138,6 +145,9 @@ func _draw() -> void:
 			[SKY_TOP, SKY_TOP, SKY_BOTTOM, SKY_BOTTOM])
 
 	for roof in sim.roofs:
+		if roof.get("platform", false):
+			_draw_pole(roof, offset, ground)  # 전봇대 판은 건물이 아니라 기둥 그림으로
+			continue
 		var left: float = roof.left + offset
 		var right: float = roof.right + offset
 		if right < 0.0 or left > size.x:
@@ -147,8 +157,8 @@ func _draw() -> void:
 		draw_rect(Rect2(left - 6.0, top, right - left + 12.0, 18.0), ROOF_FILL)
 		draw_rect(Rect2(left - 6.0, top + 18.0, right - left + 12.0, 4.0), ROOF_EDGE)
 
-	for structure in sim.structures:
-		_draw_structure(structure, offset, ground)
+	for line in sim.structures:
+		_draw_line(line, offset, ground)
 
 	for item in sim.items:
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
@@ -164,23 +174,45 @@ func _draw() -> void:
 				RESCUE_BOX_WIDTH, h), false)
 
 
-## 구조물 그림: 빨래줄은 줄이 발판 높이에, 전봇대는 꼭대기 판이 발판 높이에 오게 그린다
-func _draw_structure(structure: Dictionary, offset: float, ground: float) -> void:
-	var cx: float = (structure.left + structure.right) * 0.5 + offset
-	if cx < -200.0 or cx > get_viewport_rect().size.x + 200.0:
+## 전봇대: 판 옥상(platform) 위에 판이 오게 그리고 기둥은 화면 아래까지 늘린다 (기둥은 그림일 뿐 판정 없음)
+func _draw_pole(plate: Dictionary, offset: float, ground: float) -> void:
+	var cx: float = (plate.left + plate.right) * 0.5 + offset
+	if cx < -300.0 or cx > get_viewport_rect().size.x + 300.0:
 		return
-	if structure.kind == "pole":
-		var h: float = Balance.POLE_HEIGHT + POLE_EMBED
-		var w := h * POLE_TEXTURE.get_width() / POLE_TEXTURE.get_height() * POLE_WIDEN
-		draw_texture_rect(POLE_TEXTURE, Rect2(cx - w * 0.5, ground - structure.base - Balance.POLE_HEIGHT, w, h), false)
+	var k: float = (plate.right - plate.left) / POLE_PLATE_WIDTH
+	var top_y: float = ground - plate.top - POLE_PLATE_TOP * k
+	var head_w := POLE_TEXTURE.get_width() * k
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - head_w * 0.5, top_y, head_w, POLE_HEAD_ROWS * k),
+			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_HEAD_ROWS))
+	var trunk_top := top_y + POLE_HEAD_ROWS * k - 1.0
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - POLE_TRUNK_W * k * 0.5, trunk_top, POLE_TRUNK_W * k, ground - trunk_top + 4.0),
+			Rect2(POLE_TRUNK_X, POLE_HEAD_ROWS, POLE_TRUNK_W, 200.0))
+
+
+## 빨래줄: 틈 양쪽 옥상 끝에 기둥, 그 사이에 줄과 빨래를 틈 너비만큼 이어 붙인다 (줄이 발판 높이에 오게)
+func _draw_line(line: Dictionary, offset: float, ground: float) -> void:
+	var left: float = line.left + offset
+	var right: float = line.right + offset
+	if right < -100.0 or left > get_viewport_rect().size.x + 100.0:
 		return
-	var line_h := LINE_DRAW_WIDTH * LINE_TEXTURE.get_height() / LINE_TEXTURE.get_width()
-	# 밟은 직후에는 아래로 눌렸다 돌아오게 세로로 줄였다 늘린다 (기둥 아래는 그대로)
+	var k := (Balance.LINE_HEIGHT + 6.0) / (LINE_POST_BOTTOM - LINE_ROPE_Y)  # 기둥이 옥상에 6픽셀 묻히게
+	var h := LINE_TEXTURE.get_height() * k
+	var top_y: float = ground - line.top - LINE_ROPE_Y * k
+	# 밟은 직후에는 줄이 아래로 눌렸다 돌아온다 (기둥은 그대로, 줄과 빨래만 세로로 줄였다 늘림)
 	var squash := 1.0
-	if structure == sim.bounced_line and sim.time_since_bounce < LINE_BOUNCE_ANIM:
+	if line == sim.bounced_line and sim.time_since_bounce < LINE_BOUNCE_ANIM:
 		squash = 1.0 - 0.18 * sin(PI * sim.time_since_bounce / LINE_BOUNCE_ANIM)
-	var bottom: float = ground - structure.base + (line_h * (1.0 - LINE_ROPE_FRAC) - Balance.LINE_HEIGHT)
-	draw_texture_rect(LINE_TEXTURE, Rect2(cx - LINE_DRAW_WIDTH * 0.5, bottom - line_h * squash, LINE_DRAW_WIDTH, line_h * squash), false)
+	var mid_src_w: float = LINE_TEXTURE.get_width() - 2.0 * LINE_POST_SRC
+	var length: float = right - left
+	var count := maxi(1, roundi(length / (mid_src_w * k * LINE_TILE_STRETCH)))  # 빨래가 너무 촘촘해지지 않게 조금 넓게 편다
+	var tile_w := length / count
+	for i in count:
+		draw_texture_rect_region(LINE_TEXTURE, Rect2(left + i * tile_w, top_y + h * (1.0 - squash), tile_w, h * squash),
+				Rect2(LINE_POST_SRC, 0, mid_src_w, LINE_TEXTURE.get_height()))
+	var post_w := LINE_POST_SRC * k
+	draw_texture_rect_region(LINE_TEXTURE, Rect2(left - post_w * 0.5, top_y, post_w, h), Rect2(0, 0, LINE_POST_SRC, LINE_TEXTURE.get_height()))
+	draw_texture_rect_region(LINE_TEXTURE, Rect2(right - post_w * 0.5, top_y, post_w, h),
+			Rect2(LINE_TEXTURE.get_width() - LINE_POST_SRC, 0, LINE_POST_SRC, LINE_TEXTURE.get_height()))
 
 
 ## 아이템 그림을 가운데 pos에 그린다 (zoom 배율, alpha 투명도)

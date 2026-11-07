@@ -77,22 +77,32 @@ const BOX_EVERY_MAX := 60
 const RESCUE_HEIGHT := 0.0
 const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
 
-# --- 구조물: 빨래줄, 전봇대 ---
-## 새 옥상(첫 옥상 제외)에 구조물이 놓일 확률, 그중 빨래줄이 될 확률 (나머지는 전봇대)
-const STRUCTURE_CHANCE := 0.4
-const LINE_SHARE := 0.6
-## 빨래줄: 옥상 위 LINE_HEIGHT 높이의 줄. 위에서 내려와 밟으면 튕겨 오른다 (달리다 아래로 지나가는 건 막지 않음).
+# --- 구조물: 빨래줄, 전봇대 (넓은 틈에 놓이는 다리·디딤돌) ---
+## 새 옥상을 만들 때 "특수 틈"(점프 한 번으로 못 건너는 넓은 틈)으로 만들 확률, 그중 빨래줄이 될 확률 (나머지는 전봇대).
+## 처음 SPECIAL_GAP_AFTER개 옥상은 일반 틈만 (처음엔 쉽게)
+const SPECIAL_GAP_CHANCE := 0.3
+const SPECIAL_GAP_AFTER := 3
+const LINE_SHARE := 0.5
+## 못 건너는 틈의 여유: 최대 점프로 닿는 거리 + 발 범위 + 코요테에 더하는 픽셀
+const SPECIAL_GAP_MARGIN := 40.0
+## 빨래줄: 틈 전체를 가로지르는 줄(옥상 위 LINE_HEIGHT 높이). 위에서 내려와 밟으면 튕겨 오른다 (달리다 지나가는 건 막지 않음).
+## 튕겨 오른 뒤 아직 틈 위면 줄을 또 밟아 튕기니, 한 번만 밟으면 건너간다
 const LINE_HEIGHT := 60.0
-const LINE_WIDTH := 140.0        # 밟을 수 있는 가로 길이 (발 범위가 걸치면 되니 실제로는 이보다 넓게 밟힘)
-const LINE_MARGIN := 60.0         # 줄 끝에서 옥상 끝까지 최소 여백
-## 튕겨 오르는 높이 (줄 위로). 밟기 직전 JUMP_BUFFER_TIME(0.1초) 안에 새로 누르면 더 높이 (최대 점프 높이 250보다 높게).
-## 기본 튕김은 구조물이 놓일 때 안전한지 계산하는 기준이라 너무 높이면 빨래줄이 놓일 자리가 사라진다 (StructurePlacer)
-const LINE_BOUNCE_HEIGHT := 140.0
+## 틈 너비 범위: 못 건너는 최소 ~ 최소 + 튕김 한 번의 거리 x LINE_GAP_SPAN (1이면 튕김 1~2번 만에 건넘)
+const LINE_GAP_SPAN := 1.0
+## 튕겨 오르는 높이 (줄 위로). 밟기 직전 JUMP_BUFFER_TIME(0.1초) 안에 새로 누르면 더 높이 (최대 점프 높이 250보다 높게)
+const LINE_BOUNCE_HEIGHT := 170.0
 const LINE_BOOST_HEIGHT := 290.0
-## 전봇대: 옥상 위 POLE_HEIGHT 높이의 평평한 꼭대기에 착지한다. 최대 점프 높이(250)에 가깝게 잡아 길게 눌러야 닿는다
-const POLE_HEIGHT := 200.0
-const POLE_WIDTH := 60.0         # 꼭대기 가로 길이
-const POLE_MARGIN := 110.0       # 꼭대기 끝에서 옥상 끝까지 최소 여백
+## 줄 위 생선 줄의 높이 (줄에서 위로). 기본 튕김으로는 안 닿고 더 높이 튕겨야 먹는다
+const LINE_FISH_HEIGHT := 300.0
+## 전봇대: 틈 한가운데 판(꼭대기). 판 너비는 속도가 낮을수록 넓게 시작해 POLE_WIDTH_MIN까지 좁아진다.
+## 판 높이는 앞뒤 옥상 중 높은 쪽 (판에서 벽에 막히지 않고, 판에서 다음 옥상으로는 내려감)
+const POLE_WIDTH_START := 200.0
+const POLE_WIDTH_MIN := 120.0
+## 판까지·판에서 다음까지 각각 최대 점프 거리의 이 비율 안에 둔다 (일반 틈의 여유 0.5~0.8보다 넉넉히 어렵지 않게)
+const POLE_GAP_SAFETY := 0.75
+## 틈 너비 범위: 못 건너는 최소 ~ 최소 + POLE_GAP_SPAN
+const POLE_GAP_SPAN := 200.0
 
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)

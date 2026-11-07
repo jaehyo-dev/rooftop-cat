@@ -49,7 +49,11 @@ func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있
 			assert_true(item.y - floor_top >= Balance.ITEM_LIFT - 0.01, "옥상 %d: 옥상에 묻히지 않음 (%.0f)" % [i, item.y - floor_top])
 			# 높은 쪽 옥상에서 최대로 뛰면 몸 가운데가 닿는 높이 안
 			var above: float = item.y - maxf(prev.top, roof.top)
-			assert_true(above <= Balance.JUMP_MAX_HEIGHT + Balance.ITEM_LIFT, "옥상 %d: 뛰면 닿는 높이 (%.0f)" % [i, above])
+			# (빨래줄 틈 위 생선 줄은 더 높이 튕겨야 닿는 높이)
+			var reach := Balance.JUMP_MAX_HEIGHT
+			if roof.has("line"):
+				reach = Balance.LINE_HEIGHT + Balance.LINE_BOOST_HEIGHT
+			assert_true(above <= reach + Balance.ITEM_LIFT, "옥상 %d: 뛰면 닿는 높이 (%.0f)" % [i, above])
 			if item.kind == "fish":
 				fish += 1
 			else:
@@ -58,7 +62,11 @@ func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있
 	assert_true(fish > 300, "생선이 넉넉함 (%d)" % fish)
 	assert_true(box_roofs.size() >= 300 / Balance.BOX_EVERY_MAX, "상자 %d개" % box_roofs.size())
 	for k in range(1, box_roofs.size()):
-		var gap := box_roofs[k] - box_roofs[k - 1]
+		# 전봇대 판은 상자 간격(옥상 수)에 세지 않는다
+		var gap := 0
+		for j in range(box_roofs[k - 1] + 1, box_roofs[k] + 1):
+			if not made.roofs[j].get("platform", false):
+				gap += 1
 		assert_true(gap >= Balance.BOX_EVERY_MIN and gap <= Balance.BOX_EVERY_MAX, "상자 간격 %d" % gap)
 
 

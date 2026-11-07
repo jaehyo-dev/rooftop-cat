@@ -52,7 +52,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/items/fish.png`, `box.png` | 2026-11-07 | 위 원본 | 게임 속 생선·종이상자 그림, 왼쪽 위 생선·상자 표시 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 너비 240픽셀로 줄임 |
 | `assets/raw/structures_concept.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림을 그림체 참고로 첨부) | 구조물 콘셉트 시안(연두 배경): 빨래줄, 전봇대 (게임에 포함 안 됨) | 없음 |
 | `assets/raw/structures_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (위 시안을 `--image`로 첨부해 마젠타 배경으로 다시 그림) | 구조물 시트 원본 (게임에 포함 안 됨) | 없음 |
-| `assets/sprites/structures/clothesline.png`, `pole.png` | 2026-11-07 | 위 원본 | 게임 속 빨래줄·전봇대 그림 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 빨래줄 너비 500, 전봇대 높이 440픽셀로 줄임 |
+| `assets/sprites/structures/clothesline.png`, `pole.png` | 2026-11-07 | 위 원본 | 게임 속 빨래줄·전봇대 그림 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 빨래줄은 너비 500픽셀로 줄이고, 전봇대는 원본 크기(267x767) 그대로 |
 
 ## 직접 만든 것
 
