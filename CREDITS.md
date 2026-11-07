@@ -53,6 +53,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/structures_concept.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림을 그림체 참고로 첨부) | 구조물 콘셉트 시안(연두 배경): 빨래줄, 전봇대 (게임에 포함 안 됨) | 없음 |
 | `assets/raw/structures_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (위 시안을 `--image`로 첨부해 마젠타 배경으로 다시 그림) | 구조물 시트 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/structures/clothesline.png`, `pole.png` | 2026-11-07 | 위 원본 | 게임 속 빨래줄·전봇대 그림 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 빨래줄은 너비 500픽셀로 줄이고, 전봇대는 원본 크기(267x767) 그대로 |
+| `assets/raw/neighborhood_concept.png` | 2026-11-08 | Codex 내장 이미지 생성 (고양이·구조물 그림을 `--image`로 첨부해 그림체를 맞춤) | 주택가 건물 3종·옥상 소품 6종 시안·원본(마젠타 배경, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/buildings/*.png` | 2026-11-08 | 위 원본 | 게임 속 주택가 건물 조각(왼쪽 캡·가운데·오른쪽 캡)과 옥상 소품 | `tools/cut_buildings.py`로 마젠타 배경을 지우고 지붕 위 실외기·화분은 건물에서 지워 소품으로 분리, 건물은 0.8배·소품은 0.7배로 줄임 |
 
 ## 직접 만든 것
 

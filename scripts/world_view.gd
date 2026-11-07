@@ -14,9 +14,8 @@ const MAX_STEPS_PER_FRAME := 12
 
 const SKY_TOP := Color("#cfe6f2")
 const SKY_BOTTOM := Color("#fbe9d4")
-const ROOF_FILL := Color("#b98b6e")
-const ROOF_EDGE := Color("#8a5f4a")
-const ROOF_WALL := Color("#d7b49a")
+const BELOW_DARKEN := 0.1  # 그림 아래 벽 색이 화면 바닥에서 이만큼 어두워짐
+const WALL_LINE := 0.72  # 건물 옆 테두리: 채움 색을 이만큼 어둡게
 ## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
 const FISH_TEXTURE := preload("res://assets/sprites/items/fish.png")
 const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
@@ -51,6 +50,7 @@ var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프
 var _tap_pending := false
 var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", "t"}
 var _was_rescuing := false
+var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
 
 
 func _ready() -> void:
@@ -152,10 +152,7 @@ func _draw() -> void:
 		var right: float = roof.right + offset
 		if right < 0.0 or left > size.x:
 			continue
-		var top: float = ground - roof.top
-		draw_rect(Rect2(left, top, right - left, ground - top), ROOF_WALL)
-		draw_rect(Rect2(left - 6.0, top, right - left + 12.0, 18.0), ROOF_FILL)
-		draw_rect(Rect2(left - 6.0, top + 18.0, right - left + 12.0, 4.0), ROOF_EDGE)
+		_draw_building(roof, offset, ground)
 
 	for line in sim.structures:
 		_draw_line(line, offset, ground)
@@ -172,6 +169,52 @@ func _draw() -> void:
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
 		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
+
+
+## 옥상의 건물: 왼쪽 캡 + 가운데 조각들(옥상 폭에 맞춰 늘임) + 오른쪽 캡, 그림 아래는 벽 색으로 화면 바닥까지 채움, 그 위에 소품.
+## 그림의 맨 윗줄 = 옥상 충돌선(화면 y = ground - roof.top)이라 고양이 발이 지붕 턱 윗면에 닿는다.
+func _draw_building(roof: Dictionary, offset: float, ground: float) -> void:
+	var look := _look_of(roof)
+	var style: Dictionary = BuildingArt.style_textures(look.plan.style)
+	var fill: Color = BuildingArt.FILL_COLORS[look.plan.style]
+	var left: float = roof.left + offset
+	var right: float = roof.right + offset
+	var top: float = ground - roof.top
+	var art_h: float = style.left.get_height()
+	# 그림이 끝난 아래부터 화면 바닥까지: 벽 색 + 옆 테두리, 그림 아랫부분은 부드럽게 이어짐
+	var below := top + art_h
+	if below < ground:
+		var deep := fill.darkened(BELOW_DARKEN)  # 아래로 갈수록 살짝 어두워져 땅 쪽이 묵직해 보임
+		draw_polygon([Vector2(left, below), Vector2(right, below), Vector2(right, ground), Vector2(left, ground)], [fill, fill, deep, deep])
+	var fade := Color(fill, 0.0)
+	draw_polygon([Vector2(left, below - BuildingArt.FADE), Vector2(right, below - BuildingArt.FADE), Vector2(right, below), Vector2(left, below)],
+			[fade, fade, fill, fill])
+	var line := fill * WALL_LINE
+	line.a = 1.0
+	draw_line(Vector2(left, below), Vector2(left, ground), line, 2.0)
+	draw_line(Vector2(right, below), Vector2(right, ground), line, 2.0)
+	# 건물 그림 (캡 → 가운데 → 캡). 조각 경계를 정수 픽셀에 맞춰 이음매에 선이 비치지 않게 함
+	var x := left - BuildingLayout.OVERHANG
+	draw_texture(style.left, Vector2(roundf(x), top))
+	x += style.left.get_width()
+	for index in look.plan.mids:
+		var tex: Texture2D = style.mids[index]
+		var next_x: float = x + tex.get_width() * look.plan.stretch
+		draw_texture_rect(tex, Rect2(roundf(x), top, roundf(next_x) - roundf(x), art_h), false)
+		x = next_x
+	draw_texture(style.right, Vector2(roundf(x), top))
+	for prop in look.props:
+		var tex := BuildingArt.prop_texture(prop.kind)
+		draw_texture(tex, Vector2(prop.x + offset - tex.get_width() * 0.5, top + BuildingArt.PROP_SINK - tex.get_height()))
+
+
+func _look_of(roof: Dictionary) -> Dictionary:
+	if not _roof_looks.has(roof.left):
+		if _roof_looks.size() > 80:
+			_roof_looks.clear()
+		_roof_looks[roof.left] = {"plan": BuildingLayout.plan(roof.left, roof.right, BuildingArt.widths()),
+				"props": BuildingLayout.props(roof.left, roof.right)}
+	return _roof_looks[roof.left]
 
 
 ## 전봇대: 판 옥상(platform) 위에 판이 오게 그리고 기둥은 화면 아래까지 늘린다 (기둥은 그림일 뿐 판정 없음)
