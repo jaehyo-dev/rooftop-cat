@@ -21,14 +21,12 @@ func test_달리기_박자는_달린_거리로_정해져_한_박자에_CAT_STRID
 		assert_true(absf(a[key] - b[key]) < 0.001, "%s: 한 박자 뒤 같은 자세" % key)
 	var half := CatPose.target(true, 0.0, 40.0 + Balance.CAT_STRIDE * 0.5, 99.0)
 	assert_true(absf(a.front + half.front) < 0.001, "반 박자 뒤 다리가 반대쪽")
-	assert_true(CatPose.target(true, 0.0, Balance.CAT_STRIDE * 0.25, 99.0).body_bob > 0.0, "달리며 들썩임")
 
 
 func test_올라갈_때는_앞다리를_앞으로_뒷다리를_뒤로_뻗는다() -> void:
 	var pose := CatPose.target(false, JumpModel.jump_speed(), 0.0, 99.0)
 	assert_true(pose.front < -30.0 and pose.front_back < -20.0, "앞다리 앞으로 (음수)")
 	assert_true(pose.back > 25.0 and pose.back_back > 15.0, "뒷다리 뒤로 (양수)")
-	assert_eq(pose.body_bob, 0.0, "공중에서는 들썩이지 않음")
 
 
 func test_내려올_때는_다리를_아래로_모은다() -> void:
@@ -94,4 +92,33 @@ func test_달리면_부품이_움직이고_투명화면_반투명() -> void:
 	sim.ghost_time = 1.0
 	cat.show_state(sim, DT)
 	assert_true(cat.modulate.a < 0.6, "투명화 중 반투명")
+	cat.queue_free()
+
+
+func test_달리는_동안_가장_낮은_발이_늘_옥상에_닿고_몸은_들썩인다() -> void:
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames(1)
+	var sim := RunnerSim.new(5)
+	var body: Node2D = cat.get_node("Skeleton/body")
+	var body_heights := {}
+	for i in 240:
+		sim.step(DT, false)
+		if not sim.on_ground:
+			break
+		cat.show_state(sim, DT)
+		var lowest := -INF
+		for part in CatView.PARTS:
+			if not part.name in CatPose.LEGS:
+				continue
+			var bone: Node2D = cat.get_node("Skeleton/body/" + part.name)
+			var texture: Texture2D = load("res://assets/sprites/cat_parts/%s.png" % part.file)
+			# 발끝 = 부품 그림의 불투명한 가장 아랫줄, 다리 뼈대 기준 (도는 중심이 원점)
+			var foot := Vector2(0.0, texture.get_image().get_used_rect().end.y - part.pivot.y)
+			lowest = maxf(lowest, cat.to_local(bone.to_global(foot)).y)
+		assert_true(absf(lowest) <= 0.5, "%d번째 프레임: 가장 낮은 발 %.2f (0이면 옥상에 닿음)" % [i, lowest])
+		body_heights[snappedf(body.position.y, 0.5)] = true
+		if not failures.is_empty():
+			break
+	assert_true(body_heights.size() > 5, "다리가 움직이며 몸이 들썩임")
 	cat.queue_free()

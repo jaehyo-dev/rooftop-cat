@@ -61,7 +61,6 @@ const GHOST_RISE_SPEED := 700.0  # 투명화 중 옥상 위로 떠오르는 속�
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0     # 달리기 한 박자(다리가 한 번 앞뒤로 오감)에 가는 거리 (게임 픽셀)
 const CAT_LEG_SWING := 30.0   # 달릴 때 다리가 앞뒤로 흔들리는 최대 각도 (도)
-const CAT_RUN_BOB := 5.0      # 달릴 때 몸이 위아래로 들썩이는 높이 (게임 픽셀)
 
 # --- 늘어남·납작해짐 연출 (가로, 세로 배율) ---
 const STRETCH_RISE := Vector2(0.84, 1.2)   # 가장 빠르게 올라갈 때

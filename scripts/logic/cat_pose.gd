@@ -7,9 +7,11 @@ const LEGS := ["front", "front_back", "back", "back_back"]
 
 
 ## on_ground: 옥상 위인지, vy: 세로 속도(위로 +), x: 달린 거리, since_land: 착지 뒤 지난 시간
-## 돌려주는 값: 다리 4개·머리·꼬리 각도, body_bob(몸이 위로 뜨는 높이, 게임 픽셀)
+## 돌려주는 값: 다리 4개·머리·꼬리 각도.
+## 몸 높이는 여기서 정하지 않는다: 화면(CatView)이 다리 각도로 가장 낮은 발이 옥상에 닿게 몸을 내려서,
+## 다리가 곧을 때 몸이 가장 높고 벌어질수록 낮아지는 들썩임이 저절로 생긴다.
 static func target(on_ground: bool, vy: float, x: float, since_land: float) -> Dictionary:
-	var pose := {"head": 0.0, "tail": 0.0, "body_bob": 0.0}
+	var pose := {"head": 0.0, "tail": 0.0}
 	if on_ground:
 		var phase := x / Balance.CAT_STRIDE * TAU
 		var swing := Balance.CAT_LEG_SWING
@@ -18,7 +20,6 @@ static func target(on_ground: bool, vy: float, x: float, since_land: float) -> D
 		pose.front_back = sin(phase) * swing
 		pose.back = sin(phase) * swing
 		pose.back_back = -sin(phase) * swing
-		pose.body_bob = absf(sin(phase)) * Balance.CAT_RUN_BOB
 		pose.head = sin(phase * 2.0) * 3.0
 		pose.tail = sin(phase) * 8.0
 		if since_land < Balance.SQUASH_TIME:

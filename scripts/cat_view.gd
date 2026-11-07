@@ -28,7 +28,7 @@ const SMOOTH := 18.0
 
 var _bones := {}       # 이름 → Bone2D
 var _angles := {}      # 이름 → 지금 각도 (부드럽게 따라감)
-var _rig: Node2D
+var _legs := {}        # 다리 이름 → {"pivot_y": 몸통 기준 도는 중심 높이, "length": 도는 중심~발끝 길이} (부품 시트 픽셀)
 
 
 func _ready() -> void:
@@ -64,9 +64,11 @@ func _ready() -> void:
 		body.add_child(bone)
 		_bones[part.name] = bone
 		_angles[part.name] = 0.0
+		if part.name in CatPose.LEGS:
+			var used := sprite.texture.get_image().get_used_rect()
+			_legs[part.name] = {"pivot_y": bone.position.y, "length": used.end.y - part.pivot.y}
 	body.rest = body.transform
 	_bones["body"] = body
-	_rig = skeleton
 
 
 ## 부품 시트 픽셀 → 게임 픽셀 배율: 그림의 가로 길이를 충돌 판정 너비에 맞춘다
@@ -81,8 +83,11 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	for part_name in _angles:
 		_angles[part_name] = lerpf(_angles[part_name], target[part_name], k)
 		_bones[part_name].rotation_degrees = _angles[part_name]
-	# 몸이 들썩이면 머리·다리·꼬리도 함께 움직인다 (부품 시트 픽셀로 바꿔서)
-	_bones["body"].position.y = -target.body_bob / art_scale()
+	# 다리가 기울면 발이 올라가므로, 가장 낮은 발이 발끝 높이(ART_FEET)에 닿도록 몸 전체를 내린다
+	var lowest := -INF
+	for leg in _legs:
+		lowest = maxf(lowest, _legs[leg].pivot_y + _legs[leg].length * cos(deg_to_rad(_angles[leg])))
+	_bones["body"].position.y = ART_FEET - lowest
 	# 발끝을 기준으로 늘이고 줄여서 착지할 때 옥상에 붙어 있게 한다
 	scale = Squash.body_scale(sim.on_ground, sim.vy, sim.time_since_land)
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
