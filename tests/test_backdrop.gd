@@ -36,3 +36,22 @@ func test_구름은_시간이_가면_조금씩_흘러간다() -> void:
 	var now := Backdrop.cloud_x(900.0, 0.0, 0.0, 300.0)
 	var later := Backdrop.cloud_x(900.0, 0.0, 10.0, 300.0)
 	assert_true(absf((now - later) - 10.0 * Backdrop.CLOUD_DRIFT) < 0.001)
+
+
+func test_안개는_먼_것일수록_느리고_아래로_갈수록_진하다() -> void:
+	for i in range(1, Backdrop.MISTS.size()):
+		var prev: Array = Backdrop.MISTS[i - 1]
+		var mist: Array = Backdrop.MISTS[i]
+		assert_true(mist[1] > prev[1], "%s가 %s보다 빠름" % [mist[0], prev[0]])
+		assert_true(mist[2] >= prev[2], "%s가 %s보다 아래" % [mist[0], prev[0]])
+	assert_true(Backdrop.MISTS[2][3] > Backdrop.MISTS[0][3] and Backdrop.MISTS[3][3] >= Backdrop.MISTS[2][3], "안개 띠는 아래일수록 진함")
+	var a := Backdrop.town_tiles(0.0, 1536.0, 1280.0, 0.4)
+	var b := Backdrop.town_tiles(100.0, 1536.0, 1280.0, 0.4)
+	assert_true(absf((a[0].x - b[0].x) - 40.0) < 0.001, "시차 비율대로 움직임")
+
+
+func test_구름은_화면_가운데_높이까지_내려온다() -> void:
+	var lowest := 0.0
+	for cloud in Backdrop.CLOUDS:
+		lowest = maxf(lowest, cloud[2])
+	assert_true(lowest >= 0.35 and lowest < Backdrop.MISTS[0][2], "가장 낮은 구름이 가운데쯤, 안개보다 위")

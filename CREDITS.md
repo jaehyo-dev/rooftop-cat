@@ -10,6 +10,7 @@
 | 이름 | 버전 | 만든 사람 | 라이선스 | 출처 | 쓰는 곳 | 수정 |
 |---|---|---|---|---|---|---|
 | Godot Engine | 4.7.2-stable | Godot Engine contributors, Juan Linietsky, Ariel Manzur | MIT (엔진에 포함된 서드파티 구성 요소는 각자의 라이선스) | https://godotengine.org | 게임 엔진, 웹 내보내기 템플릿 | 없음 |
+| Gaegu Bold (`Gaegu-Bold.ttf`) | google/fonts 커밋 86aced9 | The Gaegu Project Authors (JIKJI SOFT) | SIL OFL 1.1 | https://github.com/google/fonts/tree/86aced9/ofl/gaegu | `assets/fonts/gaegu/`, HUD·게임 끝 화면 글자 (`scenes/main.tscn` 테마) | 없음 (라이선스 전문 `assets/fonts/gaegu/LICENSE.txt` = 원래 `OFL.txt`) |
 
 - Godot 엔진과 엔진 구성 요소의 라이선스 전문은 배포할 때 `licenses/godot.txt`로 자동 생성합니다 (`tools/export_licenses.gd`).
 
@@ -57,11 +58,13 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/neighborhood_concept.png` | 2026-11-08 | Codex 내장 이미지 생성 (고양이·구조물 그림을 `--image`로 첨부해 그림체를 맞춤) | 주택가 건물 3종·옥상 소품 6종 시안·원본(마젠타 배경, 게임에 포함 안 됨) | 없음 |
 | `assets/sprites/buildings/*.png` | 2026-11-08 | 위 원본 | 게임 속 주택가 건물 조각(왼쪽 캡·가운데·오른쪽 캡)과 옥상 소품 | `tools/cut_buildings.py`로 마젠타 배경을 지우고 지붕 위 실외기·화분은 건물에서 지워 소품으로 분리, 건물은 0.8배·소품은 0.7배로 줄임 |
 | `assets/raw/far_background.png` | 2026-11-08 | Codex 내장 이미지 생성 (주택가 시안·고양이 그림을 `--image`로 첨부해 그림체를 맞춤) | 먼 배경 시트 원본: 멀리 보이는 동네 띠 + 구름 4개 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
-| `assets/sprites/backdrop/*.png` | 2026-11-08 | 위 원본 | 게임 속 먼 배경: 동네 띠(far_town), 구름(cloud1~4) | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 동네 띠 위아래 투명 여백을 잘라 냄 → `tools/clean_edges.py`로 가장자리 분홍 잔여물 정리 |
+| `assets/sprites/backdrop/far_town.png`, `cloud1~4.png` | 2026-11-08 | 위 원본 | 게임 속 먼 배경: 동네 띠(far_town), 구름(cloud1~4) | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 동네 띠 위아래 투명 여백을 잘라 냄 → `tools/clean_edges.py`로 가장자리 분홍 잔여물 정리 |
+| `assets/raw/mist_bands.png`, `mist_silhouette.png` | 2026-11-08 | Codex 내장 이미지 생성 (시안 C·먼 배경 원본을 `--image`로 첨부해 그림체를 맞춤) | 안개 띠 3겹 시트, 안개 속 먼 지붕·나무·전봇대·전깃줄 실루엣 띠 원본 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/backdrop/mist_far.png`, `mist_mid.png`, `mist_near.png`, `mist_town.png` | 2026-11-08 | 위 원본 | v0.4.1 화면 아래 안개 겹(먼·가운데·맨 앞)과 안개 속 실루엣 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 여백·아래 가장자리 섞인 줄 잘라 냄 → 안개 띠는 윗가장자리에서 아래로 90~110줄에 걸쳐 투명→불투명으로 부드럽게, 색을 크림색 쪽으로 30% 옅게 → `tools/clean_edges.py` |
 | `review/v0.4.1/mockup_A_extend.png`, `mockup_B_alley.png`, `mockup_C_mist.png` | 2026-11-08 | Codex 내장 이미지 생성 (v0.4.0 캡처와 주택가 시안을 `--image`로 첨부) | v0.4.1 화면 아래 시안 A·B·C (검토용, 게임에 포함 안 됨) | 없음 |
 
 ## 직접 만든 것
 
-- 검토용 비교 그림 `review/v0.4.1/before_*.png`, `font_compare.png`, `pole_compare.png`, `compare_sheet.png`: 2026-11-08, 게임 캡처와 기존 그림으로 직접 합성 (게임에 포함 안 됨). `font_compare.png`의 글꼴(Gaegu, Gamja Flower, Poor Story, 모두 SIL OFL 1.1, google/fonts 커밋 86aced9)은 비교 그림에만 쓰고 저장소에는 넣지 않음
+- 검토용 비교 그림 `review/v0.4.1/before_*.png`, `after_*.png`, `before_seed7_*.png`, `font_compare.png`, `pole_compare.png`, `compare_sheet.png`, `compare_after.png`, `play_30s.gif`: 2026-11-08, 게임 캡처와 기존 그림으로 직접 합성 (게임에 포함 안 됨). `font_compare.png`의 글꼴(Gaegu, Gamja Flower, Poor Story, 모두 SIL OFL 1.1, google/fonts 커밋 86aced9)은 비교 그림에만 쓰고 저장소에는 넣지 않음
 - 프로젝트 아이콘 `icon.svg`: 이 프로젝트에서 직접 만듦
 - 배경 음악 `assets/audio/neighborhood.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦

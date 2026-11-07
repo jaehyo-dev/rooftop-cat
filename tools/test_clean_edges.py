@@ -28,7 +28,11 @@ class CleanEdgesTest(unittest.TestCase):
         files = [p for d in ("buildings", "structures", "items", "backdrop") for p in (ROOT / d).glob("*.png")]
         self.assertTrue(files)
         for path in files:
-            count = int(self.ce.pink_edge(self.np.asarray(self.Image.open(path).convert("RGBA"))).sum())
+            rgba = self.np.asarray(self.Image.open(path).convert("RGBA"))
+            inside = (rgba[..., 3] > 0) & ~self.ce.edge_mask(rgba)
+            if self.ce.pinkish(rgba)[inside].mean() > 0.5:
+                continue  # 안쪽도 대부분 분홍인 그림(노을 안개 띠)은 분홍이 원래 색이라 잔여물 검사 대상이 아님
+            count = int(self.ce.pink_edge(rgba).sum())
             self.assertEqual(count, 0, f"{path.name} 가장자리 분홍 픽셀 {count}개")
 
 

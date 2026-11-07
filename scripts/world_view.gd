@@ -19,8 +19,19 @@ const TOWN_TEXTURE := preload("res://assets/sprites/backdrop/far_town.png")
 const CLOUD_TEXTURES := [
 	preload("res://assets/sprites/backdrop/cloud1.png"), preload("res://assets/sprites/backdrop/cloud2.png"),
 	preload("res://assets/sprites/backdrop/cloud3.png"), preload("res://assets/sprites/backdrop/cloud4.png")]
-const TOWN_BOTTOM := 0.70       # 먼 동네 띠 아래 끝 (화면 높이 비율)
-const TOWN_FILL := Color("#fadecf")  # 띠 아래를 이어 채우는 안개색 (그림 맨 아랫줄 색)
+const TOWN_BOTTOM := 0.66       # 먼 동네 띠 아래 끝 (화면 높이 비율). 아랫부분은 먼 안개에 묻힘
+## 안개 띠 그림 (Backdrop.MISTS 이름별)과 띠 아래를 이어 채우는 색 (그림 맨 아랫줄 색)
+const MIST_TEXTURES := {"far": preload("res://assets/sprites/backdrop/mist_far.png"),
+		"town": preload("res://assets/sprites/backdrop/mist_town.png"),
+		"mid": preload("res://assets/sprites/backdrop/mist_mid.png"), "near": preload("res://assets/sprites/backdrop/mist_near.png")}
+const MIST_FILLS := {"far": Color("#fdd0a3"), "mid": Color("#fec4bd"), "near": Color("#cebbdf")}
+## 건물 몸통이 안개에 묻히는 구간: 옥상 윗면에서 이만큼 아래부터 묻히기 시작해 BODY_MIST_TO에서 다 묻힘
+const BODY_MIST_FROM := 70.0
+const BODY_MIST_TO := 330.0
+const BODY_MIST_MAX := 0.95
+const SHADOW_COLOR := Color("#5a4636")
+const SHADOW_WIDTH := 0.42   # 그림자 반지름 = 고양이 몸 너비 x 이 값
+const SHADOW_FLAT := 0.18    # 세로/가로 비율 (납작한 타원)
 const BELOW_DARKEN := 0.1  # 그림 아래 벽 색이 화면 바닥에서 이만큼 어두워짐
 const WALL_LINE := 0.72  # 건물 옆 테두리: 채움 색을 이만큼 어둡게
 ## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
@@ -40,9 +51,11 @@ const POLE_PLATE_TOP := 7.0
 const POLE_HEAD_ROWS := 209.0
 const POLE_TOP_ROWS := 92.0   # 위 조각(판+받침) 줄 수
 const POLE_BAR_ROW := 125.0   # 아래 조각(애자+가로대) 시작 줄
-const POLE_BAR_AT := 0.5      # 가로대 중심이 판~화면 바닥 사이 어디에 오는지 (0~1)
+const POLE_BAR_GAP := 8.0     # 받침 버팀대 끝과 가로대 사이 (그림 픽셀). 가로대를 위로 붙여 아래 안개에 묻히지 않게
 const POLE_TRUNK_X := 105.0
 const POLE_TRUNK_W := 56.0
+const POLE_PLATE_ROWS := 42.0  # 위 조각 중 판 부분 (그 아래는 받침 버팀대)
+const POLE_SLIM := 0.7         # 판 아래 그림(버팀대·가로대·기둥)만 이 배율로 가늘게. 판 너비(판정)는 그대로
 const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초)
 const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
@@ -61,12 +74,16 @@ var _tap_pending := false
 var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", "t"}
 var _was_rescuing := false
 var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
+var _front_mist := Node2D.new()  # 가장 가까운 안개: 고양이보다 앞에 그려 떨어지면 안개 속으로 사라짐
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 아이템 그림을 크게 줄여 그려도 거칠지 않게
 	cat.name = "Cat"
 	add_child(cat)
+	_front_mist.name = "FrontMist"
+	_front_mist.draw.connect(func() -> void: _draw_mist(_front_mist, Backdrop.MISTS[-1], get_viewport_rect().size))
+	add_child(_front_mist)
 	_place_cat(0.0)
 
 
@@ -102,6 +119,7 @@ func _process(delta: float) -> void:
 	_pops = _pops.filter(func(pop: Dictionary) -> bool: return pop.t < POP_TIME)
 	_place_cat(delta)
 	queue_redraw()
+	_front_mist.queue_redraw()
 
 
 ## 고양이를 로직 위치(발끝)에 놓고 자세를 맞춘다
@@ -169,6 +187,10 @@ func _draw() -> void:
 	for line in sim.structures:
 		_draw_line(line, offset, ground)
 
+	var shadow := CatShadow.under(sim.roofs, sim.x, sim.y)
+	if not shadow.is_empty() and not sim.rescuing:
+		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top), shadow)
+
 	for item in sim.items:
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
 		var bob := 4.0 * sin(sim.elapsed * 4.0 + item.x * 0.01)
@@ -183,20 +205,61 @@ func _draw() -> void:
 				RESCUE_BOX_WIDTH, h), false)
 
 
-## 먼 배경: 구름(가장 멀리) → 멀리 보이는 동네 띠. 모두 옥상보다 느리게 지나간다.
+## 먼 배경: 구름(가장 멀리) → 멀리 보이는 동네 띠 → 안개 겹들(건물 뒤). 모두 옥상보다 느리게 지나간다.
 func _draw_backdrop(size: Vector2) -> void:
 	for cloud in Backdrop.CLOUDS:
 		var tex: Texture2D = CLOUD_TEXTURES[cloud[0]]
 		var x := Backdrop.cloud_x(cloud[1], sim.x, sim.elapsed, tex.get_width())
 		draw_texture(tex, Vector2(x, size.y * cloud[2]))
-	var bottom := size.y * TOWN_BOTTOM
-	var tile_w := float(TOWN_TEXTURE.get_width())
-	var top := bottom - TOWN_TEXTURE.get_height()
-	draw_rect(Rect2(0.0, bottom - 1.0, size.x, size.y - bottom + 1.0), TOWN_FILL)
-	for tile in Backdrop.town_tiles(sim.x, tile_w, size.x):
-		# 뒤집은 조각은 너비를 음수로 줘서 좌우로 뒤집어 그린다
-		var rect := Rect2(roundf(tile.x) + (tile_w if tile.flip else 0.0), top, -tile_w if tile.flip else tile_w, TOWN_TEXTURE.get_height())
-		draw_texture_rect(TOWN_TEXTURE, rect, false)
+	var top := size.y * TOWN_BOTTOM - TOWN_TEXTURE.get_height()
+	_draw_strip(self, TOWN_TEXTURE, top, Backdrop.TOWN_PARALLAX, size.x, Color.WHITE)
+	for mist in Backdrop.MISTS.slice(0, -1):
+		_draw_mist(self, mist, size)
+
+
+## 띠 그림을 가로로 이어 붙여 그린다 (이웃 조각은 번갈아 뒤집음)
+func _draw_strip(canvas: CanvasItem, tex: Texture2D, top: float, parallax: float, view_w: float, tint: Color) -> void:
+	var tile_w := float(tex.get_width())
+	for tile in Backdrop.town_tiles(sim.x, tile_w, view_w, parallax):
+		# 뒤집은 조각은 가로 배율 -1로 그린다 (v0.4.0의 음수 너비 사각형은 화면에 안 그려져 띠가 중간에 끊겼음)
+		var flip := tile.flip as bool
+		canvas.draw_set_transform(Vector2(roundf(tile.x) + (tile_w if flip else 0.0), top), 0.0, Vector2(-1.0 if flip else 1.0, 1.0))
+		canvas.draw_texture(tex, Vector2.ZERO, tint)
+	canvas.draw_set_transform(Vector2.ZERO)
+
+
+## 안개 한 겹: 띠 그림 + 띠 아래는 같은 색으로 화면 바닥까지 채움 (틈 아래가 안개 속 낭떠러지로 보이게)
+func _draw_mist(canvas: CanvasItem, mist: Array, size: Vector2) -> void:
+	var tex: Texture2D = MIST_TEXTURES[mist[0]]
+	var top: float = size.y * mist[2]
+	var tint := Color(1, 1, 1, mist[3])
+	_draw_strip(canvas, tex, top, mist[1], size.x, tint)
+	var bottom := top + tex.get_height() - 1.0
+	if MIST_FILLS.has(mist[0]) and bottom < size.y:
+		canvas.draw_rect(Rect2(0.0, bottom, size.x, size.y - bottom), Color(MIST_FILLS[mist[0]], mist[3]))
+
+
+## 건물·기둥 몸통을 아래로 갈수록 안개 색으로 덮는다 (옥상 윗면 기준이라 고양이가 서는 곳은 늘 또렷함)
+func _draw_body_mist(left: float, right: float, top: float, ground: float) -> void:
+	var from := top + BODY_MIST_FROM
+	if from >= ground:
+		return
+	var to := minf(top + BODY_MIST_TO, ground)
+	var mist: Color = MIST_FILLS.mid
+	var end := Color(mist, BODY_MIST_MAX * (to - from) / (BODY_MIST_TO - BODY_MIST_FROM))
+	draw_polygon([Vector2(left, from), Vector2(right, from), Vector2(right, to), Vector2(left, to)],
+			[Color(mist, 0.0), Color(mist, 0.0), end, end])
+	if to < ground:
+		draw_rect(Rect2(left, to, right - left, ground - to), end)
+
+
+## 고양이 그림자: 가운데가 진한 납작한 타원 (원 3개를 겹쳐 가장자리를 부드럽게)
+func _draw_shadow(pos: Vector2, shadow: Dictionary) -> void:
+	var r: float = Balance.CAT_BODY_SIZE.x * SHADOW_WIDTH * shadow.scale
+	draw_set_transform(pos, 0.0, Vector2(1.0, SHADOW_FLAT))
+	for k in [1.0, 0.8, 0.6]:
+		draw_circle(Vector2.ZERO, r * k, Color(SHADOW_COLOR, shadow.alpha / 3.0))
+	draw_set_transform(Vector2.ZERO)
 
 
 ## 옥상의 건물: 왼쪽 캡 + 가운데 조각들(옥상 폭에 맞춰 늘임) + 오른쪽 캡, 그림 아래는 벽 색으로 화면 바닥까지 채움, 그 위에 소품.
@@ -234,6 +297,7 @@ func _draw_building(roof: Dictionary, offset: float, ground: float) -> void:
 	for prop in look.props:
 		var tex := BuildingArt.prop_texture(prop.kind)
 		draw_texture(tex, Vector2(prop.x + offset - tex.get_width() * 0.5, top + BuildingArt.PROP_SINK - tex.get_height()))
+	_draw_body_mist(left, right, top, ground)  # 벽 너비만 (지붕 턱은 BODY_MIST_FROM보다 위라 상관없음)
 
 
 func _look_of(roof: Dictionary) -> Dictionary:
@@ -254,16 +318,23 @@ func _draw_pole(plate: Dictionary, offset: float, ground: float) -> void:
 	var k: float = (plate.right - plate.left) / POLE_PLATE_WIDTH
 	var top_y: float = ground - plate.top - POLE_PLATE_TOP * k
 	var w := POLE_TEXTURE.get_width() * k
+	var slim := w * POLE_SLIM
 	# 기둥 몸통: 판 아래부터 화면 바닥까지 (먼저 그려 위 조각이 덮음)
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - POLE_TRUNK_W * k * 0.5, top_y + 14.0 * k, POLE_TRUNK_W * k, ground - top_y + 4.0),
+	var trunk_w := POLE_TRUNK_W * k * POLE_SLIM
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - trunk_w * 0.5, top_y + 14.0 * k, trunk_w, ground - top_y + 4.0),
 			Rect2(POLE_TRUNK_X, POLE_HEAD_ROWS, POLE_TRUNK_W, 200.0))
-	# 가로대: 원래 자리보다 아래, 판에서 바닥까지의 중간쯤 (원래 자리가 더 아래면 그대로)
-	var bar_h := (POLE_HEAD_ROWS - POLE_BAR_ROW) * k
-	var bar_y := maxf(top_y + POLE_BAR_ROW * k, top_y + (ground - top_y) * POLE_BAR_AT - bar_h * 0.5)
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, bar_y, w, bar_h),
+	# 가로대: 받침 버팀대 바로 아래
+	var bar_h := (POLE_HEAD_ROWS - POLE_BAR_ROW) * k * POLE_SLIM
+	var bar_y := top_y + (POLE_TOP_ROWS + POLE_BAR_GAP) * k
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - slim * 0.5, bar_y, slim, bar_h),
 			Rect2(0, POLE_BAR_ROW, POLE_TEXTURE.get_width(), POLE_HEAD_ROWS - POLE_BAR_ROW))
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, top_y, w, POLE_TOP_ROWS * k),
-			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_TOP_ROWS))
+	# 받침 버팀대(가늘게) → 판(원래 너비)
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - slim * 0.5, top_y + POLE_PLATE_ROWS * k, slim, (POLE_TOP_ROWS - POLE_PLATE_ROWS) * k),
+			Rect2(0, POLE_PLATE_ROWS, POLE_TEXTURE.get_width(), POLE_TOP_ROWS - POLE_PLATE_ROWS))
+	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, top_y, w, POLE_PLATE_ROWS * k),
+			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_PLATE_ROWS))
+	# 기둥은 가로대 아래부터 안개에 묻힘 (가로대가 보이게)
+	_draw_body_mist(cx - trunk_w * 0.5, cx + trunk_w * 0.5, bar_y + bar_h - BODY_MIST_FROM, ground)
 
 
 ## 빨래줄: 틈 양쪽 옥상 끝에 기둥, 그 사이에 줄과 빨래를 틈 너비만큼 이어 붙인다 (줄이 발판 높이에 오게)
