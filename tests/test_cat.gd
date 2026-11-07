@@ -62,17 +62,25 @@ func test_길게_누를수록_도약할_때_몸이_더_늘어난다() -> void:
 	assert_true(stretch[1] > stretch[0] and stretch[0] > 1.0, "가로 늘어남 %s" % str(stretch))
 
 
-func test_올라갈_때는_기울지_않고_내려올_때는_코가_아래로() -> void:
-	var sim := RunnerSim.new(1)
-	sim.on_ground = false
-	sim.time_since_jump = 1.0
-	sim.vy = JumpModel.jump_speed()
-	assert_eq(CatPose.pose(sim).tilt, 0.0, "올라갈 때 코를 쳐들지 않음")
-	sim.vy = -JumpModel.jump_speed()
-	sim.y = 1000.0  # 높은 곳: 아직 떨어지는 중이 아님
-	var pose := CatPose.pose(sim)
-	assert_eq(pose.frame, "fall")
-	assert_true(pose.tilt > 0.0)
+func test_뛰어서_올라갈_때도_내려올_때도_기울지_않는다() -> void:
+	# 낮게 뛴 경우(0.05초)와 가장 높게 뛴 경우(끝까지 누름) 모두, 공중에서 내내 tilt 0
+	for hold in [0.05, 5.0]:
+		var sim := _sim_on_roofs([{"left": 0.0, "right": 100000.0, "top": 200.0}])
+		sim.accelerate = false
+		var t := 0.0
+		var seen := {}
+		var peak := 0.0
+		while t < 3.0:
+			sim.step(DT, t < hold and t >= 0.0)
+			t += DT
+			if not sim.on_ground and sim.time_since_jump >= Balance.CAT_CROUCH_TIME:
+				var pose := CatPose.pose(sim)
+				seen[pose.frame] = true
+				peak = maxf(peak, sim.y - 200.0)
+				assert_eq(pose.tilt, 0.0, "공중 기울기 0 (%s, 누름 %s)" % [pose.frame, hold])
+		assert_true(seen.has("rise") and seen.has("fall"), "올라감·내려옴 모두 확인 %s" % str(seen.keys()))
+		if hold > 1.0:
+			assert_true(peak > Balance.JUMP_MAX_HEIGHT * 0.95, "가장 높게 뜀 %s" % peak)
 
 
 func test_더는_올라설_수_없으면_허우적거린다() -> void:

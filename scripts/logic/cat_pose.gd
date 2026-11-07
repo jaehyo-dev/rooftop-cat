@@ -39,5 +39,5 @@ static func pose(sim: RunnerSim) -> Dictionary:
 	if sim.vy > 0.0:
 		# 올라갈 때도 기울이지 않는다 (발끝 기준 회전이 몸을 위로 쳐들어 보이게 함)
 		return {"frame": "rise", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 0.0}
-	var down := clampf(-sim.vy / jump_speed, 0.0, 1.0)
-	return {"frame": "fall", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 6.0 * down}
+	# 내려올 때도 기울이지 않는다: 낙하 속도에 비례해 기울이면 높이 뛸수록 몸이 돌아가 어색함
+	return {"frame": "fall", "scale": Squash.body_scale(false, sim.vy, 99.0), "tilt": 0.0}
