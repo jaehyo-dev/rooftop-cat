@@ -62,12 +62,12 @@ func test_길게_누를수록_도약할_때_몸이_더_늘어난다() -> void:
 	assert_true(stretch[1] > stretch[0] and stretch[0] > 1.0, "가로 늘어남 %s" % str(stretch))
 
 
-func test_올라갈_때는_코가_위로_내려올_때는_코가_아래로() -> void:
+func test_올라갈_때는_기울지_않고_내려올_때는_코가_아래로() -> void:
 	var sim := RunnerSim.new(1)
 	sim.on_ground = false
 	sim.time_since_jump = 1.0
 	sim.vy = JumpModel.jump_speed()
-	assert_true(CatPose.pose(sim).tilt < 0.0)
+	assert_eq(CatPose.pose(sim).tilt, 0.0, "올라갈 때 코를 쳐들지 않음")
 	sim.vy = -JumpModel.jump_speed()
 	sim.y = 1000.0  # 높은 곳: 아직 떨어지는 중이 아님
 	var pose := CatPose.pose(sim)
