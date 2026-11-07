@@ -10,6 +10,8 @@ extends RefCounted
 ##   - 달리다 부딪혔거나, 점프했는데 살짝 모자라 몸이 모서리에 걸렸으면(몸 높이 안쪽) 잠시 투명해져(ghost_time)
 ##     벽을 통과하고, 발 범위가 그 옥상에 걸치면 옥상 위로 떠올라 올라선다.
 ##   - 점프 없이 틈으로 떨어지는 중이거나 너무 낮게 부딪혔으면 벽에 막혀 그대로 떨어진다 (투명화가 남아 있어도).
+## 구조물(structures): 빨래줄은 위에서 내려와 밟으면 튕겨 오르고(밟기 직전에 새로 누르면 더 높이), 전봇대는 꼭대기에 착지한다.
+##   달리다 아래로 지나가는 건 막지 않는다. 구조물 위에 서면 옥상처럼 발이 걸쳐 있는 동안 선다.
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
 ## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
 
@@ -19,6 +21,8 @@ var landed := false
 var fell := false             # 떨어져서 이번 step에 게임이 끝남
 var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
 var rescued := false  # 종이상자로 구제가 시작됨
+var bounced := false  # 빨래줄을 밟아 튕김
+var boosted := false  # 이번 튕김이 더 높이 튕기는 것이었는지
 ## 이번 step에 먹은 아이템들 (먹는 연출용)
 var picked: Array[Dictionary] = []
 
@@ -34,6 +38,8 @@ var game_over := false
 ## 달린 시간 (초)
 var elapsed := 0.0
 var roofs: Array[Dictionary] = []
+## 옥상 위 구조물 (StructurePlacer 형식). 지나간 것은 지운다
+var structures: Array[Dictionary] = []
 ## 아직 먹지 않은 아이템 (ItemPlacer 형식). 먹거나 지나간 아이템은 지운다
 var items: Array[Dictionary] = []
 ## 이번 판에 먹은 생선 수
@@ -48,9 +54,13 @@ var ghost_time := 0.0
 var time_since_land := 99.0
 ## 점프한 뒤 지난 시간 (웅크림·도약 연출용). 점프 전이면 큰 값
 var time_since_jump := 99.0
+## 마지막으로 밟아 튕긴 빨래줄과 그 뒤 지난 시간 (줄이 출렁이는 연출용)
+var bounced_line := {}
+var time_since_bounce := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
+var _structure_placer: StructurePlacer
 var _start_speed := Balance.RUN_SPEED
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
@@ -69,6 +79,7 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
 	_start_speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
+	_structure_placer = StructurePlacer.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	_ground_roof = roofs[0]
 	y = roofs[0].top
@@ -83,6 +94,7 @@ func step(dt: float, pressed: bool) -> void:
 	fell = false
 	ghosted = false
 	rescued = false
+	bounced = false
 	picked.clear()
 	if game_over:
 		return
@@ -94,6 +106,7 @@ func step(dt: float, pressed: bool) -> void:
 	_was_pressed = pressed
 	time_since_land += dt
 	time_since_jump += dt
+	time_since_bounce += dt
 
 	_move_forward(speed * dt)
 	_fill_roofs()
@@ -285,11 +298,31 @@ func _start_jump(pressed: bool) -> void:
 func _check_landing(prev_y: float) -> void:
 	if vy > 0.0:
 		return
-	for roof in roofs:
-		# 위에서 옥상 높이를 지나 내려왔을 때만 선다 (아래에서 벽에 부딪힌 경우는 계속 떨어짐)
-		if _feet_over(roof) and prev_y >= roof.top and y <= roof.top:
-			_land_on(roof)
-			return
+	# 위에서 지나 내려온 발판 중 가장 높은 것에 선다 (옥상과 구조물)
+	var best := {}
+	for surface in roofs + structures:
+		# 위에서 높이를 지나 내려왔을 때만 선다 (아래에서 벽에 부딪힌 경우는 계속 떨어짐)
+		if _feet_over(surface) and prev_y >= surface.top and y <= surface.top and (best.is_empty() or surface.top > best.top):
+			best = surface
+	if best.is_empty():
+		return
+	if best.get("kind", "") == "line":
+		_bounce(best)
+	else:
+		_land_on(best)
+
+
+## 빨래줄을 밟아 튕긴다. 밟기 직전에 새로 누른 입력이 있으면(버퍼) 더 높이
+func _bounce(line: Dictionary) -> void:
+	boosted = _buffer > 0.0
+	y = line.top
+	vy = sqrt(2.0 * Balance.GRAVITY * (Balance.LINE_BOOST_HEIGHT if boosted else Balance.LINE_BOUNCE_HEIGHT))
+	_buffer = 0.0
+	_holding = false
+	_jumped = true  # 튕겨 오르다 살짝 모자라 모서리에 걸려도 투명화로 구제됨 (점프와 같은 취급)
+	bounced = true
+	bounced_line = line
+	time_since_bounce = 0.0
 
 
 func _land_on(roof: Dictionary) -> void:
@@ -309,5 +342,12 @@ func _fill_roofs() -> void:
 		var roof := _generator.next_roof(roofs[-1], speed)
 		items.append_array(_placer.items_for(roofs[-1], roof))
 		roofs.append(roof)
+		# 구조물은 다음 옥상이 생겨야 안전한 자리를 알 수 있어서, 한 옥상 늦게 앞 옥상(첫 옥상 제외)에 놓는다
+		if roofs.size() > 2:
+			var structure := _structure_placer.structure_for(roofs[-2], roofs[-1], speed)
+			if not structure.is_empty():
+				structures.append(structure)
 	while roofs.size() > 1 and roofs[0].right < x - 1000.0:
 		roofs.pop_front()
+	while not structures.is_empty() and structures[0].right < x - 1000.0:
+		structures.pop_front()

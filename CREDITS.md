@@ -50,6 +50,9 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/cat_frames/*.png` | 2026-11-07 | 위 원본 2장 | 게임 속 고양이 그림 (프레임 애니메이션 10장) | `tools/cut_parts.py`로 마젠타 배경을 지우고 자세를 잘라 냄 → `tools/align_frames.py`로 크기(시트별 배율)·발끝·몸 중심을 맞춰 640x512 캔버스에 놓음 |
 | `assets/raw/items_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림을 그림체 참고로 첨부) | 아이템 시트 원본: 생선, 종이상자 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/items/fish.png`, `box.png` | 2026-11-07 | 위 원본 | 게임 속 생선·종이상자 그림, 왼쪽 위 생선·상자 표시 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 너비 240픽셀로 줄임 |
+| `assets/raw/structures_concept.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림을 그림체 참고로 첨부) | 구조물 콘셉트 시안(연두 배경): 빨래줄, 전봇대 (게임에 포함 안 됨) | 없음 |
+| `assets/raw/structures_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (위 시안을 `--image`로 첨부해 마젠타 배경으로 다시 그림) | 구조물 시트 원본 (게임에 포함 안 됨) | 없음 |
+| `assets/sprites/structures/clothesline.png`, `pole.png` | 2026-11-07 | 위 원본 | 게임 속 빨래줄·전봇대 그림 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 빨래줄 너비 500, 전봇대 높이 440픽셀로 줄임 |
 
 ## 직접 만든 것
 

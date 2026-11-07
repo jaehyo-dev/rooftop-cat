@@ -20,6 +20,14 @@ const ROOF_WALL := Color("#d7b49a")
 ## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
 const FISH_TEXTURE := preload("res://assets/sprites/items/fish.png")
 const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
+## 구조물 그림 (assets/sprites/structures/, 화면에 그릴 크기)
+const LINE_TEXTURE := preload("res://assets/sprites/structures/clothesline.png")
+const POLE_TEXTURE := preload("res://assets/sprites/structures/pole.png")
+const LINE_DRAW_WIDTH := 216.0   # 빨래줄 그림 너비 (기둥이 옥상에 닿도록 LINE_HEIGHT에 맞춘 크기)
+const LINE_ROPE_FRAC := 0.2      # 빨래줄 그림에서 줄이 있는 높이 (그림 위에서부터 비율)
+const POLE_WIDEN := 1.35         # 전봇대 그림을 가로로 넓혀 꼭대기가 고양이가 서기에 충분해 보이게
+const POLE_EMBED := 8.0          # 기둥 아래가 옥상에 묻히는 정도
+const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초)
 const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
 const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
@@ -139,6 +147,9 @@ func _draw() -> void:
 		draw_rect(Rect2(left - 6.0, top, right - left + 12.0, 18.0), ROOF_FILL)
 		draw_rect(Rect2(left - 6.0, top + 18.0, right - left + 12.0, 4.0), ROOF_EDGE)
 
+	for structure in sim.structures:
+		_draw_structure(structure, offset, ground)
+
 	for item in sim.items:
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
 		var bob := 4.0 * sin(sim.elapsed * 4.0 + item.x * 0.01)
@@ -151,6 +162,25 @@ func _draw() -> void:
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
 		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
+
+
+## 구조물 그림: 빨래줄은 줄이 발판 높이에, 전봇대는 꼭대기 판이 발판 높이에 오게 그린다
+func _draw_structure(structure: Dictionary, offset: float, ground: float) -> void:
+	var cx: float = (structure.left + structure.right) * 0.5 + offset
+	if cx < -200.0 or cx > get_viewport_rect().size.x + 200.0:
+		return
+	if structure.kind == "pole":
+		var h: float = Balance.POLE_HEIGHT + POLE_EMBED
+		var w := h * POLE_TEXTURE.get_width() / POLE_TEXTURE.get_height() * POLE_WIDEN
+		draw_texture_rect(POLE_TEXTURE, Rect2(cx - w * 0.5, ground - structure.base - Balance.POLE_HEIGHT, w, h), false)
+		return
+	var line_h := LINE_DRAW_WIDTH * LINE_TEXTURE.get_height() / LINE_TEXTURE.get_width()
+	# 밟은 직후에는 아래로 눌렸다 돌아오게 세로로 줄였다 늘린다 (기둥 아래는 그대로)
+	var squash := 1.0
+	if structure == sim.bounced_line and sim.time_since_bounce < LINE_BOUNCE_ANIM:
+		squash = 1.0 - 0.18 * sin(PI * sim.time_since_bounce / LINE_BOUNCE_ANIM)
+	var bottom: float = ground - structure.base + (line_h * (1.0 - LINE_ROPE_FRAC) - Balance.LINE_HEIGHT)
+	draw_texture_rect(LINE_TEXTURE, Rect2(cx - LINE_DRAW_WIDTH * 0.5, bottom - line_h * squash, LINE_DRAW_WIDTH, line_h * squash), false)
 
 
 ## 아이템 그림을 가운데 pos에 그린다 (zoom 배율, alpha 투명도)

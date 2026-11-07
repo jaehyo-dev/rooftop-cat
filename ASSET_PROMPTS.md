@@ -180,3 +180,11 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 가로로 긴 PNG (1536x1024).
 내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마.
 ```
+
+## 구조물 콘셉트 시트: 빨래줄, 전봇대 (5단계, 2026-11-07)
+
+- 계획: 콘셉트 시트 1장 (두 구조물을 한 장에 함께 만들어 그림체를 맞춤). 사용자가 확인하면 게임용으로 잘라 `assets/sprites/structures/`에 넣음
+- 명령: `codex exec --sandbox read-only "<요청문>" --image assets/sprites/cat_base_run.png < /dev/null`
+- 결과: `assets/raw/structures_concept.png` (연두 배경, 1536x1024)
+- 요청문 요약: 고양이 기준 그림체 + 동네 콘셉트 "해질녘 포근한 주택가 옥상"(크림·살구·연하늘·연두). 왼쪽 빨래줄(나무 막대 기둥 2개, 팽팽한 줄, 집게로 건 분홍 수건·하늘색 셔츠·노란 양말·흰 손수건, 줄 위는 비움), 오른쪽 전봇대(갈색 나무, 가로 막대와 도자기 애자, 꼭대기 평평한 나무 판, 전선 없음). 겹침·그림자·글자 없음, 단색 연두 배경.
+- 5단계 확정(2026-11-07): 사용자가 시안을 승인하고 마젠타 배경을 요청해, 같은 시트를 `--image assets/raw/structures_concept.png`로 첨부해 "모습·색·그림체 그대로, 배경만 마젠타(#FF00FF), 분홍 수건은 마젠타와 다르게"로 다시 생성 → `assets/raw/structures_sheet.png` → `python3 tools/cut_parts.py assets/raw/structures_sheet.png assets/sprites/structures pole clothesline`(위 줄부터 읽으므로 전봇대가 먼저) → 크기 줄임

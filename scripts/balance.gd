@@ -77,6 +77,23 @@ const BOX_EVERY_MAX := 60
 const RESCUE_HEIGHT := 0.0
 const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
 
+# --- 구조물: 빨래줄, 전봇대 ---
+## 새 옥상(첫 옥상 제외)에 구조물이 놓일 확률, 그중 빨래줄이 될 확률 (나머지는 전봇대)
+const STRUCTURE_CHANCE := 0.4
+const LINE_SHARE := 0.6
+## 빨래줄: 옥상 위 LINE_HEIGHT 높이의 줄. 위에서 내려와 밟으면 튕겨 오른다 (달리다 아래로 지나가는 건 막지 않음).
+const LINE_HEIGHT := 60.0
+const LINE_WIDTH := 140.0        # 밟을 수 있는 가로 길이 (발 범위가 걸치면 되니 실제로는 이보다 넓게 밟힘)
+const LINE_MARGIN := 60.0         # 줄 끝에서 옥상 끝까지 최소 여백
+## 튕겨 오르는 높이 (줄 위로). 밟기 직전 JUMP_BUFFER_TIME(0.1초) 안에 새로 누르면 더 높이 (최대 점프 높이 250보다 높게).
+## 기본 튕김은 구조물이 놓일 때 안전한지 계산하는 기준이라 너무 높이면 빨래줄이 놓일 자리가 사라진다 (StructurePlacer)
+const LINE_BOUNCE_HEIGHT := 140.0
+const LINE_BOOST_HEIGHT := 290.0
+## 전봇대: 옥상 위 POLE_HEIGHT 높이의 평평한 꼭대기에 착지한다. 최대 점프 높이(250)에 가깝게 잡아 길게 눌러야 닿는다
+const POLE_HEIGHT := 200.0
+const POLE_WIDTH := 60.0         # 꼭대기 가로 길이
+const POLE_MARGIN := 110.0       # 꼭대기 끝에서 옥상 끝까지 최소 여백
+
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)
 const CAT_CROUCH_TIME := 0.06  # 뛰는 순간 웅크린 그림을 보여 주는 시간 (초)
