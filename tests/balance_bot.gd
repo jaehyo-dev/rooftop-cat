@@ -59,7 +59,11 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			dj_at = INF
 			tap_at = INF
 			tapped = false
-		if sim.on_ground and not is_same(ground, planned_roof):
+		# 트램펄린 뒤 긴 옥상은 내려설 때 다음 옥상이 아직 안 만들어졌을 수 있다: 생길 때까지 계획을 미룬다
+		var next_known := sim.roofs.find(ground) + 1 < sim.roofs.size()
+		if sim.on_ground and not next_known:
+			press_x = INF
+		if sim.on_ground and next_known and not is_same(ground, planned_roof):
 			planned_roof = ground
 			var plan := _plan(sim)
 			press_x = plan.x + rng.randfn(0.0, skill.timing) * sim.speed

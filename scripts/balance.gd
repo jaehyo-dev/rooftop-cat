@@ -120,11 +120,14 @@ const LINE_FISH_HEIGHT := 460.0
 ## 트램펄린: 넓은 틈 앞 옥상 끝 발사대. 누름 판정 창·퍼펙트 창·너무 이른 누름은 빨래줄 값(LINE_PRESS_EARLY, LINE_RIDE_TIME,
 ## LINE_PERFECT, LINE_BLOCK_EARLY)을 그대로 쓴다. 달려 들어가 몸 가운데가 왼쪽 끝에서 TRAMP_RUN_IN 들어가거나(그물 가운데쯤),
 ## 위에서 내려와 발이 걸치면 닿음.
-const TRAMP_WIDTH := 150.0
-const TRAMP_RUN_IN := 60.0
+## v0.5.0 2b: 그물 꺼짐이 몸 아래로 보이게 150 → 210 (1.4배), 닿는 자리도 같은 비율로 60 → 84
+const TRAMP_WIDTH := 210.0
+const TRAMP_RUN_IN := 84.0
 const TRAMP_INSET := 10.0     # 옥상 끝에서 이만큼 안쪽에 놓음
-## 밟은 그물 높이 (옥상 위로). 그림의 꺼진 그물 바닥이 다리 끝보다 이만큼 위라 고양이 발이 그물에 닿아 보이게 판정도 맞춤
+## 밟은 그물의 판정 높이 (옥상 위로). 그림에서 꺼진 그물 바닥은 더 높을 수 있고, 고양이 그림만 그 깊이를 따라간다 (world_view.gd tramp_cat_lift)
 const TRAMP_LIFT := 10.0
+## 튕긴 직후 이 시간 동안은 그림만 그물에 눌려 있다가 튀어 나간다 (판정은 이미 튕김, 입력 지연 없음)
+const TRAMP_PUSH := 0.05
 ## 트램펄린 틈은 옥상 높이가 이 값 이하일 때만 (퍼펙트 꼭대기와 생선 길이 세로 카메라 안에 들게)
 const TRAMP_TOP_MAX := 240.0
 ## 튕겨 오르는 높이 (그물 위로): 안 누름·이른 누름(제자리에서 낮게, 앞으로 밀어 주지 않음) / 누름 / 퍼펙트
@@ -153,12 +156,34 @@ const POLE_GAP_SPAN := 100.0
 
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)
-const CAT_CROUCH_TIME := 0.06  # 뛰는 순간 웅크린 그림을 보여 주는 시간 (초)
+const CAT_CROUCH_TIME := 0.03  # 뛰는 순간 웅크린 그림을 보여 주는 시간 (초). v0.5.0 2b: 0.06 → 0.03 (공중에서 웅크려 보이지 않게)
 const CAT_LAND_TIME := 0.12    # 착지 그림(앞발부터 닿고 몸이 눌림)을 보여 주는 시간 (초)
-const CAT_SPIN_TIME := 0.36    # 더블점프 공중제비(웅크린 그림을 몸 가운데 기준으로 한 바퀴) 시간 (초)
+## 앞구르기 공중제비(더블점프, 트램펄린 퍼펙트 발사 뒤): 숙이기 → C자 → 공(가장 빠르게 회전) → 펴기, 한 바퀴. v0.5.0 2b: 0.36 → 0.42
+const CAT_FLIP_TIME := 0.42
+## 회전 빠르기의 출렁임: 각도 = 한 바퀴 x (k - FLIP_EASE x sin(2πk) / 2π). 0.6이면 말기 끝 약 56도, 펴기 시작 약 304도 (ART_BIBLE 8-1)
+const CAT_FLIP_EASE := 0.6
+## 트램펄린에서 튕길 때 도약 그림을 보여 주는 시간 (초). 퍼펙트는 이 뒤에 앞구르기
+const CAT_LAUNCH_TIME := 0.12
+## 달리기 몸 들썩임 (게임 픽셀, 한 바퀴에 2번). 그림만 들썩이고 판정 발끝은 그대로
+const CAT_RUN_BOB := 4.0
+## 공중 숨쉬기 (몸 배율 ±, 1초에 몇 번)
+const CAT_BREATH := 0.02
+const CAT_BREATH_HZ := 2.0
+## 꼭대기 부풀기: 세로 속도가 이보다 느린 구간에서 몸이 CAT_APEX_PUFF 쪽으로 둥글게
+const CAT_APEX_SPEED := 200.0
+const CAT_APEX_PUFF := Vector2(1.06, 1.03)
 
 # --- 늘어남·납작해짐 연출 (가로, 세로 배율) ---
 const STRETCH_RISE := Vector2(0.84, 1.2)   # 가장 빠르게 올라갈 때
 const STRETCH_FALL := Vector2(0.92, 1.1)   # 가장 빠르게 떨어질 때
-const SQUASH_LAND := Vector2(1.22, 0.8)    # 착지 순간
-const SQUASH_TIME := 0.14                  # 착지 후 원래 모양으로 돌아오는 시간
+## 몸 배율 스프링 (Spring): 1초에 몇 번 출렁이는지, 감쇠비 (작을수록 오래 출렁임)
+const CAT_SPRING_HZ := 5.0
+const CAT_SPRING_DAMPING := 0.4
+## 스프링 충격: 원래 모양에서 가장 크게 벗어나는 정도 (가로, 세로)
+const KICK_LAND := Vector2(0.22, -0.2)          # 착지 (1.22 x 0.80)
+const KICK_CROUCH := Vector2(0.06, -0.1)        # 누르는 순간 웅크림
+const KICK_TAKEOFF := Vector2(-0.12, 0.18)      # 웅크림 끝 = 박차는 순간 세로로 늘어남 (0.88 x 1.18)
+const KICK_DOUBLE := Vector2(-0.08, 0.12)       # 더블점프
+const KICK_TRAMP_RIDE := Vector2(0.25, -0.24)   # 트램펄린 그물에 실림 (웅크려 납작)
+## 트램펄린 튕김: 결과별 세로 늘어남
+const KICK_TRAMP_LAUNCH := {"miss": Vector2(0.04, -0.06), "early": Vector2(-0.04, 0.06), "good": Vector2(-0.14, 0.24), "perfect": Vector2(-0.18, 0.32)}

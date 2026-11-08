@@ -26,15 +26,15 @@ const TOWN_BOTTOM := 0.66       # 먼 동네 띠 아래 끝 (화면 높이 비�
 ## 안개 띠 그림 (Backdrop.MISTS 이름별)과 띠 아래를 이어 채우는 색 (그림 맨 아랫줄 색)
 const MIST_TEXTURES := {"far": preload("res://assets/sprites/backdrop/mist_far.png"),
 		"town": preload("res://assets/sprites/backdrop/mist_town.png"),
-		"mid": preload("res://assets/sprites/backdrop/mist_mid.png"), "near": preload("res://assets/sprites/backdrop/mist_near.png")}
-const MIST_FILLS := {"far": Color("#fdd0a3"), "mid": Color("#fec4bd"), "near": Color("#cebbdf")}
+		"mid": preload("res://assets/sprites/backdrop/mist_mid_cream.png"), "near": preload("res://assets/sprites/backdrop/mist_near_cream.png")}
+## 분홍 두 겹(mid, near)은 크림색(#fff6ec) 쪽으로 45% 섞음 (v0.5.0 2b, 투명도 그대로): 그림은 tools/tint_mist.py, 원래 채움 색 #fec4bd, #cebbdf
+const MIST_FILLS := {"far": Color("#fdd0a3"), "mid": Color("#fedad2"), "near": Color("#e4d6e5")}
 ## 건물 몸통이 안개에 묻히는 구간: 옥상 윗면에서 이만큼 아래부터 묻히기 시작해 BODY_MIST_TO에서 다 묻힘
 const BODY_MIST_FROM := 70.0
 const BODY_MIST_TO := 330.0
 const BODY_MIST_MAX := 0.95
 const SHADOW_COLOR := Color("#5a4636")
-const SHADOW_WIDTH := 0.42   # 그림자 반지름 = 고양이 몸 너비 x 이 값
-const SHADOW_FLAT := 0.18    # 세로/가로 비율 (납작한 타원)
+const SHADOW_PEAK := 1.6     # 그라데이션이 바깥으로 옅어지는 만큼 가운데 진하기를 올림
 const BELOW_DARKEN := 0.1  # 그림 아래 벽 색이 화면 바닥에서 이만큼 어두워짐
 const WALL_LINE := 0.72  # 건물 옆 테두리: 채움 색을 이만큼 어둡게
 ## 아이템 그림 (assets/sprites/items/, 화면에 그릴 너비)
@@ -64,15 +64,23 @@ const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초
 const FOOT_SINK := 16.0
 const POLE_FACE_MID := 10.5   # 전봇대 그림에서 판 윗면 가운데 줄 (판 윗면 7~14줄)
 ## 트램펄린 그림(216x100, 평소·밟음·튕김이 같은 캔버스): 테 왼쪽 끝 3, 테 너비 209, 다리 끝 97줄.
-## 밟음 그림의 꺼진 그물 바닥(82줄)이 다리 끝보다 Balance.TRAMP_LIFT만큼 위라 밟은 고양이 발이 그물에 닿는다
+## 테 아래(TRAMP_SRC_LEG줄부터)는 세로로 TRAMP_LEG_STRETCH배 늘여 그린다: 다리가 길어져 꺼진 그물이 고양이 몸 아래로 보임
 const TRAMP_TEXTURES := {"rest": preload("res://assets/sprites/structures/trampoline_rest.png"),
 		"pressed": preload("res://assets/sprites/structures/trampoline_pressed.png"),
 		"launch": preload("res://assets/sprites/structures/trampoline_launch.png")}
 const TRAMP_SRC_LEFT := 3.0
 const TRAMP_SRC_WIDTH := 209.0
 const TRAMP_SRC_FEET := 97.0
-## 트램펄린 모양 변화 (튕긴 뒤 지난 시간): 밟음 그림 TRAMP_PUSH초(발을 떼는 순간) → 튕김 그림 TRAMP_POP초 → 평소 그림이 출렁이며 TRAMP_SETTLE초
-const TRAMP_PUSH := 0.012  # 60fps 한 프레임 안: 닿은 프레임에만 밟음 그림 (고양이가 그물을 떠나면 바로 튕김 그림)
+const TRAMP_SRC_LEG := 60.0
+const TRAMP_LEG_STRETCH := 1.7
+## 그림에서 그물 가운데 줄: 평소 그물 윗면, 밟음 그림의 꺼진 바닥(82줄 아래 끝)
+const TRAMP_SRC_NET := {"rest": 33.0, "pressed": 82.0}
+## 달려 들어갈 때 그림만 그물 위로 폴짝: 몸 가운데가 트램펄린 왼쪽 끝 이만큼 앞에서 시작해 닿는 자리에서 평소 그물 높이에 도착
+const TRAMP_HOP_FROM := 100.0
+const TRAMP_HOP_ARC := 14.0
+const TRAMP_RELEASE := 0.07     # 그물을 떠난 그림이 실제 높이를 따라잡는 시간 (초)
+const CAT_LIFT_RATE := 60.0     # 고양이 그림 높이 보정이 목표로 다가가는 빠르기
+## 트램펄린 모양 변화 (튕긴 뒤 지난 시간): 밟음 그림 Balance.TRAMP_PUSH초(고양이 그림이 눌려 있는 동안) → 튕김 그림 TRAMP_POP초 → 평소 그림이 출렁이며 TRAMP_SETTLE초
 const TRAMP_POP := 0.12
 const TRAMP_SETTLE := 0.5
 ## 세로 배율 (다리 끝 기준): 밟음 = 눌림(1보다 작음), 튕김·출렁임 = 늘어남 폭. [안 누름·이른 누름, 누름, 퍼펙트]
@@ -93,6 +101,16 @@ const HUD_FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
 ## 줄 판정 결과 글자 (0.4초 떠올랐다 사라짐). miss(안 누름)는 글자 없이 줄이 처지는 것으로 보여 줌
 const RESULT_TEXT := {"perfect": "퍼펙트!", "good": "좋아!", "early": "빨랐어!"}
 const RESULT_TIME := 0.4
+## 더블점프·트램펄린 발사 때 발밑에서 터지는 먼지 고리와 별
+const BURST_TIME := 0.32
+const BURST_RING := 70.0        # 먼지 고리가 퍼지는 반지름 (납작한 타원의 가로)
+const BURST_FLAT := 0.3
+const BURST_COLOR := Color(1.0, 0.96, 0.86)
+const BURST_STAR_COLOR := Color("#ffd166")
+const BURST_STAR_OUTLINE := Color("#a8693a")
+const BURST_STARS := 6
+const BURST_STAR_REACH := 90.0
+const SFX_VOLUME_DB := -6.0
 const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
 
 var sim := RunnerSim.new(randi())
@@ -106,14 +124,41 @@ var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프
 var _tap_pending := false
 var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", "t"}
 var _was_rescuing := false
+var _bursts: Array[Dictionary] = []  # 발밑 터짐 {"x", "y", "t", "stars"}
+var _sfx := {}                       # 효과음 이름 → AudioStreamPlayer
+var _fall_sounded := false           # 이번 떨어짐에 소리를 냈는지
 var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
+var _shadow_texture := _make_shadow_texture()
 var _front_mist := Node2D.new()  # 가장 가까운 안개: 고양이보다 앞에 그려 떨어지면 안개 속으로 사라짐
 var _overlay := Node2D.new()     # 맨 앞: 빨래줄 안내·결과 글자
+var _cat_lift := 0.0             # 고양이 그림만 올려 그리는 픽셀 (트램펄린, tramp_cat_lift를 부드럽게 따라감)
 var _cam_lift := 0.0             # 세로 카메라: 화면을 아래로 내려 그리는 픽셀 (CameraFollow)
 var _guided: Array[float] = []   # 이번 판에 안내를 보여 준 줄 (왼쪽 x)
 
 
+## 가운데가 진하고 가장자리로 사라지는 원 (흰색, 그릴 때 색을 입힘)
+static func _make_shadow_texture() -> GradientTexture2D:
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color.WHITE)
+	gradient.set_color(1, Color(1, 1, 1, 0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = gradient
+	tex.width = 128
+	tex.height = 128
+	tex.fill = GradientTexture2D.FILL_RADIAL
+	tex.fill_from = Vector2(0.5, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	return tex
+
+
 func _ready() -> void:
+	for sound in SfxEvents.ALL:
+		var player := AudioStreamPlayer.new()
+		player.name = "Sfx_" + sound
+		player.stream = load("res://assets/audio/sfx/%s.wav" % sound)
+		player.volume_db = SFX_VOLUME_DB
+		add_child(player)
+		_sfx[sound] = player
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 아이템 그림을 크게 줄여 그려도 거칠지 않게
 	cat.name = "Cat"
 	add_child(cat)
@@ -140,6 +185,7 @@ func _process(delta: float) -> void:
 	_accumulator = minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
 		sim.step(STEP, pressed and not _wait_release)
+		_play_events()
 		for item in sim.picked:
 			_pops.append({"kind": item.kind, "x": item.x, "y": item.y, "t": 0.0})
 		if _was_rescuing and not sim.rescuing:
@@ -156,6 +202,9 @@ func _process(delta: float) -> void:
 	for pop in _pops:
 		pop.t += delta
 	_pops = _pops.filter(func(pop: Dictionary) -> bool: return pop.t < POP_TIME)
+	for burst in _bursts:
+		burst.t += delta
+	_bursts = _bursts.filter(func(burst: Dictionary) -> bool: return burst.t < BURST_TIME)
 	# 이번 판 처음 GUIDE_LINES개 줄 틈에만 안내 (닿을 것으로 보이는 순간 그 줄을 셈)
 	var touch := sim.line_touch_eta(GUIDE_TIME)
 	if not touch.is_empty() and not _guided.has(touch.line.left) and _guided.size() < GUIDE_LINES:
@@ -167,9 +216,25 @@ func _process(delta: float) -> void:
 	_overlay.queue_redraw()
 
 
+## 이번 step에 일어난 일의 효과음과 발밑 터짐
+func _play_events() -> void:
+	var doomed := sim.is_doomed()
+	for sound in SfxEvents.sounds(sim, doomed and not _fall_sounded):
+		_sfx[sound].play()
+	if doomed:
+		_fall_sounded = true
+	elif sim.on_ground or sim.bounced:
+		_fall_sounded = false
+	var bounced_good := sim.bounced and sim.bounce_result in ["good", "perfect"]
+	if sim.double_jumped or bounced_good:
+		_bursts.append({"x": sim.x, "y": sim.y, "t": 0.0, "stars": sim.double_jumped or sim.bounce_result == "perfect"})
+
+
 ## 고양이를 로직 위치(발끝)에 놓고 자세를 맞춘다
 func _place_cat(delta: float) -> void:
-	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK)
+	var lift := tramp_cat_lift(sim)
+	_cat_lift = lift if delta <= 0.0 else lerpf(_cat_lift, lift, 1.0 - exp(-CAT_LIFT_RATE * delta))
+	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK - _cat_lift)
 	cat.show_state(sim, delta)
 
 
@@ -178,6 +243,8 @@ func restart() -> void:
 	sim = RunnerSim.new(randi())
 	_accumulator = 0.0
 	_pops.clear()
+	_bursts.clear()
+	_fall_sounded = false
 	_was_rescuing = false
 	_wait_release = true
 	_cam_lift = 0.0
@@ -242,11 +309,15 @@ func _draw() -> void:
 		else:
 			_draw_line(structure, offset, ground)
 
-	# 트램펄린을 밟고 있으면 그림자도 꺼진 그물 위에
-	var floors: Array = sim.roofs + ([sim.line_touch_eta(0.0).line] if sim.is_riding() else [])
+	# 트램펄린을 밟고 있으면 그림자도 꺼진 그물 위에 (고양이 그림 높이 보정만큼 같이 올림)
+	var riding := sim.is_riding()
+	var floors: Array = sim.roofs + ([sim.line_touch_eta(0.0).line] if riding else [])
 	var shadow := CatShadow.under(floors, sim.x, sim.y)
 	if not shadow.is_empty() and not sim.rescuing:
-		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top + FOOT_SINK), shadow)
+		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top + FOOT_SINK - (_cat_lift if riding else 0.0)), shadow)
+
+	for burst in _bursts:
+		_draw_burst(Vector2(burst.x + offset, ground - burst.y + FOOT_SINK), burst)
 
 	for item in sim.items:
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
@@ -310,13 +381,40 @@ func _draw_body_mist(left: float, right: float, top: float, ground: float) -> vo
 		draw_rect(Rect2(left, to, right - left, ground - to), end)
 
 
-## 고양이 그림자: 가운데가 진한 납작한 타원 (원 3개를 겹쳐 가장자리를 부드럽게)
+## 고양이 그림자: 자세에 맞는 납작한 타원 하나 (원형 그라데이션 텍스처라 가장자리가 부드러움)
 func _draw_shadow(pos: Vector2, shadow: Dictionary) -> void:
-	var r: float = Balance.CAT_BODY_SIZE.x * SHADOW_WIDTH * shadow.scale
-	draw_set_transform(pos, 0.0, Vector2(1.0, SHADOW_FLAT))
-	for k in [1.0, 0.8, 0.6]:
-		draw_circle(Vector2.ZERO, r * k, Color(SHADOW_COLOR, shadow.alpha / 3.0))
+	var look := CatShadow.shape(cat.frame_name, cat.body_scale(), cat.spin())
+	var r: float = look.radius * shadow.scale
+	draw_set_transform(pos + Vector2(look.center_x, 0.0), 0.0, Vector2(1.0, look.flat))
+	draw_texture_rect(_shadow_texture, Rect2(-r, -r, r * 2.0, r * 2.0), false, Color(SHADOW_COLOR, minf(1.0, shadow.alpha * look.alpha * SHADOW_PEAK)))
 	draw_set_transform(Vector2.ZERO)
+
+
+## 발밑 터짐: 납작하게 퍼지는 먼지 고리 + (더블점프·퍼펙트) 바깥으로 튀는 별
+func _draw_burst(pos: Vector2, burst: Dictionary) -> void:
+	var k: float = burst.t / BURST_TIME
+	var out := 1.0 - (1.0 - k) * (1.0 - k)  # 빠르게 퍼졌다가 천천히
+	draw_set_transform(pos, 0.0, Vector2(1.0, BURST_FLAT))
+	draw_arc(Vector2.ZERO, BURST_RING * out, 0.0, TAU, 28, Color(BURST_COLOR, 0.85 * (1.0 - k)), 10.0 * (1.0 - k) + 1.0, true)
+	draw_set_transform(Vector2.ZERO)
+	if not burst.stars:
+		return
+	for i in BURST_STARS:
+		# 아래쪽 반원으로 부채꼴 (발밑에서 옆·위로 튐)
+		var a: float = PI + PI * (i + 0.5) / BURST_STARS
+		var center: Vector2 = pos + Vector2(cos(a), sin(a) * 0.7) * BURST_STAR_REACH * out
+		_draw_star(center, 11.0 * (1.0 - 0.5 * k), k * 3.0 + i, 1.0 - k * k)
+
+
+## 다섯 뿔 별 (손그림 그림체에 맞게 갈색 테두리)
+func _draw_star(center: Vector2, r: float, angle: float, alpha: float) -> void:
+	var points := PackedVector2Array()
+	for i in 10:
+		var a := angle + TAU * i / 10.0
+		points.append(center + Vector2(cos(a), sin(a)) * (r if i % 2 == 0 else r * 0.45))
+	draw_colored_polygon(points, Color(BURST_STAR_COLOR, alpha))
+	points.append(points[0])
+	draw_polyline(points, Color(BURST_STAR_OUTLINE, alpha), 1.5, true)
 
 
 ## 옥상의 건물: 왼쪽 캡 + 가운데 조각들(옥상 폭에 맞춰 늘임) + 오른쪽 캡, 그림 아래는 벽 색으로 화면 바닥까지 채움, 그 위에 소품.
@@ -432,22 +530,61 @@ func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
 	var tex: Texture2D = TRAMP_TEXTURES[look.frame]
 	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
 	var feet: float = ground - tramp.base + FOOT_SINK
-	# 다리 끝을 기준으로 세로로 늘이고 줄인다
-	var h: float = TRAMP_SRC_FEET * k * look.sy
-	draw_texture_rect(tex, Rect2(left - TRAMP_SRC_LEFT * k, feet - h, tex.get_width() * k, tex.get_height() * k * look.sy), false)
+	# 테까지와 다리를 따로 그려 다리만 길게. 다리 끝을 기준으로 세로로 늘이고 줄인다
+	var w: float = tex.get_width() * k
+	var x := left - TRAMP_SRC_LEFT * k
+	var top_h: float = TRAMP_SRC_LEG * k * look.sy
+	var leg_rows: float = tex.get_height() - TRAMP_SRC_LEG
+	var leg_h: float = leg_rows * k * TRAMP_LEG_STRETCH * look.sy
+	var top: float = feet - tramp_height(TRAMP_SRC_FEET, look.sy)
+	draw_texture_rect_region(tex, Rect2(x, top, w, top_h), Rect2(0, 0, tex.get_width(), TRAMP_SRC_LEG))
+	draw_texture_rect_region(tex, Rect2(x, top + top_h, w, leg_h), Rect2(0, TRAMP_SRC_LEG, tex.get_width(), leg_rows))
+
+
+## 그림의 row줄 위치가 다리 끝에서 몇 게임 픽셀 위인지 (row = TRAMP_SRC_FEET이면 전체 높이가 아니라 "맨 윗줄 ~ 다리 끝" 높이를 돌려줌)
+static func tramp_height(row: float, sy: float) -> float:
+	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
+	var legs := (TRAMP_SRC_FEET - TRAMP_SRC_LEG) * TRAMP_LEG_STRETCH
+	if row == TRAMP_SRC_FEET:
+		return (TRAMP_SRC_LEG + legs) * k * sy
+	var up := (TRAMP_SRC_FEET - row) * TRAMP_LEG_STRETCH if row >= TRAMP_SRC_LEG else legs + (TRAMP_SRC_LEG - row)
+	return up * k * sy
+
+
+## 고양이 그림을 로직 높이보다 얼마나 올려 그릴지 (그림만, 판정은 그대로): 그물로 폴짝 올라타고, 꺼진 그물을 따라 내려가고, 눌렸다 튀어 나간다
+static func tramp_cat_lift(state: RunnerSim) -> float:
+	var net := func(tramp: Dictionary, sy: float) -> float:
+		return tramp.base + tramp_height(TRAMP_SRC_NET.pressed, sy) - state.y
+	if state.is_riding():
+		var riding: Dictionary = state.line_touch_eta(0.0).line
+		return net.call(riding, TRAMP_PRESS_SY.good) if riding.kind == "tramp" else 0.0
+	if state.bounced_line.get("kind", "") == "tramp" and state.time_since_bounce < state.time_since_land:
+		var t := state.time_since_bounce
+		var lift: float = net.call(state.bounced_line, TRAMP_PRESS_SY[state.bounce_result])
+		if t < Balance.TRAMP_PUSH:
+			return lift
+		if t < Balance.TRAMP_PUSH + TRAMP_RELEASE:
+			return lift * (1.0 - (t - Balance.TRAMP_PUSH) / TRAMP_RELEASE)
+	if state.on_ground:
+		for tramp in state.structures:
+			if tramp.kind == "tramp" and tramp.base == state.y and not state.is_slack(tramp):
+				var u: float = (state.x - tramp.left + TRAMP_HOP_FROM) / (Balance.TRAMP_RUN_IN + TRAMP_HOP_FROM)
+				if u > 0.0 and u <= 1.0:
+					return tramp_height(TRAMP_SRC_NET.rest, 1.0) * sin(u * PI * 0.5) + TRAMP_HOP_ARC * sin(u * PI)
+	return 0.0
 
 
 ## 트램펄린의 지금 모양 {"frame": rest/pressed/launch, "sy": 세로 배율} (sim 상태만으로 정해 캡처·테스트에서 같은 값)
 static func tramp_look(state: RunnerSim, tramp: Dictionary) -> Dictionary:
 	if state.is_riding() and is_same(state.line_touch_eta(0.0).line, tramp):
 		return {"frame": "pressed", "sy": TRAMP_PRESS_SY.good}
-	if not is_same(state.bounced_line, tramp) or state.time_since_bounce >= TRAMP_PUSH + TRAMP_POP + TRAMP_SETTLE:
+	if not is_same(state.bounced_line, tramp) or state.time_since_bounce >= Balance.TRAMP_PUSH + TRAMP_POP + TRAMP_SETTLE:
 		return {"frame": "rest", "sy": 1.0}
 	var result: String = state.bounce_result
 	var t := state.time_since_bounce
-	if t < TRAMP_PUSH:
+	if t < Balance.TRAMP_PUSH:
 		return {"frame": "pressed", "sy": TRAMP_PRESS_SY[result]}
-	t -= TRAMP_PUSH
+	t -= Balance.TRAMP_PUSH
 	if t < TRAMP_POP:
 		return {"frame": "launch", "sy": 1.0 + TRAMP_POP_SY[result] * sin(PI * t / TRAMP_POP)}
 	# 출렁이며 평소로: 줄어드는 사인 (약 3번 출렁임)

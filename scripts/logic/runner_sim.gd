@@ -527,7 +527,8 @@ func _ride(dt: float, press_started: bool) -> void:
 			return
 	if press_started:
 		_ride_line = {}
-		_bounce(line, "perfect" if _ride_time <= Balance.LINE_PERFECT else "good")
+		# 누른 때는 이번 step 시작 (_touch_line의 _press_age와 같은 기준이라 프레임 간격에 따라 창이 바뀌지 않음)
+		_bounce(line, "perfect" if _ride_time - dt <= Balance.LINE_PERFECT else "good")
 	elif _ride_time > Balance.LINE_RIDE_TIME:
 		_ride_line = {}
 		_bounce(line, "miss")

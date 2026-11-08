@@ -184,27 +184,37 @@ func test_상태에_맞는_그림과_투명화() -> void:
 	cat.queue_free()
 
 
-func test_더블점프_공중제비는_웅크린_그림으로_한_바퀴_돌고_착지하면_끊긴다() -> void:
+## 높은 곳 공중(아래 옥상 없음)에 띄운 sim
+func _sim_in_air() -> RunnerSim:
 	var sim := _sim_on_roofs([{"left": -2000.0, "right": 0.0, "top": 200.0}, {"left": 100000.0, "right": 200000.0, "top": 0.0}])
 	sim.x = -10.0
 	sim.on_ground = false
 	sim.set("_jumped", true)
 	sim.y = 600.0
 	sim.vy = 0.0
+	return sim
+
+
+func test_더블점프는_몸을_말아_앞구르기_한_바퀴를_돌고_착지하면_끊긴다() -> void:
+	var sim := _sim_in_air()
 	sim.step(DT, true)  # 더블점프 (평소 점프는 회전 없음: 위 test_뛰어서_올라갈_때도_내려올_때도_기울지_않는다)
 	assert_true(sim.double_jumped)
-	var first := CatPose.pose(sim)
-	assert_eq(first.frame, "crouch", "웅크린 그림")
-	assert_true(first.spin >= 0.0 and first.spin < 1.0, "막 돌기 시작")
-	var last_spin: float = first.spin
-	while sim.time_since_double_jump < Balance.CAT_SPIN_TIME - DT:
+	var order: Array[String] = [CatPose.pose(sim).frame]
+	var last_spin: float = CatPose.pose(sim).spin
+	assert_true(last_spin < 0.2, "막 돌기 시작")
+	while sim.time_since_double_jump < Balance.CAT_FLIP_TIME - DT:
+		sim.y = 600.0
 		sim.step(DT, true)
 		var p: Dictionary = CatPose.pose(sim)
 		assert_true(p.spin >= last_spin, "한 방향으로 돎")
 		last_spin = p.spin
-	assert_true(last_spin > TAU * 0.98, "한 바퀴 (%.2f)" % last_spin)
+		if order[-1] != p.frame:
+			order.append(p.frame)
+	assert_eq(order, ["flip_tuck", "flip_curl", "flip_ball", "flip_open"] as Array[String], "숙이기 → C자 → 공 → 펴기")
+	assert_true(last_spin > TAU * 0.97, "한 바퀴 (%.2f)" % last_spin)
 	sim.step(DT * 2.0, true)
-	assert_eq(CatPose.pose(sim).spin, 0.0, "0.36초 뒤 끝")
+	assert_eq(CatPose.pose(sim).spin, 0.0, "끝나면 회전 없음")
+	assert_eq(CatPose.pose(sim).frame, "fall", "끝나면 누르고 있어도 내려옴 그림으로 이어짐")
 	# 도는 중에 착지하면 바로 끊김
 	sim.time_since_double_jump = 0.1
 	sim.on_ground = true
@@ -212,6 +222,46 @@ func test_더블점프_공중제비는_웅크린_그림으로_한_바퀴_돌고_
 	sim.on_ground = false
 	sim.ghost_time = 0.5
 	assert_eq(CatPose.pose(sim).spin, 0.0, "투명화면 끊김")
+
+
+func test_앞구르기_회전은_공일_때_가장_빠르다() -> void:
+	var speed := func(k: float) -> float: return CatPose.flip_angle(k + 0.01) - CatPose.flip_angle(k)
+	assert_true(speed.call(0.5) > speed.call(0.1) * 2.0, "공 > 말기")
+	assert_true(speed.call(0.5) > speed.call(0.9) * 2.0, "공 > 펴기")
+	assert_eq(CatPose.flip_angle(0.0), 0.0)
+	assert_true(absf(CatPose.flip_angle(1.0) - TAU) < 0.001, "딱 한 바퀴")
+	var curl_end := CatPose.flip_angle(0.25)
+	var open_start := CatPose.flip_angle(0.75)
+	assert_true(absf(rad_to_deg(curl_end) - 60.0) < 8.0, "말기 끝 약 60도 (%.0f)" % rad_to_deg(curl_end))
+	assert_true(absf(rad_to_deg(open_start) - 300.0) < 8.0, "펴기 시작 약 300도 (%.0f)" % rad_to_deg(open_start))
+
+
+func test_트램펄린_결과별_자세() -> void:
+	var tramp := {"kind": "tramp", "left": 0.0, "right": 210.0, "top": 210.0, "base": 200.0}
+	var sim := _sim_in_air()
+	sim.bounced_line = tramp
+	sim.time_since_bounce = 0.0
+	sim.vy = 500.0
+	sim.time_since_jump = 5.0
+	sim.bounce_result = "perfect"
+	assert_eq(CatPose.pose(sim).frame, "crouch", "튕긴 직후는 아직 그물에 눌린 웅크림")
+	sim.time_since_bounce = Balance.TRAMP_PUSH
+	assert_eq(CatPose.pose(sim).frame, "takeoff", "퍼펙트: 도약 그림으로 늘어나며 발사")
+	var launch_end := Balance.TRAMP_PUSH + Balance.CAT_LAUNCH_TIME
+	sim.time_since_bounce = launch_end + 0.2
+	assert_true(CatPose.pose(sim).frame.begins_with("flip_"), "그 뒤 앞구르기 자동 1회")
+	sim.time_since_bounce = launch_end + Balance.CAT_FLIP_TIME + 0.01
+	assert_eq(CatPose.pose(sim).spin, 0.0, "한 번만")
+	sim.time_since_bounce = launch_end + 0.1
+	sim.bounce_result = "good"
+	assert_eq(CatPose.pose(sim).spin, 0.0, "그냥 누름은 앞구르기 없음")
+	sim.time_since_bounce = Balance.TRAMP_PUSH + 0.01
+	assert_eq(CatPose.pose(sim).frame, "takeoff", "누름도 도약 그림으로 발사")
+	sim.bounce_result = "miss"
+	assert_eq(CatPose.pose(sim).frame, "flail", "안 누르면 허우적")
+	sim.time_since_land = 0.0
+	sim.on_ground = true
+	assert_true(CatPose.pose(sim).frame != "flail", "내려서면 끝")
 
 
 func test_공중제비_회전축은_몸_가운데() -> void:

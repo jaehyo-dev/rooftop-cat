@@ -712,6 +712,61 @@ func test_트램펄린_밟음_그림의_그물_바닥이_밟은_발_높이() -> 
 	for y in img.get_height():
 		if img.get_pixel(cx, y).a > 0.5:
 			bottom = y
-	var k: float = Balance.TRAMP_WIDTH / world_script.TRAMP_SRC_WIDTH
-	var lift: float = (world_script.TRAMP_SRC_FEET - (bottom + 1)) * k
-	assert_true(absf(lift - Balance.TRAMP_LIFT) <= 2.0, "그물 바닥 높이 %.1f (판정 %.0f)" % [lift, Balance.TRAMP_LIFT])
+	assert_true(absf(bottom + 1 - world_script.TRAMP_SRC_NET.pressed) <= 2.0, "그물 바닥 줄 %d" % (bottom + 1))
+	var net: float = world_script.tramp_height(world_script.TRAMP_SRC_NET.pressed, 1.0)
+	var rest: float = world_script.tramp_height(world_script.TRAMP_SRC_NET.rest, 1.0)
+	assert_true(net > Balance.TRAMP_LIFT and net < rest * 0.5, "꺼진 그물 %.0f, 평소 그물 %.0f" % [net, rest])
+	assert_true(world_script.tramp_height(world_script.TRAMP_SRC_FEET, 1.0) > Balance.CAT_BODY_SIZE.y, "다리를 늘여 몸보다 큼")
+
+
+func test_트램펄린_고양이_그림은_폴짝_올라타_그물_깊이를_따라가고_튀어_나간다() -> void:
+	var world_script := load("res://scripts/world_view.gd")
+	var rest: float = world_script.tramp_height(world_script.TRAMP_SRC_NET.rest, 1.0)
+	var sim := _tramp_course(600.0)
+	var tramp: Dictionary = sim.structures[0]
+	var touch_at: float = (RunnerSim.run_in_x(tramp) - sim.x) / sim.speed
+	var press_step := roundi((touch_at + 0.08) / DT)  # 닿고 0.08초 뒤 누름
+	var y_before := sim.y
+	assert_eq(world_script.tramp_cat_lift(sim), 0.0, "멀리서는 그대로")
+	var best := 0.0
+	while not sim.is_riding():
+		sim.step(DT, false)
+		best = maxf(best, world_script.tramp_cat_lift(sim) if sim.on_ground else 0.0)
+	assert_true(best > rest * 0.85, "달려 들어가며 그물 위로 폴짝 %.0f (평소 그물 %.0f)" % [best, rest])
+	var riding: float = world_script.tramp_cat_lift(sim)
+	var expect: float = y_before + world_script.tramp_height(world_script.TRAMP_SRC_NET.pressed, world_script.TRAMP_PRESS_SY.good) - sim.y
+	assert_true(absf(riding - expect) < 0.01, "실린 동안 꺼진 그물 깊이 (%.1f)" % riding)
+	assert_eq(sim.y, tramp.top, "판정 높이는 그대로")
+	var i := int(touch_at / DT)
+	while not sim.bounced:
+		sim.step(DT, i >= press_step)
+		i += 1
+	var drawn: float = sim.y + world_script.tramp_cat_lift(sim)
+	assert_true(absf(drawn - y_before - world_script.tramp_height(world_script.TRAMP_SRC_NET.pressed, world_script.TRAMP_PRESS_SY[sim.bounce_result])) < 0.01, "튕긴 직후 그림은 그물에")
+	for n in int((Balance.TRAMP_PUSH + world_script.TRAMP_RELEASE) / DT) + 2:
+		sim.step(DT, false)
+	assert_eq(world_script.tramp_cat_lift(sim), 0.0, "튀어 나간 뒤 실제 높이")
+
+
+func test_효과음은_일어난_일에_맞게_난다() -> void:
+	var sim := RunnerSim.new(1)
+	assert_eq(SfxEvents.sounds(sim, false), [] as Array[String], "아무 일 없음")
+	sim.jumped = true
+	assert_eq(SfxEvents.sounds(sim, false), ["jump"] as Array[String])
+	sim.jumped = false
+	sim.double_jumped = true
+	assert_eq(SfxEvents.sounds(sim, false), ["double_jump"] as Array[String])
+	sim.double_jumped = false
+	sim.landed = true
+	assert_eq(SfxEvents.sounds(sim, true), ["land", "fall"] as Array[String])
+	sim.landed = false
+	sim.bounced = true
+	sim.bounce_result = "good"
+	assert_eq(SfxEvents.sounds(sim, false), ["boing"] as Array[String])
+	sim.bounce_result = "perfect"
+	assert_eq(SfxEvents.sounds(sim, false), ["boing", "perfect"] as Array[String])
+	sim.bounced = false
+	sim.picked.assign([{"kind": "fish"}, {"kind": "fish"}])
+	assert_eq(SfxEvents.sounds(sim, false), ["fish"] as Array[String], "한 번만")
+	sim.picked.assign([{"kind": "box"}])
+	assert_eq(SfxEvents.sounds(sim, false), [] as Array[String], "상자는 소리 없음")

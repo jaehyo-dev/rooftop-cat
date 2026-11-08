@@ -106,5 +106,6 @@ func test_고양이와_그림자는_판정선보다_발_내림만큼_아래에_�
 	add_child(world)
 	await wait_frames(2)
 	var ground: float = world.call("_ground_y")
-	assert_eq(world.cat.position.y, ground - world.sim.y + world.FOOT_SINK, "고양이 발끝")
+	# 달리기 들썩임(그림만)만큼 위로 간 자리를 빼면 판정선 + 발 내림
+	assert_true(absf(world.cat.position.y + CatPose.pose(world.sim).bob - (ground - world.sim.y + world.FOOT_SINK)) < 0.01, "고양이 발끝")
 	world.queue_free()

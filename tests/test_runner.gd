@@ -244,14 +244,12 @@ func test_옥상_끝을_막_지난_뒤에도_점프를_받아준다() -> void:
 
 
 func test_늘어남과_납작해짐() -> void:
-	assert_eq(Squash.body_scale(true, 0.0, 99.0), Vector2.ONE, "달릴 때는 원래 모양")
-	var rise := Squash.body_scale(false, JumpModel.jump_speed(), 99.0)
+	# 착지 눌림은 스프링 충격 (test_spring.gd)
+	assert_eq(Squash.body_scale(0.0), Vector2.ONE, "멈춰 있으면 원래 모양")
+	var rise := Squash.body_scale(JumpModel.jump_speed())
 	assert_true(rise.y > 1.0 and rise.x < 1.0, "올라갈 때 세로로 늘어남")
-	var land := Squash.body_scale(true, 0.0, 0.0)
-	assert_true(land.x > 1.0 and land.y < 1.0, "착지 순간 납작")
-	var later := Squash.body_scale(true, 0.0, Balance.SQUASH_TIME * 0.5)
-	assert_true(later.y > land.y and later.y < 1.0, "점점 원래 모양으로")
-	assert_eq(Squash.body_scale(true, 0.0, Balance.SQUASH_TIME), Vector2.ONE, "시간이 지나면 원래 모양")
+	var fall := Squash.body_scale(-JumpModel.jump_speed() * 0.5)
+	assert_true(fall.y > 1.0 and fall.y < Balance.STRETCH_FALL.y, "떨어지는 속도에 따라 계속 변함")
 
 
 func test_충돌_판정은_기준_그림과_같은_비율() -> void:
