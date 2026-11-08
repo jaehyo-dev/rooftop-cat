@@ -28,6 +28,8 @@ class CleanEdgesTest(unittest.TestCase):
         files = [p for d in ("buildings", "structures", "items", "backdrop") for p in (ROOT / d).glob("*.png")]
         self.assertTrue(files)
         for path in files:
+            if path.stem.endswith("_cream"):
+                continue  # 안개 원본(검사 제외 대상)의 색만 섞은 파일: 가장자리 분홍은 안개 고유색이고 원본과 같은 자리
             rgba = self.np.asarray(self.Image.open(path).convert("RGBA"))
             inside = (rgba[..., 3] > 0) & ~self.ce.edge_mask(rgba)
             if self.ce.pinkish(rgba)[inside].mean() > 0.5:
