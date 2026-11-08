@@ -86,11 +86,13 @@ const RESCUE_HEIGHT := 0.0
 const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
 
 # --- 구조물: 빨래줄, 전봇대 (넓은 틈에 놓이는 다리·디딤돌) ---
-## 새 옥상을 만들 때 "특수 틈"(점프 한 번으로 못 건너는 넓은 틈)으로 만들 확률, 그중 빨래줄이 될 확률 (나머지는 전봇대).
-## 처음 SPECIAL_GAP_AFTER개 옥상은 일반 틈만 (처음엔 쉽게)
+## 새 옥상을 만들 때 "특수 틈"(점프 한 번으로 못 건너는 넓은 틈)으로 만들 확률, 그중 트램펄린(빨래줄을 켜면 빨래줄)이 될 확률
+## (나머지는 전봇대). 처음 SPECIAL_GAP_AFTER개 옥상은 일반 틈만 (처음엔 쉽게)
 const SPECIAL_GAP_CHANCE := 0.3
 const SPECIAL_GAP_AFTER := 3
 const LINE_SHARE := 0.5
+## 빨래줄 생성 (v0.5.0 2a-2에서 은퇴: 트램펄린이 대신함. 코드·그림·판정은 남겨 둠)
+const LINE_ENABLED := false
 ## 못 건너는 틈의 여유: 최대 점프로 닿는 거리 + 발 범위 + 코요테에 더하는 픽셀
 const SPECIAL_GAP_MARGIN := 40.0
 ## 빨래줄: 틈 전체를 가로지르는 줄(옥상 위 LINE_HEIGHT 높이). 위에서 내려와 닿을 때마다 누름 타이밍으로 판정해 튕긴다
@@ -115,6 +117,28 @@ const LINE_PERFECT_HEIGHT := 330.0
 ## 줄 위 생선 줄의 높이 (줄에서 위로, 생선 가운데). 퍼펙트 튕김 꼭대기(330 + 몸 절반 46)에서 먹는 거리(46 + 24)보다 멀어
 ## 더블점프를 더해야 닿는다 (PLAN의 420은 퍼펙트만으로 닿아서 460으로 올림)
 const LINE_FISH_HEIGHT := 460.0
+## 트램펄린: 넓은 틈 앞 옥상 끝 발사대. 누름 판정 창·퍼펙트 창·너무 이른 누름은 빨래줄 값(LINE_PRESS_EARLY, LINE_RIDE_TIME,
+## LINE_PERFECT, LINE_BLOCK_EARLY)을 그대로 쓴다. 달려 들어가 몸 가운데가 왼쪽 끝에서 TRAMP_RUN_IN 들어가거나(그물 가운데쯤),
+## 위에서 내려와 발이 걸치면 닿음.
+const TRAMP_WIDTH := 150.0
+const TRAMP_RUN_IN := 60.0
+const TRAMP_INSET := 10.0     # 옥상 끝에서 이만큼 안쪽에 놓음
+## 밟은 그물 높이 (옥상 위로). 그림의 꺼진 그물 바닥이 다리 끝보다 이만큼 위라 고양이 발이 그물에 닿아 보이게 판정도 맞춤
+const TRAMP_LIFT := 10.0
+## 트램펄린 틈은 옥상 높이가 이 값 이하일 때만 (퍼펙트 꼭대기와 생선 길이 세로 카메라 안에 들게)
+const TRAMP_TOP_MAX := 240.0
+## 튕겨 오르는 높이 (그물 위로): 안 누름·이른 누름(제자리에서 낮게, 앞으로 밀어 주지 않음) / 누름 / 퍼펙트
+const TRAMP_MISS_HEIGHT := 80.0
+const TRAMP_GOOD_HEIGHT := 300.0
+const TRAMP_PERFECT_HEIGHT := 420.0
+## 발사 가로 속도는 트램펄린마다 생성 때 계산한다(RoofGenerator.tramp_*): 누름은 가장 일찍 튕겨도 다음 옥상 끝에서
+## TRAMP_LAND_IN 안쪽에, 퍼펙트는 그보다 TRAMP_PERFECT_EXTRA 더 멀리 내려앉는 속도
+const TRAMP_LAND_IN := 60.0
+const TRAMP_PERFECT_EXTRA := 160.0
+## 틈 너비 범위: 못 건너는 최소(점프 + 더블점프로도 못 건넘) ~ 최소 + TRAMP_GAP_SPAN
+const TRAMP_GAP_SPAN := 100.0
+## 퍼펙트 생선 길: 퍼펙트 궤적 중 누름 꼭대기보다 이만큼 이상 높은 구간에만 (누름으로는 못 먹게: 먹는 거리 70보다 큼)
+const TRAMP_FISH_ABOVE_GOOD := 80.0
 ## 전봇대: 틈 한가운데 판(꼭대기). 판 너비는 속도가 낮을수록 넓게 시작해 POLE_WIDTH_MIN까지 좁아진다.
 ## 판 높이는 앞뒤 옥상 중 높은 쪽 (판에서 벽에 막히지 않고, 판에서 다음 옥상으로는 내려감).
 ## v0.5.0 2a: 판 앞뒤 틈이 한 번 점프 거리만큼 넓어져 200/120 → 240/140으로 넓힘 (밸런스 봇 초보 판 성공률)

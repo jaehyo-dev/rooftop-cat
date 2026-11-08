@@ -16,11 +16,13 @@ func _init(seed_value: int) -> void:
 ## prev 다음에 roof가 생겼을 때 놓을 아이템들 (가로 위치 순서)
 func items_for(prev: Dictionary, roof: Dictionary) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
-	if _rng.randf() < Balance.FISH_ARC_CHANCE and not roof.has("line"):
+	if _rng.randf() < Balance.FISH_ARC_CHANCE and not roof.has("line") and not roof.has("tramp"):
 		items.append_array(_fish_arc(prev, roof))
 	if roof.has("line"):
 		# 빨래줄 틈: 줄 위 높은 곳에 생선 줄 (더 높이 튕겨야 먹음)
 		items.append_array(_line_fish(roof.line))
+	if roof.has("tramp"):
+		items.append_array(tramp_fish(roof.tramp))
 	if roof.get("platform", false):
 		return items  # 전봇대 판: 작아서 생선 줄·상자는 놓지 않음
 	_roofs_until_box -= 1
@@ -56,6 +58,21 @@ func _fish_row(roof: Dictionary) -> Array[Dictionary]:
 			break
 		items.append({"kind": "fish", "x": x, "y": roof.top + Balance.ITEM_LIFT})
 		x += Balance.FISH_SPACING
+	return items
+
+
+## 트램펄린 퍼펙트 생선 길: 달려 들어가 닿는 순간(몸 가운데 = RunnerSim.run_in_x) 퍼펙트로 튕긴 궤적을 따라 FISH_SPACING 간격으로,
+## 누름 꼭대기보다 TRAMP_FISH_ABOVE_GOOD 이상 높은 구간에만 (누름으로는 못 먹음)
+static func tramp_fish(tramp: Dictionary) -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	var vy := RoofGenerator.line_bounce_speed(Balance.TRAMP_PERFECT_HEIGHT)
+	var vx: float = tramp.perfect_vx
+	var t := 0.0
+	while t <= 2.0 * vy / Balance.GRAVITY:
+		var h := vy * t - 0.5 * Balance.GRAVITY * t * t
+		if h >= Balance.TRAMP_GOOD_HEIGHT + Balance.TRAMP_FISH_ABOVE_GOOD:
+			items.append({"kind": "fish", "x": RunnerSim.run_in_x(tramp) + vx * t, "y": tramp.top + h + Balance.ITEM_LIFT})
+		t += Balance.FISH_SPACING / vx
 	return items
 
 

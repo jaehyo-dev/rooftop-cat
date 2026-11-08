@@ -61,6 +61,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/backdrop/far_town.png`, `cloud1~4.png` | 2026-11-08 | 위 원본 | 게임 속 먼 배경: 동네 띠(far_town), 구름(cloud1~4) | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 동네 띠 위아래 투명 여백을 잘라 냄 → `tools/clean_edges.py`로 가장자리 분홍 잔여물 정리 |
 | `assets/raw/mist_bands.png`, `mist_silhouette.png` | 2026-11-08 | Codex 내장 이미지 생성 (시안 C·먼 배경 원본을 `--image`로 첨부해 그림체를 맞춤) | 안개 띠 3겹 시트, 안개 속 먼 지붕·나무·전봇대·전깃줄 실루엣 띠 원본 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
 | `assets/sprites/backdrop/mist_far.png`, `mist_mid.png`, `mist_near.png`, `mist_town.png` | 2026-11-08 | 위 원본 | v0.4.1 화면 아래 안개 겹(먼·가운데·맨 앞)과 안개 속 실루엣 | `tools/cut_parts.py`로 마젠타 배경을 지우고 잘라 냄 → 여백·아래 가장자리 섞인 줄 잘라 냄 → 안개 띠는 윗가장자리에서 아래로 90~110줄에 걸쳐 투명→불투명으로 부드럽게, 색을 크림색 쪽으로 30% 옅게 → `tools/clean_edges.py` |
+| `assets/raw/trampoline_sheet.png` | 2026-11-08 | Codex 내장 이미지 생성 (주택가 건물 시안·구조물 시트를 `--image`로 첨부해 그림체를 맞춤) | 트램펄린 3상태 시트 원본: 평소·밟음·튕김 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
+| `assets/sprites/structures/trampoline_rest.png`, `trampoline_pressed.png`, `trampoline_launch.png` | 2026-11-08 | 위 원본 | 게임 속 트램펄린 (평소·밟음·튕김) | `tools/cut_parts.py`의 마젠타 지우기로 배경을 지우고 세 그림을 같은 캔버스(432x200)로 잘라 절반(216x100)으로 줄임 → `tools/clean_edges.py` |
 | `review/v0.4.1/mockup_A_extend.png`, `mockup_B_alley.png`, `mockup_C_mist.png` | 2026-11-08 | Codex 내장 이미지 생성 (v0.4.0 캡처와 주택가 시안을 `--image`로 첨부) | v0.4.1 화면 아래 시안 A·B·C (검토용, 게임에 포함 안 됨) | 없음 |
 
 ## 직접 만든 것

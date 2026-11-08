@@ -3,7 +3,8 @@ extends Node2D
 ## 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE·CAT_FOOT_HALF로 하고, 고양이 그림은 같은 크기로 그리기만 한다.
 ## 떨어지면 game_over를 알리고, 잠시(Balance.RESTART_DELAY) 뒤 새로 누르면 새 판을 시작한다.
 ## 세로 카메라(CameraFollow): 고양이가 높이 오르면 화면 전체를 아래로 내려 그린다(그림만, 판정과 무관). 하늘·구름·안개는 시차만큼만.
-## 빨래줄 안내: 매 판 처음 GUIDE_LINES개 줄 틈에서 닿을 자리에 줄어드는 동그라미와 "눌러!" 말풍선, 줄 판정 결과 글자는 늘.
+## 트램펄린(빨래줄) 안내: 매 판 처음 GUIDE_LINES개 트램펄린에서 닿을 자리에 줄어드는 동그라미와 "눌러!" 말풍선, 판정 결과 글자는 늘.
+## 발 붙이기(v0.5.0 2a-2): 판정선은 지붕 턱 윗면 맨 뒤 선이지만, 고양이·그림자·아이템은 FOOT_SINK만큼 내려 윗면 가운데에 서 보이게 그린다.
 
 ## 떨어져서 게임이 끝남 (meters = 이번 거리 점수)
 signal game_over(meters: int)
@@ -49,7 +50,6 @@ const LINE_TILE_STRETCH := 1.3  # 줄과 빨래 조각을 가로로 이만큼 �
 const LINE_POST_BOTTOM := 187.0  # 그림 안에서 기둥 아래 끝
 ## 전봇대 그림(267x767)에서: 위 조각(판~가로대, 0~209줄)과 기둥 몸통 조각(가로 105~161). 판 너비(187)에 맞춰 크기를 정하고 기둥은 아래로 늘린다
 const POLE_PLATE_WIDTH := 187.0
-const POLE_PLATE_TOP := 7.0
 const POLE_HEAD_ROWS := 209.0
 const POLE_TOP_ROWS := 92.0   # 위 조각(판+받침) 줄 수
 const POLE_BAR_ROW := 125.0   # 아래 조각(애자+가로대) 시작 줄
@@ -59,6 +59,25 @@ const POLE_TRUNK_W := 56.0
 const POLE_PLATE_ROWS := 42.0  # 위 조각 중 판 부분 (그 아래는 받침 버팀대)
 const POLE_SLIM := 0.7         # 판 아래 그림(버팀대·가로대·기둥)만 이 배율로 가늘게. 판 너비(판정)는 그대로
 const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초)
+## 고양이·그림자·아이템을 판정선보다 이만큼 아래에 그린다: 건물 3종 모두 지붕 턱 윗면이 그림 4줄(뒤 선)~29줄(앞 선)이라 그 가운데(16).
+## 전봇대 판·트램펄린도 서는 자리가 이 높이에 오게 그린다
+const FOOT_SINK := 16.0
+const POLE_FACE_MID := 10.5   # 전봇대 그림에서 판 윗면 가운데 줄 (판 윗면 7~14줄)
+## 트램펄린 그림(216x100, 평소·밟음·튕김이 같은 캔버스): 테 왼쪽 끝 3, 테 너비 209, 다리 끝 97줄.
+## 밟음 그림의 꺼진 그물 바닥(82줄)이 다리 끝보다 Balance.TRAMP_LIFT만큼 위라 밟은 고양이 발이 그물에 닿는다
+const TRAMP_TEXTURES := {"rest": preload("res://assets/sprites/structures/trampoline_rest.png"),
+		"pressed": preload("res://assets/sprites/structures/trampoline_pressed.png"),
+		"launch": preload("res://assets/sprites/structures/trampoline_launch.png")}
+const TRAMP_SRC_LEFT := 3.0
+const TRAMP_SRC_WIDTH := 209.0
+const TRAMP_SRC_FEET := 97.0
+## 트램펄린 모양 변화 (튕긴 뒤 지난 시간): 밟음 그림 TRAMP_PUSH초(발을 떼는 순간) → 튕김 그림 TRAMP_POP초 → 평소 그림이 출렁이며 TRAMP_SETTLE초
+const TRAMP_PUSH := 0.012  # 60fps 한 프레임 안: 닿은 프레임에만 밟음 그림 (고양이가 그물을 떠나면 바로 튕김 그림)
+const TRAMP_POP := 0.12
+const TRAMP_SETTLE := 0.5
+## 세로 배율 (다리 끝 기준): 밟음 = 눌림(1보다 작음), 튕김·출렁임 = 늘어남 폭. [안 누름·이른 누름, 누름, 퍼펙트]
+const TRAMP_PRESS_SY := {"miss": 0.95, "early": 0.95, "good": 0.92, "perfect": 0.84}
+const TRAMP_POP_SY := {"miss": 0.05, "early": 0.05, "good": 0.14, "perfect": 0.28}
 const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
 const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
@@ -150,7 +169,7 @@ func _process(delta: float) -> void:
 
 ## 고양이를 로직 위치(발끝)에 놓고 자세를 맞춘다
 func _place_cat(delta: float) -> void:
-	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y)
+	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK)
 	cat.show_state(sim, delta)
 
 
@@ -217,24 +236,29 @@ func _draw() -> void:
 			continue
 		_draw_building(roof, offset, ground)
 
-	for line in sim.structures:
-		_draw_line(line, offset, ground)
+	for structure in sim.structures:
+		if structure.kind == "tramp":
+			_draw_tramp(structure, offset, ground)
+		else:
+			_draw_line(structure, offset, ground)
 
-	var shadow := CatShadow.under(sim.roofs, sim.x, sim.y)
+	# 트램펄린을 밟고 있으면 그림자도 꺼진 그물 위에
+	var floors: Array = sim.roofs + ([sim.line_touch_eta(0.0).line] if sim.is_riding() else [])
+	var shadow := CatShadow.under(floors, sim.x, sim.y)
 	if not shadow.is_empty() and not sim.rescuing:
-		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top), shadow)
+		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top + FOOT_SINK), shadow)
 
 	for item in sim.items:
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
 		var bob := 4.0 * sin(sim.elapsed * 4.0 + item.x * 0.01)
-		_draw_item(item.kind, Vector2(item.x + offset, ground - item.y + bob), 1.0, 1.0)
+		_draw_item(item.kind, Vector2(item.x + offset, ground - item.y + FOOT_SINK + bob), 1.0, 1.0)
 	for pop in _pops:
 		var k: float = pop.t / POP_TIME
-		_draw_item(pop.kind, Vector2(pop.x + offset, ground - pop.y - 40.0 * k), 1.0 + 0.5 * k, 1.0 - k)
+		_draw_item(pop.kind, Vector2(pop.x + offset, ground - pop.y + FOOT_SINK - 40.0 * k), 1.0 + 0.5 * k, 1.0 - k)
 	if sim.rescuing:
 		# 고양이 발밑에서 상자가 받쳐 올린다 (고양이는 자식 노드라 상자 위에 그려짐)
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
-		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y - h * 0.35,
+		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
 
 
@@ -296,7 +320,7 @@ func _draw_shadow(pos: Vector2, shadow: Dictionary) -> void:
 
 
 ## 옥상의 건물: 왼쪽 캡 + 가운데 조각들(옥상 폭에 맞춰 늘임) + 오른쪽 캡, 그림 아래는 벽 색으로 화면 바닥까지 채움, 그 위에 소품.
-## 그림의 맨 윗줄 = 옥상 충돌선(화면 y = ground - roof.top)이라 고양이 발이 지붕 턱 윗면에 닿는다.
+## 그림의 맨 윗줄 = 옥상 충돌선(화면 y = ground - roof.top). 고양이는 FOOT_SINK만큼 내려 그려 지붕 턱 윗면 가운데에 선다.
 func _draw_building(roof: Dictionary, offset: float, ground: float) -> void:
 	var look := _look_of(roof)
 	var style: Dictionary = BuildingArt.style_textures(look.plan.style)
@@ -349,7 +373,7 @@ func _draw_pole(plate: Dictionary, offset: float, ground: float) -> void:
 	if cx < -300.0 or cx > get_viewport_rect().size.x + 300.0:
 		return
 	var k: float = (plate.right - plate.left) / POLE_PLATE_WIDTH
-	var top_y: float = ground - plate.top - POLE_PLATE_TOP * k
+	var top_y: float = ground - plate.top + FOOT_SINK - POLE_FACE_MID * k  # 판 윗면 가운데가 고양이 발 높이에
 	var w := POLE_TEXTURE.get_width() * k
 	var slim := w * POLE_SLIM
 	# 기둥 몸통: 판 아래부터 화면 바닥까지 (먼저 그려 위 조각이 덮음)
@@ -398,6 +422,39 @@ func _draw_line(line: Dictionary, offset: float, ground: float) -> void:
 			Rect2(LINE_TEXTURE.get_width() - LINE_POST_SRC, 0, LINE_POST_SRC, LINE_TEXTURE.get_height()))
 
 
+## 트램펄린: 옥상 끝에 다리를 딛고(다리 끝 = 옥상 서는 자리) 상태마다 그림을 바꾼다.
+## 평소 → 밟음(고양이가 실려 있는 동안, 튕긴 직후 TRAMP_PUSH초) → 튕김(TRAMP_POP초) → 출렁이며 평소로. 그림 사이는 세로 배율로 잇는다
+func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
+	var left: float = tramp.left + offset
+	if left > get_viewport_rect().size.x + 100.0 or left + Balance.TRAMP_WIDTH < -100.0:
+		return
+	var look := tramp_look(sim, tramp)
+	var tex: Texture2D = TRAMP_TEXTURES[look.frame]
+	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
+	var feet: float = ground - tramp.base + FOOT_SINK
+	# 다리 끝을 기준으로 세로로 늘이고 줄인다
+	var h: float = TRAMP_SRC_FEET * k * look.sy
+	draw_texture_rect(tex, Rect2(left - TRAMP_SRC_LEFT * k, feet - h, tex.get_width() * k, tex.get_height() * k * look.sy), false)
+
+
+## 트램펄린의 지금 모양 {"frame": rest/pressed/launch, "sy": 세로 배율} (sim 상태만으로 정해 캡처·테스트에서 같은 값)
+static func tramp_look(state: RunnerSim, tramp: Dictionary) -> Dictionary:
+	if state.is_riding() and is_same(state.line_touch_eta(0.0).line, tramp):
+		return {"frame": "pressed", "sy": TRAMP_PRESS_SY.good}
+	if not is_same(state.bounced_line, tramp) or state.time_since_bounce >= TRAMP_PUSH + TRAMP_POP + TRAMP_SETTLE:
+		return {"frame": "rest", "sy": 1.0}
+	var result: String = state.bounce_result
+	var t := state.time_since_bounce
+	if t < TRAMP_PUSH:
+		return {"frame": "pressed", "sy": TRAMP_PRESS_SY[result]}
+	t -= TRAMP_PUSH
+	if t < TRAMP_POP:
+		return {"frame": "launch", "sy": 1.0 + TRAMP_POP_SY[result] * sin(PI * t / TRAMP_POP)}
+	# 출렁이며 평소로: 줄어드는 사인 (약 3번 출렁임)
+	var u := (t - TRAMP_POP) / TRAMP_SETTLE
+	return {"frame": "rest", "sy": 1.0 - 0.5 * TRAMP_POP_SY[result] * sin(TAU * 3.0 * u) * (1.0 - u) * (1.0 - u)}
+
+
 ## 아이템 그림을 가운데 pos에 그린다 (zoom 배율, alpha 투명도)
 func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
 	if pos.x < -100.0 or pos.x > get_viewport_rect().size.x + 100.0:
@@ -416,16 +473,16 @@ func _draw_overlay() -> void:
 	if not touch.is_empty() and not sim.game_over:
 		# 첫 점프를 누르고 있는 동안은 그리지 않는다 (누름이 끝난 뒤부터)
 		if _guided.has(touch.line.left) and not sim.is_holding():
-			var at := Vector2(touch.x + offset, ground - touch.line.top)
+			var at := Vector2(touch.x + offset, ground - touch.line.top + FOOT_SINK)
 			var r := lerpf(GUIDE_PAW, GUIDE_START, touch.t / GUIDE_TIME)
 			_overlay.draw_arc(at, GUIDE_PAW, 0.0, TAU, 32, Color(HUD_BROWN, 0.45), 3.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
-			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
-		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
+		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 
 

@@ -21,7 +21,7 @@ func test_간격과_높이와_너비가_범위_안() -> void:
 				var rise: float = roof.top - prev.top
 				var where := "속도 %d, 시드 %d, %d번째" % [speed, seed_value, i]
 				assert_true(gap >= Balance.ROOF_GAP_MIN, where + " 최소 간격")
-				if roof.has("line") or roof.get("platform", false) or prev.get("platform", false):
+				if roof.has("line") or roof.has("tramp") or roof.get("platform", false) or prev.get("platform", false):
 					continue  # 특수 틈은 tests/test_structures.gd에서 확인 (일반 틈보다 넓고, 판은 너비 제한 없음)
 				assert_true(gap <= JumpModel.max_reach(speed, rise) * RoofGenerator.gap_safety(speed) + 0.001, where + " 최대 점프로 닿음 (속도별 여유)")
 				assert_true(absf(rise) <= Balance.ROOF_TOP_STEP + 0.001, where + " 높이 차")

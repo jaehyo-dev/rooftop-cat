@@ -21,6 +21,10 @@ extends RefCounted
 ##   실려 있는 동안 발이 다음 옥상에 걸치면 바로 착지. 전봇대는 틈 한가운데 판(roofs에 들어 있는 platform 옥상)으로,
 ##   위에서 내려앉으면 서고 올라서면 다시 뛸 수 있다. 판은 벽 판정이 없다(몸이 닿아도 막히지 않음).
 ##   특수 틈 다음 옥상(no_ghost)은 벽에 닿아도 투명화 구제가 없다.
+## 트램펄린(structures, kind "tramp", v0.5.0 2a-2): 옥상 끝 발사대. 판정은 빨래줄과 같은 코드(_touch_line·_ride·_bounce)를 쓴다.
+##   달려 들어가 몸 가운데가 run_in_x를 지나거나 위에서 내려와 발이 걸치면 닿음. 닿기 LINE_BLOCK_EARLY 안의 땅 위 누름은 점프가 아니라
+##   트램펄린 누름으로 남긴다. 누름·퍼펙트는 앞으로 발사(가로 속도 tramp.good_vx·perfect_vx, 내려설 때까지), 안 누름·이른 누름은
+##   제자리에서 낮게 튀고(가로 속도 그대로) 다시 받아 주지 않는다.
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
 ## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
 
@@ -89,6 +93,7 @@ var _held_top := NAN        # 착지·줄 누름으로 남겨 둔 공중 누름:
 var _ride_line := {}        # 지금 실려 있는 빨래줄 (닿은 뒤 튕기기 전)
 var _ride_time := 0.0       # 줄에 실린 뒤 지난 시간
 var _slack_line := {}       # 실패 튕김으로 느슨해진 줄 (이 줄은 다시 받아 주지 않음)
+var _launch_vx := 0.0       # 트램펄린 발사 가로 속도 (내려설 때까지, 0이면 달리는 속도)
 var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
 var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 남은 시간
 
@@ -130,7 +135,7 @@ func step(dt: float, pressed: bool) -> void:
 	time_since_double_jump += dt
 	_press_age = 0.0 if press_started else _press_age + dt
 
-	_move_forward(speed * dt)
+	_move_forward(vx() * dt)
 	_fill_roofs()
 	_pick_items()
 
@@ -144,7 +149,11 @@ func step(dt: float, pressed: bool) -> void:
 		_buffer = maxf(0.0, _buffer - dt)
 
 	if (on_ground or _coyote > 0.0) and _buffer > 0.0:
-		_start_jump(pressed)
+		var tramp := _tramp_ahead() if on_ground else {}
+		if not tramp.is_empty() and run_in_x(tramp) - x <= speed * Balance.LINE_BLOCK_EARLY:
+			_buffer = 0.0  # 트램펄린 바로 앞 누름은 점프가 아니라 트램펄린 누름 (닿을 때 _press_age로 판정)
+		else:
+			_start_jump(pressed)
 	elif press_started and not on_ground:
 		_air_press(pressed)
 
@@ -156,6 +165,13 @@ func step(dt: float, pressed: bool) -> void:
 		return
 
 	if on_ground:
+		var tramp := _tramp_ahead()
+		if not tramp.is_empty() and x >= run_in_x(tramp):
+			# 달려 들어가 몸 가운데가 그물 가운데쯤을 지남 = 닿음 (after = 이번 step에서 닿은 뒤 지난 시간)
+			on_ground = false
+			_coyote = 0.0
+			_touch_line(tramp, minf(dt, (x - run_in_x(tramp)) / maxf(speed, 1.0)), dt)
+			return
 		if not _feet_over(_ground_roof):
 			# 발 범위가 옥상 끝을 다 지나 발밑이 비었다
 			on_ground = false
@@ -189,6 +205,7 @@ func step(dt: float, pressed: bool) -> void:
 		has_box = false
 		rescuing = true
 		rescued = true
+		_launch_vx = 0.0
 		_holding = false
 		_floating = false
 		_held_top = NAN
@@ -248,6 +265,25 @@ func landing_top() -> float:
 		if roof.right >= x - Balance.CAT_FOOT_HALF:
 			return roof.top
 	return 0.0
+
+
+## 지금 앞으로 가는 속도 (트램펄린 발사 중이면 발사 속도)
+func vx() -> float:
+	return maxf(speed, _launch_vx)
+
+
+## 달려 들어갈 때 닿는 자리 (몸 가운데): 그물 가운데쯤
+static func run_in_x(tramp: Dictionary) -> float:
+	return tramp.left + Balance.TRAMP_RUN_IN
+
+
+## 서 있는 옥상 위, 아직 닿지 않은(몸 가운데가 오른쪽 끝 전) 받아 주는 트램펄린. 없으면 빈 Dictionary
+func _tramp_ahead() -> Dictionary:
+	for s in structures:
+		if s.kind == "tramp" and not is_same(s, _slack_line) and x <= s.right \
+				and s.left >= _ground_roof.left and s.right <= _ground_roof.right and s.base == _ground_roof.top:
+			return s
+	return {}
 
 
 ## 몸 앞쪽 끝의 가로 위치
@@ -404,9 +440,9 @@ func _surface_eta(within: float, lines_only: bool) -> Dictionary:
 		var t := JumpModel.fall_to(y, vy, surface.top, _floating)
 		if t < 0.0 or t > within:
 			continue
-		var at_x := x + speed * t
+		var at_x := x + vx() * t
 		# step은 앞으로 먼저 간 뒤 착지를 보므로, 닿는 자리는 최대 한 프레임(1/60초) 거리만큼 앞일 수 있다
-		var slop := speed / 60.0
+		var slop := vx() / 60.0
 		if at_x + Balance.CAT_FOOT_HALF + slop >= surface.left and at_x - Balance.CAT_FOOT_HALF <= surface.right and (best.is_empty() or t < best.t):
 			best = {"surface": surface, "t": t, "x": at_x}
 	return best
@@ -417,6 +453,11 @@ func _surface_eta(within: float, lines_only: bool) -> Dictionary:
 func line_touch_eta(within: float) -> Dictionary:
 	if not _ride_line.is_empty():
 		return {"line": _ride_line, "t": 0.0, "x": x}
+	if on_ground:
+		# 달려 들어가는 트램펄린: 몸 가운데가 닿는 자리에 오는 때
+		var tramp := _tramp_ahead()
+		var eta: float = INF if tramp.is_empty() else (run_in_x(tramp) - x) / maxf(speed, 1.0)
+		return {"line": tramp, "t": maxf(eta, 0.0), "x": run_in_x(tramp)} if eta <= within else {}
 	var hit := _surface_eta(within, true)
 	return {} if hit.is_empty() else {"line": hit.surface, "t": hit.t, "x": hit.x}
 
@@ -434,9 +475,9 @@ func is_slack(line: Dictionary) -> bool:
 func _check_landing(prev_y: float, dt: float) -> void:
 	if vy > 0.0:
 		return
-	# 위에서 지나 내려온 발판 중 가장 높은 것에 선다 (옥상과 구조물)
+	# 위에서 지나 내려온 발판 중 가장 높은 것에 선다 (옥상과 구조물. 높이가 같으면 먼저 본 구조물)
 	var best := {}
-	for surface in roofs + structures:
+	for surface in structures + roofs:
 		if is_same(surface, _slack_line):
 			continue  # 느슨해진 줄은 받아 주지 않는다
 		# 위에서 높이를 지나 내려왔을 때만 선다 (아래에서 벽에 부딪힌 경우는 계속 떨어짐)
@@ -444,7 +485,7 @@ func _check_landing(prev_y: float, dt: float) -> void:
 			best = surface
 	if best.is_empty():
 		return
-	if best.get("kind", "") == "line":
+	if best.has("kind"):  # 빨래줄·트램펄린
 		# 이번 step 안에서 줄에 닿은 뒤 지난 시간 (높이가 줄을 지난 비율로 나눔): 판정이 프레임 간격에 덜 흔들리게
 		var after: float = dt * (best.top - y) / maxf(prev_y - y, 0.0001)
 		_touch_line(best, after, dt)
@@ -492,19 +533,23 @@ func _ride(dt: float, press_started: bool) -> void:
 		_bounce(line, "miss")
 
 
-## 빨래줄에서 튕긴다. result: perfect / good (더블점프 다시 생김) / early / miss (낮게, 줄이 느슨해짐)
+## 빨래줄·트램펄린에서 튕긴다. result: perfect / good (더블점프 다시 생김, 트램펄린은 앞으로 발사) / early / miss (낮게, 다시 안 받아 줌)
 func _bounce(line: Dictionary, result: String) -> void:
-	var height := Balance.LINE_MISS_HEIGHT
+	var tramp: bool = line.kind == "tramp"
+	var height := Balance.TRAMP_MISS_HEIGHT if tramp else Balance.LINE_MISS_HEIGHT
 	if result == "perfect":
-		height = Balance.LINE_PERFECT_HEIGHT
+		height = Balance.TRAMP_PERFECT_HEIGHT if tramp else Balance.LINE_PERFECT_HEIGHT
+		_launch_vx = line.perfect_vx if tramp else 0.0
 	elif result == "good":
-		height = Balance.LINE_GOOD_HEIGHT
+		height = Balance.TRAMP_GOOD_HEIGHT if tramp else Balance.LINE_GOOD_HEIGHT
+		_launch_vx = line.good_vx if tramp else 0.0
 	if result == "perfect" or result == "good":
 		_double_used = false
 	else:
 		_slack_line = line
 	y = line.top
 	vy = RoofGenerator.line_bounce_speed(height)
+	_held_top = NAN  # 이 누름은 튕김에 썼다 (남겨 두면 튕긴 뒤 줄·그물 높이를 지나 내려올 때 더블점프로 바뀜)
 	_buffer = 0.0
 	_holding = false
 	_floating = false
@@ -526,6 +571,7 @@ func _land_on(roof: Dictionary) -> void:
 	_floating = false
 	_held_top = NAN
 	_ride_line = {}
+	_launch_vx = 0.0
 	landed = true
 	time_since_land = 0.0
 
@@ -538,6 +584,8 @@ func _fill_roofs() -> void:
 		roofs.append(roof)
 		if roof.has("line"):
 			structures.append(roof.line)
+		if roof.has("tramp"):
+			structures.append(roof.tramp)
 	while roofs.size() > 1 and roofs[0].right < x - 1000.0:
 		roofs.pop_front()
 	while not structures.is_empty() and structures[0].right < x - 1000.0:

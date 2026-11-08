@@ -6,8 +6,9 @@ extends RefCounted
 ##
 ## 특수 틈: 일부 틈은 점프 한 번으로 못 건너게 넓히고 구조물을 둔다 (별도 난수로 정하니 일반 틈의 난수 흐름은 그대로).
 ## 넓은 틈은 "점프 + 더블점프를 다 써도" 못 건너는 너비다.
-## - 빨래줄 틈: 두 옥상 높이를 같게 하고(LINE_TOP_MAX 이하에서만), 틈 전체를 줄이 가로지른다.
-##   다음 옥상(roof.line = 줄 판정)은 퍼펙트 튕김 + 더블점프로도 지나치지 않게 넓다.
+## - 트램펄린 틈: 두 옥상 높이를 같게 하고(TRAMP_TOP_MAX 이하에서만), 앞 옥상 끝에 트램펄린(roof.tramp)을 둔다.
+##   누름·퍼펙트 튕김은 앞으로 발사(가로 속도 good_vx·perfect_vx)되어 항상 다음 옥상에 내려앉고, 다음 옥상은 퍼펙트 + 더블점프로도
+##   지나치지 않게 넓다. 빨래줄 틈(Balance.LINE_ENABLED일 때만, 지금은 꺼짐)은 두 옥상 사이를 줄(roof.line)이 가로지른다.
 ## - 전봇대 틈: 틈 한가운데 작은 판 옥상(platform = true, 벽 판정 없는 발판)이 끼고, 그 다음 옥상이 이어진다.
 ## 특수 틈 다음 옥상은 no_ghost = true (벽에 닿아도 투명화 구제 없음: 줄·판을 거치지 않고 건너는 걸 막는다).
 
@@ -37,8 +38,14 @@ func next_roof(prev: Dictionary, speed: float) -> Dictionary:
 	var t := _special_rng.randf()
 	_made += 1
 	if wants_special and _made > Balance.SPECIAL_GAP_AFTER:
-		# 줄 틈을 못 만드는 높이(LINE_TOP_MAX 위)면 일반 틈 (전봇대로 바꾸면 전봇대가 v0.4.1보다 잦아짐)
-		var special := _line_roof(prev, roof, speed, t) if is_line else _pole_roofs(prev, roof, speed, t)
+		# 줄·트램펄린 틈을 못 만드는 높이면 일반 틈 (전봇대로 바꾸면 전봇대가 v0.4.1보다 잦아짐)
+		var special := {}
+		if not is_line:
+			special = _pole_roofs(prev, roof, speed, t)
+		elif Balance.LINE_ENABLED:
+			special = _line_roof(prev, roof, speed, t)
+		else:
+			special = _tramp_roof(prev, roof, speed, t)
 		if not special.is_empty():
 			return special
 	return roof
@@ -107,6 +114,39 @@ static func line_bounce_speed(height: float) -> float:
 static func line_landing_width(v: float) -> float:
 	var flight := JumpModel.best_double(line_bounce_speed(Balance.LINE_PERFECT_HEIGHT), 0.0, -Balance.LINE_HEIGHT).x
 	return Balance.CAT_FOOT_HALF + v * (Balance.LINE_RIDE_TIME + flight) + 120.0
+
+
+## 트램펄린 틈: prev 끝(TRAMP_INSET 안쪽)에 트램펄린을 두고, 틈은 못 건너는 최소 ~ 최소 + TRAMP_GAP_SPAN, 다음 옥상 높이는 prev와 같게.
+## 발사 속도(good_vx, perfect_vx)를 트램펄린에 적어 둔다. 옥상이 TRAMP_TOP_MAX보다 높으면 빈 Dictionary
+func _tramp_roof(prev: Dictionary, base: Dictionary, speed: float, t: float) -> Dictionary:
+	if prev.top > Balance.TRAMP_TOP_MAX:
+		return {}
+	var min_gap := clear_gap(speed, 0.0)
+	var left: float = prev.right + lerpf(min_gap, min_gap + Balance.TRAMP_GAP_SPAN, t)
+	var right: float = prev.right - Balance.TRAMP_INSET
+	var tramp := {"kind": "tramp", "left": right - Balance.TRAMP_WIDTH, "right": right, "top": prev.top + Balance.TRAMP_LIFT, "base": prev.top}
+	# 가장 일찍 튕기는 자리 = 위에서 내려와 뒷발 끝만 걸친 때
+	var earliest: float = tramp.left - Balance.CAT_FOOT_HALF
+	tramp.good_vx = (left + Balance.TRAMP_LAND_IN - earliest) / tramp_flight(Balance.TRAMP_GOOD_HEIGHT)
+	tramp.perfect_vx = (left + Balance.TRAMP_LAND_IN + Balance.TRAMP_PERFECT_EXTRA - earliest) / tramp_flight(Balance.TRAMP_PERFECT_HEIGHT)
+	var width := maxf(base.right - base.left, tramp_landing_right(tramp, arrival_speed(speed)) - left)
+	return {"left": left, "right": left + width, "top": prev.top, "no_ghost": true, "tramp": tramp}
+
+
+## 트램펄린 그물에서 height만큼 튕겨 옥상 높이(그물보다 TRAMP_LIFT 아래)까지 내려오는 시간 (더블점프 없이)
+static func tramp_flight(height: float) -> float:
+	return JumpModel.fall_time(Balance.TRAMP_LIFT, line_bounce_speed(height), 0.0)
+
+
+## 가장 늦게 튕긴 자리(앞발 끝만 걸쳐 내려와 끝까지 실려 있던 때, 속도 v)에서 누름·퍼펙트로 튕기고 더블점프까지 가장 멀리 썼을 때
+## 다음 옥상에 서려면 옥상이 이어져야 하는 오른쪽 끝 (발 범위 + 여유 120 포함)
+static func tramp_landing_right(tramp: Dictionary, v: float) -> float:
+	var latest: float = tramp.right + Balance.CAT_FOOT_HALF + v * Balance.LINE_RIDE_TIME
+	var far := 0.0
+	for c in [[tramp.good_vx, Balance.TRAMP_GOOD_HEIGHT], [tramp.perfect_vx, Balance.TRAMP_PERFECT_HEIGHT]]:
+		var t := JumpModel.best_double(line_bounce_speed(c[1]), 0.0, -Balance.TRAMP_LIFT).x
+		far = maxf(far, maxf(c[0], v) * t)
+	return latest + far + Balance.CAT_FOOT_HALF + 120.0
 
 
 ## 전봇대 판 앞이나 뒤 틈의 상한: 점프 + 더블점프 최대 거리 x POLE_GAP_SAFETY, 화면에 보이는 거리(POLE_GAP_VIEW_MAX) 이하

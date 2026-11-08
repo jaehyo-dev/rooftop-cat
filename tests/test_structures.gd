@@ -1,19 +1,20 @@
 extends TestCase
-## 구조물(넓은 틈): 빨래줄 누름 판정(창·높이·더블점프 충전·느슨해짐·실림), 전봇대 판(착지·몸통 판정 없음·투명화 제외·다시 점프),
-## 특수 틈은 점프 + 더블점프로도 못 건너고 줄·판을 거쳐야만 건너는지, 속도별로 항상 건널 수 있는 범위인지, 배치.
+## 구조물(넓은 틈): 빨래줄 누름 판정(창·높이·더블점프 충전·느슨해짐·실림, 은퇴했지만 트램펄린이 같은 판정을 씀),
+## 전봇대 판(착지·몸통 판정 없음·투명화 제외·다시 점프), 특수 틈은 점프 + 더블점프로도 못 건너고 판을 거쳐야만 건너는지, 배치.
+## 트램펄린(옥상 끝 발사대): 판정 창·높이·발사·생성 수치는 맨 아래 "트램펄린" 부분.
 
 const DT := 1.0 / 120.0
 const SPEEDS := [430.0, 700.0, 950.0]
 
 
-## 시드를 돌려 kind("line"/"pole")인 특수 틈을 처음 찾는다. {"prev": 앞 옥상, "roofs": [줄 옥상] 또는 [판, 다음 옥상]}
+## 시드를 돌려 kind("tramp"/"pole")인 특수 틈을 처음 찾는다. {"prev": 앞 옥상, "roofs": [다음 옥상] 또는 [판, 다음 옥상]}
 func _find(kind: String, speed: float, from_seed: int = 1) -> Dictionary:
 	for seed_value in range(from_seed, from_seed + 400):
 		var gen := RoofGenerator.new(seed_value)
 		var prev := RoofGenerator.first_roof(0.0)
 		for i in 80:
 			var roof := gen.next_roof(prev, speed)
-			if kind == "line" and roof.has("line"):
+			if kind == "tramp" and roof.has("tramp"):
 				return {"prev": prev, "roofs": [roof]}
 			if kind == "pole" and roof.get("platform", false):
 				return {"prev": prev, "roofs": [roof, gen.next_roof(roof, speed)]}
@@ -35,8 +36,8 @@ func _sim(found: Dictionary, speed: float, with_structure: bool = true) -> Runne
 		if not with_structure and roof.get("platform", false):
 			continue  # 판을 뺀 틈 (판 없이 건널 수 있는지 확인용)
 		sim.roofs.append(roof.duplicate())
-		if with_structure and roof.has("line"):
-			sim.structures.append(roof.line)
+		if with_structure and roof.has("tramp"):
+			sim.structures.append(roof.tramp)
 	sim.roofs[-1].right = 100000.0
 	sim.set("_ground_roof", prev)
 	sim.x = prev.right - 600.0
@@ -48,7 +49,7 @@ func _sim(found: Dictionary, speed: float, with_structure: bool = true) -> Runne
 
 ## sim에서 press_x에 닿으면 hold초 누르고, dj_delay >= 0이면 점프 뒤 dj_delay초에 더블점프(dj_hold초 누름),
 ## retap이면 줄에 닿기 직전마다 새로 한 번 누른다. 건너거나 떨어지면 일찍 끝낸다.
-## 돌려주는 값: fell, bounced(줄 밟음), ghosted, plate(판에 내려앉음), doubled, crossed(마지막 옥상에 서 있음)
+## 돌려주는 값: fell, bounced(줄 밟음), result(처음 튕긴 판정), ghosted, plate(판에 내려앉음), doubled, crossed(마지막 옥상에 서 있음)
 func _trial(sim: RunnerSim, press_x: float, hold: float, retap: bool, dj_delay: float = -1.0, dj_hold: float = 1.0, seconds: float = 6.0) -> Dictionary:
 	var out := {"fell": false, "bounced": false, "ghosted": false, "plate": false, "doubled": false}
 	var hold_left := 0.0
@@ -79,6 +80,8 @@ func _trial(sim: RunnerSim, press_x: float, hold: float, retap: bool, dj_delay: 
 		if sim.jumped and jumped_at < 0.0:
 			jumped_at = sim.elapsed - DT
 		out.bounced = out.bounced or sim.bounced
+		if sim.bounced and not out.has("result"):
+			out.result = sim.bounce_result  # 처음 튕긴 판정
 		out.ghosted = out.ghosted or sim.ghosted
 		out.doubled = out.doubled or sim.double_jumped
 		if sim.landed and sim.get("_ground_roof").get("platform", false):
@@ -325,77 +328,6 @@ func test_특수_틈_다음_옥상은_벽에_닿아도_투명화_구제가_없�
 
 # --- 특수 틈: 못 건넘 / 건널 수 있음 ---
 
-func test_빨래줄_틈은_더블점프까지_다_써도_못_건너고_줄을_누르며_밟으면_반드시_건넌다() -> void:
-	for speed in SPEEDS:
-		var found := _find("line", speed)
-		assert_true(not found.is_empty(), "속도 %d: 빨래줄 틈이 나옴" % speed)
-		var prev: Dictionary = found.prev
-		var roof: Dictionary = found.roofs[0]
-		assert_eq(roof.top, prev.top, "속도 %d: 두 옥상 높이가 같음" % speed)
-		assert_eq(roof.line.left, prev.right, "줄은 틈 시작부터")
-		assert_eq(roof.line.right, roof.left, "줄은 틈 끝까지")
-		assert_eq(roof.line.top, prev.top + Balance.LINE_HEIGHT, "줄 높이")
-		assert_true(roof.no_ghost, "투명화 구제 없음")
-		assert_true(roof.left - prev.right >= RoofGenerator.clear_gap(speed, 0.0), "속도 %d: 못 건너는 넓이 (%.0f)" % [speed, roof.left - prev.right])
-		# 줄이 없으면 누르는 위치·시간·더블점프 때 어느 조합으로도 못 건넌다
-		var crossed_without := 0
-		var doubled := 0
-		for r in _sweep(found, speed, false, false, true):
-			if r.crossed:
-				crossed_without += 1
-			if r.doubled:
-				doubled += 1
-		assert_true(doubled > 0, "속도 %d: 더블점프를 쓴 조합이 있음" % speed)
-		assert_eq(crossed_without, 0, "속도 %d: 줄 없이 건너는 조합" % speed)
-		# 줄이 있으면: 줄에 닿을 때마다 눌러 튕긴 조합은 전부 건너 서 있다
-		var stepped := 0
-		var failed := 0
-		for r in _sweep(found, speed, true, true):
-			if r.bounced:
-				stepped += 1
-				if not r.crossed:
-					failed += 1
-		assert_true(stepped > 0, "속도 %d: 줄을 밟은 조합이 있음" % speed)
-		assert_eq(failed, 0, "속도 %d: 줄을 누르며 밟고도 못 건넌 조합 (밟은 %d)" % [speed, stepped])
-
-
-func test_줄_틈은_낮은_옥상에서만_나오고_다음_옥상은_퍼펙트와_더블점프로도_안_지나친다() -> void:
-	for speed in SPEEDS:
-		for seed_value in 10:
-			for roof in _gen_roofs(seed_value + 1, speed, 120):
-				if roof.has("line"):
-					assert_true(roof.line.base <= Balance.LINE_TOP_MAX, "줄 틈 옥상 높이 %.0f" % roof.line.base)
-					assert_true(roof.right - roof.left >= RoofGenerator.line_landing_width(RoofGenerator.arrival_speed(speed)) - 0.01, "다음 옥상 너비")
-		# 실제로: 줄 끝에서 퍼펙트로 튕기고 가장 멀리 가는 때에 더블점프해도 다음 옥상 안에 내려앉는다
-		var found := _find("line", speed)
-		var roof: Dictionary = found.roofs[0]
-		var sim := _sim(found, RoofGenerator.arrival_speed(speed))
-		sim.roofs[-1].right = roof.right  # 끝없이 늘인 것을 원래 너비로
-		var last: Dictionary = sim.roofs[-1]
-		sim.on_ground = false
-		sim.set("_jumped", true)
-		sim.x = roof.line.right - Balance.CAT_FOOT_HALF - 1.0  # 줄 끝 (앞발이 다음 옥상에 걸치기 직전)
-		sim.y = roof.line.top + 1.0
-		sim.vy = -200.0
-		var best := JumpModel.best_double(RoofGenerator.line_bounce_speed(Balance.LINE_PERFECT_HEIGHT), 0.0, -Balance.LINE_HEIGHT)
-		var bounced_at := -1.0
-		var dj_done := false
-		for i in 600:
-			var pressed := i == 0
-			if bounced_at >= 0.0 and not dj_done and sim.elapsed - bounced_at >= best.y:
-				pressed = true
-				dj_done = true
-			elif dj_done and sim.is_holding():
-				pressed = true
-			sim.step(DT, pressed)
-			if sim.bounced:
-				assert_eq(sim.bounce_result, "perfect", "속도 %d" % speed)
-				bounced_at = sim.elapsed
-			if sim.landed or sim.game_over:
-				break
-		assert_true(dj_done and sim.on_ground and is_same(sim.get("_ground_roof"), last), "속도 %d: 다음 옥상 안에 착지 (x=%.0f, 끝 %.0f)" % [speed, sim.x, last.right])
-
-
 func test_전봇대_틈은_더블점프까지_써도_판_없이_못_건너고_판을_거쳐_갈_수_있다() -> void:
 	for speed in SPEEDS:
 		var found := _find("pole", speed)
@@ -498,42 +430,288 @@ func test_한_틈에_구조물은_최대_하나이고_처음_몇_옥상은_일�
 			var roof: Dictionary = roofs[i]
 			var prev: Dictionary = roofs[i - 1]
 			assert_true(not (roof.get("platform", false) and prev.get("platform", false)), "판이 이어지지 않음")
-			assert_true(not (roof.has("line") and prev.get("platform", false)), "한 틈에 줄과 판이 같이 없음")
+			assert_true(not (roof.has("tramp") and prev.get("platform", false)), "한 틈에 트램펄린과 판이 같이 없음")
+			assert_true(not roof.has("line"), "빨래줄은 은퇴 (생성 안 됨)")
 			if i <= Balance.SPECIAL_GAP_AFTER:
-				assert_true(not roof.has("line") and not roof.get("platform", false), "처음 옥상은 일반 틈 (%d)" % i)
+				assert_true(not roof.has("tramp") and not roof.get("platform", false), "처음 옥상은 일반 틈 (%d)" % i)
 
 
 func test_속도별로_특수_틈이_눈에_띌_만큼_나온다() -> void:
 	for speed in SPEEDS:
-		var lines := 0
+		var tramps := 0
 		var poles := 0
 		var total := 0
 		for seed_value in 10:
 			for roof in _gen_roofs(seed_value + 1, speed, 100):
 				total += 1
-				if roof.has("line"):
-					lines += 1
+				if roof.has("tramp"):
+					tramps += 1
 				if roof.get("platform", false):
 					poles += 1
-		print("    속도 %d: 옥상 %d개 중 빨래줄 %d (%.0f%%), 전봇대 %d (%.0f%%)" % [speed, total, lines, 100.0 * lines / total, poles, 100.0 * poles / total])
-		assert_true(lines * 100 >= total * 5, "속도 %d: 빨래줄 %d/%d" % [speed, lines, total])
+		print("    속도 %d: 옥상 %d개 중 트램펄린 %d (%.0f%%), 전봇대 %d (%.0f%%)" % [speed, total, tramps, 100.0 * tramps / total, poles, 100.0 * poles / total])
+		assert_true(tramps * 100 >= total * 5, "속도 %d: 트램펄린 %d/%d" % [speed, tramps, total])
 		assert_true(poles * 100 >= total * 5, "속도 %d: 전봇대 %d/%d" % [speed, poles, total])
 
 
-func test_빨래줄_틈_위에_퍼펙트와_더블점프로_닿는_생선_줄이_있다() -> void:
-	var found := _find("line", 700.0)
-	var roof: Dictionary = found.roofs[0]
-	var placer := ItemPlacer.new(1)
-	var items := placer.items_for(found.prev, roof)
-	var high := 0
-	for item in items:
-		if item.kind == "fish" and absf(item.y - (roof.line.top + Balance.LINE_FISH_HEIGHT)) < 0.01:
-			high += 1
-			assert_true(item.x > roof.line.left and item.x < roof.line.right, "생선은 줄 위")
-	assert_true(high >= 3, "줄 위 생선 (%d)" % high)
-	# 퍼펙트 튕김의 꼭대기(몸 가운데)에서는 안 닿고, 퍼펙트 + 더블점프면 지나가며 닿는다
-	var ellipse_y := Balance.CAT_BODY_SIZE.y * 0.5 + Balance.ITEM_RADIUS
-	var perfect_top := Balance.LINE_PERFECT_HEIGHT + Balance.ITEM_LIFT
-	var double_top := Balance.LINE_PERFECT_HEIGHT + Balance.DOUBLE_JUMP_MAX_HEIGHT + Balance.ITEM_LIFT
-	assert_true(Balance.LINE_FISH_HEIGHT - perfect_top > ellipse_y, "퍼펙트만으로는 안 닿음")
-	assert_true(Balance.LINE_FISH_HEIGHT < double_top, "퍼펙트 + 더블점프면 닿음")
+# --- 트램펄린 (옥상 끝 발사대, v0.5.0 2a-2) ---
+
+## 트램펄린 하나만 있는 코스: 앞 옥상(길게) 끝에 트램펄린, 가장 좁은 틈, 다음 옥상(끝없이 길게). 속도 고정
+func _tramp_course(speed: float) -> RunnerSim:
+	var gen := RoofGenerator.new(1)
+	var prev := {"left": -4000.0, "right": 0.0, "top": 150.0}
+	var roof: Dictionary = gen.call("_tramp_roof", prev, {"left": 0.0, "right": 500.0, "top": 150.0}, speed, 0.0)
+	var found := {"prev": prev, "roofs": [roof]}
+	var sim := _sim(found, speed)
+	sim.x = roof.tramp.left - 400.0
+	return sim
+
+
+## 달려 들어가며 닿는 순간 기준 offset초에 새로 누른다 (null = 안 누름). dj_after >= 0이면 튕긴 뒤 그만큼 지나 더블점프(최대).
+## 돌려주는 값: result, apex(그물 위로), crossed, fell, doubled, jumped(옥상에서 보통 점프를 했는지), fish(먹은 생선 수), sim
+func _tramp_run(sim: RunnerSim, offset, dt: float = DT, dj_after: float = -1.0) -> Dictionary:
+	var tramp: Dictionary = sim.structures[0]
+	var last: Dictionary = sim.roofs[-1]
+	var out := {"result": "", "apex": 0.0, "crossed": false, "fell": false, "doubled": false, "jumped": false, "fish": 0, "sim": sim}
+	var touch_at: float = sim.elapsed + (RunnerSim.run_in_x(tramp) - sim.x) / sim.speed  # 몸 가운데가 닿는 자리에 오는 시각
+	var press_step := -1 if offset == null else roundi((touch_at + offset) / dt)
+	var bounced_at := -1.0
+	var dj_left := 0
+	for i in int(5.0 / dt):
+		var pressed := i == press_step
+		if bounced_at >= 0.0 and dj_after >= 0.0 and dj_left == 0 and sim.elapsed - bounced_at >= dj_after:
+			dj_left = ceili(JumpModel.double_max_hold() / dt) + 1
+		if dj_left > 0:
+			pressed = true
+			dj_left -= 1
+			if dj_left == 0:
+				dj_left = -1
+		sim.step(dt, pressed)
+		out.jumped = out.jumped or sim.jumped
+		out.doubled = out.doubled or sim.double_jumped
+		out.fish = sim.fish
+		if sim.bounced and out.result == "":
+			out.result = sim.bounce_result
+			bounced_at = sim.elapsed
+		if bounced_at >= 0.0:
+			out.apex = maxf(out.apex, sim.y - tramp.top)
+		if sim.game_over:
+			out.fell = true
+			break
+		if sim.on_ground and is_same(sim.get("_ground_roof"), last):
+			out.crossed = true
+			break
+	return out
+
+
+func test_트램펄린_누름_판정_창은_빨래줄과_같다() -> void:
+	# 달려 들어가며 닿는 순간 기준 offset초에 누름 → 판정 (창 경계에서 0.02초 이상 떨어진 값으로)
+	var late_good := Balance.LINE_RIDE_TIME - 0.03
+	var cases := [[-0.25, "early"], [-0.12, "good"], [-0.02, "perfect"], [0.02, "perfect"], [0.07, "good"], [late_good, "good"], [Balance.LINE_RIDE_TIME + 0.03, "miss"], [null, "miss"]]
+	for dt in [1.0 / 60.0, 1.0 / 120.0, 1.0 / 240.0]:
+		for c in cases:
+			var r := _tramp_run(_tramp_course(600.0), c[0], dt)
+			assert_eq(r.result, c[1], "닿기 %s초, 간격 1/%d" % [str(c[0]), roundi(1.0 / dt)])
+			if c[1] != "miss":
+				assert_true(not r.jumped and not r.doubled, "창 안의 누름은 옥상 점프·더블점프로 새지 않음 (%s)" % str(c[0]))
+
+
+func test_트램펄린_닿기_전_창보다_이른_누름은_보통_점프() -> void:
+	var r := _tramp_run(_tramp_course(600.0), -0.34)
+	assert_true(r.jumped, "닿기 0.28초보다 전이면 옥상에서 점프")
+
+
+func test_트램펄린_튕김_높이는_안누름_누름_퍼펙트() -> void:
+	for c in [[null, Balance.TRAMP_MISS_HEIGHT], [-0.12, Balance.TRAMP_GOOD_HEIGHT], [0.0, Balance.TRAMP_PERFECT_HEIGHT]]:
+		var r := _tramp_run(_tramp_course(600.0), c[0])
+		assert_true(absf(r.apex - c[1]) < 4.0, "%s 튕김 높이 %.1f (기대 %.0f)" % [r.result, r.apex, c[1]])
+
+
+func test_트램펄린_누름_퍼펙트는_앞으로_발사하고_더블점프를_다시_준다() -> void:
+	for c in [[-0.12, "good_vx"], [0.0, "perfect_vx"]]:
+		var sim := _tramp_course(600.0)
+		sim.set("_double_used", true)
+		var tramp: Dictionary = sim.structures[0]
+		var r := _tramp_run(sim, c[0])
+		assert_true(r.crossed, "%s: 건넘" % r.result)
+		assert_true(tramp[c[1]] > 600.0 * 1.5, "발사 속도 %.0f가 달리는 속도보다 빠름" % tramp[c[1]])
+		assert_eq(sim.vx(), 600.0, "내려서면 달리는 속도로")
+		assert_true(not sim.get("_double_used"), "더블점프 다시 생김")
+
+
+func test_트램펄린_안누름과_이른_누름은_제자리에서_낮게_튀고_더블점프를_써도_못_건넌다() -> void:
+	for speed in SPEEDS:
+		for offset in [null, -0.24]:
+			for dj in [-1.0, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5]:
+				var sim := _tramp_course(speed)
+				var tramp: Dictionary = sim.structures[0]
+				sim.set("_double_used", false)
+				var r := _tramp_run(sim, offset, DT, dj)
+				assert_true(r.result == "miss" or r.result == "early", "결과 %s" % r.result)
+				assert_true(r.fell and not r.crossed, "속도 %d, %s, 더블점프 %.1f초: 떨어짐" % [speed, r.result, dj])
+				assert_true(sim.is_slack(tramp), "다시 받아 주지 않음")
+
+
+func test_트램펄린_틈은_트램펄린_없이_더블점프까지_다_써도_못_건너고_뛰어넘으면_떨어진다() -> void:
+	for speed in SPEEDS:
+		var found := _find("tramp", speed)
+		assert_true(not found.is_empty(), "속도 %d: 트램펄린 틈이 나옴" % speed)
+		var prev: Dictionary = found.prev
+		var roof: Dictionary = found.roofs[0]
+		assert_eq(roof.top, prev.top, "두 옥상 높이가 같음")
+		assert_true(roof.no_ghost, "투명화 구제 없음")
+		assert_eq(roof.tramp.right, prev.right - Balance.TRAMP_INSET, "옥상 끝에 놓임")
+		assert_eq(roof.tramp.top, prev.top + Balance.TRAMP_LIFT, "그물 높이")
+		assert_true(roof.left - prev.right >= RoofGenerator.clear_gap(speed, 0.0), "속도 %d: 못 건너는 넓이" % speed)
+		var crossed_without := 0
+		for r in _sweep(found, speed, false, false, true):
+			crossed_without += 1 if r.crossed else 0
+		assert_eq(crossed_without, 0, "속도 %d: 트램펄린 없이 건너는 조합" % speed)
+		# 트램펄린이 있어도 밟지 않고(뛰어넘음) 건너는 조합은 없다
+		var skipped := 0
+		for r in _sweep(found, speed, true, false, true):
+			skipped += 1 if r.crossed and not r.bounced else 0
+		assert_eq(skipped, 0, "속도 %d: 트램펄린을 뛰어넘고 건넌 조합" % speed)
+
+
+func test_트램펄린을_누르며_밟으면_달려_들어가도_뛰어서_떨어져도_반드시_건넌다() -> void:
+	for speed in SPEEDS:
+		var found := _find("tramp", speed)
+		# 옥상 끝 근처 여러 자리에서 여러 높이로 뛰어 위에 떨어지거나 달려 들어가며, 닿기 바로 전에 누름
+		# (트램펄린 바로 앞에서 길게 누른 손이 닿을 때까지 이어지면 새 누름이 아니라 "early"라 뺀다)
+		var stepped := 0
+		var failed := 0
+		for r in _sweep(found, speed, true, true):
+			if r.get("result", "") in ["good", "perfect"]:
+				stepped += 1
+				failed += 0 if r.crossed else 1
+		assert_true(stepped > 20, "속도 %d: 밟은 조합 %d" % [speed, stepped])
+		assert_eq(failed, 0, "속도 %d: 누르며 밟고도 못 건넌 조합 (밟은 %d)" % [speed, failed])
+		# 가장 일찍 튕기는 자리(위에서 내려와 뒷발 끝만 걸침)에서 누름(퍼펙트 아님)으로 튕겨도 건넌다
+		var sim := _sim(found, speed)
+		var tramp: Dictionary = sim.structures[0]
+		var fall := sqrt(2.0 * 60.0 / Balance.GRAVITY)
+		sim.on_ground = false
+		sim.set("_jumped", true)
+		sim.x = tramp.left - Balance.CAT_FOOT_HALF + 2.0 - speed * fall
+		sim.y = tramp.top + 60.0
+		var press_step := roundi((fall - 0.1) / DT)
+		var result := ""
+		for i in int(4.0 / DT):
+			sim.step(DT, i == press_step)
+			if sim.bounced and result == "":
+				result = sim.bounce_result
+			if sim.on_ground or sim.game_over:
+				break
+		assert_eq(result, "good", "속도 %d: 누름" % speed)
+		assert_true(sim.on_ground and is_same(sim.get("_ground_roof"), sim.roofs[-1]), "속도 %d: 가장 일찍 튕겨도 건넘 (x %.0f)" % [speed, sim.x])
+
+
+func test_트램펄린_다음_옥상은_가장_늦게_튕기고_더블점프를_가장_멀리_써도_안_지나친다() -> void:
+	for speed in SPEEDS:
+		for seed_value in 10:
+			for roof in _gen_roofs(seed_value + 1, speed, 120):
+				if roof.has("tramp"):
+					assert_true(roof.tramp.base <= Balance.TRAMP_TOP_MAX, "트램펄린 옥상 높이 %.0f" % roof.tramp.base)
+					assert_true(roof.right >= RoofGenerator.tramp_landing_right(roof.tramp, RoofGenerator.arrival_speed(speed)) - 0.01, "다음 옥상 너비")
+		var found := _find("tramp", speed)
+		var roof: Dictionary = found.roofs[0]
+		var v := RoofGenerator.arrival_speed(speed)
+		# 앞발 끝만 걸쳐 내려와 퍼펙트(닿기 바로 전 누름) / 끝까지 실려 있다 누름(늦은 good)
+		for c in [["perfect", -1, Balance.TRAMP_PERFECT_HEIGHT], ["good", roundi((Balance.LINE_RIDE_TIME - 0.01) / DT), Balance.TRAMP_GOOD_HEIGHT]]:
+			var sim := _sim(found, v)
+			sim.roofs[-1].right = roof.right  # 끝없이 늘인 것을 원래 너비로
+			var last: Dictionary = sim.roofs[-1]
+			sim.on_ground = false
+			sim.set("_jumped", true)
+			sim.x = roof.tramp.right + Balance.CAT_FOOT_HALF - 1.0 - 2.0 * v * DT  # 첫 step에 앞으로 간 뒤에도 앞발 끝이 걸침
+			sim.y = roof.tramp.top + 1.0
+			sim.vy = -200.0
+			var best := JumpModel.best_double(RoofGenerator.line_bounce_speed(c[2]), 0.0, -Balance.TRAMP_LIFT)
+			var ride := -1
+			var bounced_at := -1.0
+			var dj_left := 0
+			for i in int(5.0 / DT):
+				var pressed: bool = i == 0 and c[1] < 0
+				if sim.is_riding():
+					ride += 1
+					pressed = ride == c[1]
+				if bounced_at >= 0.0 and dj_left == 0 and sim.elapsed - bounced_at >= best.y:
+					dj_left = ceili(JumpModel.double_max_hold() / DT) + 1
+				if dj_left > 0:
+					pressed = true
+					dj_left -= 1
+					if dj_left == 0:
+						dj_left = -1
+				sim.step(DT, pressed)
+				if sim.bounced:
+					assert_eq(sim.bounce_result, c[0], "속도 %d" % speed)
+					bounced_at = sim.elapsed
+				if sim.landed or sim.game_over:
+					break
+			assert_true(dj_left != 0 and sim.on_ground and is_same(sim.get("_ground_roof"), last), "속도 %d %s: 다음 옥상 안에 착지 (x=%.0f, 끝 %.0f, 더블점프 %d)" % [speed, c[0], sim.x, last.right, dj_left])
+
+
+func test_트램펄린_틈은_낮은_옥상에서만_나오고_빨래줄은_안_나온다() -> void:
+	for speed in SPEEDS:
+		for seed_value in 10:
+			for roof in _gen_roofs(seed_value + 1, speed, 120):
+				assert_true(not roof.has("line"), "빨래줄 생성 꺼짐")
+				if roof.has("tramp"):
+					assert_true(roof.top <= Balance.TRAMP_TOP_MAX, "옥상 높이 %.0f" % roof.top)
+
+
+func test_트램펄린_퍼펙트는_높은_생선_길을_지나고_누름은_못_먹는다() -> void:
+	for speed in SPEEDS:
+		for c in [[0.0, true], [-0.12, false]]:
+			var sim := _tramp_course(speed)
+			var fish := ItemPlacer.tramp_fish(sim.structures[0])
+			assert_true(fish.size() >= 3, "속도 %d: 생선 길 %d마리" % [speed, fish.size()])
+			sim.items.append_array(fish)
+			var r := _tramp_run(sim, c[0])
+			if c[1]:
+				assert_eq(r.fish, fish.size(), "속도 %d 퍼펙트: 생선 길을 다 먹음" % speed)
+			else:
+				assert_eq(r.fish, 0, "속도 %d 누름: 생선 길은 못 먹음" % speed)
+
+
+func test_트램펄린_그림은_닿는_순간_밟음_발을_떼면_튕김_그다음_평소로() -> void:
+	var world_script := load("res://scripts/world_view.gd")
+	for c in [[0.0, "perfect"], [0.07, "good"], [null, "miss"]]:
+		var sim := _tramp_course(600.0)
+		var tramp: Dictionary = sim.structures[0]
+		var touch_at: float = (RunnerSim.run_in_x(tramp) - sim.x) / sim.speed
+		var press_step := -1 if c[0] == null else roundi((touch_at + c[0]) / DT)
+		var frames: Array[String] = []
+		var touched_step := -1
+		var bounce_step := -1
+		for i in int((touch_at + 1.0) / DT):
+			sim.step(DT, i == press_step)
+			var look: Dictionary = world_script.tramp_look(sim, tramp)
+			frames.append(look.frame)
+			if touched_step < 0 and (sim.is_riding() or sim.bounced):
+				touched_step = i
+			if sim.bounced:
+				bounce_step = i
+		assert_eq(frames[touched_step - 1], "rest", "%s: 닿기 전 step은 평소" % c[1])
+		assert_eq(frames[touched_step], "pressed", "%s: 닿는 step에 밟음" % c[1])
+		for i in range(touched_step, bounce_step + 1):
+			assert_eq(frames[i], "pressed", "%s: 실려 있는 동안과 튕기는 step은 밟음" % c[1])
+		assert_true(frames.slice(bounce_step + 1, bounce_step + 1 + roundi(0.1 / DT)).has("launch"), "%s: 튕긴 뒤 튕김 그림" % c[1])
+		assert_eq(frames[-1], "rest", "%s: 출렁인 뒤 평소" % c[1])
+	# 퍼펙트는 누름보다 깊게 눌렸다 크게 솟는다
+	assert_true(world_script.TRAMP_PRESS_SY.perfect < world_script.TRAMP_PRESS_SY.good, "퍼펙트가 더 깊게 눌림")
+	assert_true(world_script.TRAMP_POP_SY.perfect > world_script.TRAMP_POP_SY.good, "퍼펙트가 더 크게 솟음")
+
+
+func test_트램펄린_밟음_그림의_그물_바닥이_밟은_발_높이() -> void:
+	# 밟음 그림에서 가운데 세로줄의 가장 아래 불투명 픽셀(꺼진 그물 바닥)이 다리 끝보다 TRAMP_LIFT(게임 픽셀)만큼 위
+	var world_script := load("res://scripts/world_view.gd")
+	var img: Image = world_script.TRAMP_TEXTURES.pressed.get_image()
+	var cx := int(world_script.TRAMP_SRC_LEFT + world_script.TRAMP_SRC_WIDTH * 0.5)
+	var bottom := 0
+	for y in img.get_height():
+		if img.get_pixel(cx, y).a > 0.5:
+			bottom = y
+	var k: float = Balance.TRAMP_WIDTH / world_script.TRAMP_SRC_WIDTH
+	var lift: float = (world_script.TRAMP_SRC_FEET - (bottom + 1)) * k
+	assert_true(absf(lift - Balance.TRAMP_LIFT) <= 2.0, "그물 바닥 높이 %.1f (판정 %.0f)" % [lift, Balance.TRAMP_LIFT])

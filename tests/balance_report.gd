@@ -9,12 +9,12 @@ const MAX_TIME := 900.0
 
 
 func _initialize() -> void:
-	print("| 실력 | 가운데값(초) | 하위25% | 상위25% | 줄 틈 성공 | 판 틈 성공 | 줄 닿음 누름·퍼펙트/전체 | 떨어진 곳 |")
+	print("| 실력 | 가운데값(초) | 하위25% | 상위25% | 트램펄린 틈 성공 | 판 틈 성공 | 트램펄린 닿음 누름·퍼펙트/전체 | 떨어진 곳 |")
 	print("|---|---|---|---|---|---|---|---|")
 	for skill_name in BalanceBot.SKILLS:
 		var times: Array[float] = []
 		var total := {}
-		var deaths := {}  # 떨어진 곳별 판 수 (line / pole / plain)
+		var deaths := {}  # 떨어진 곳별 판 수 (tramp / line / pole / plain)
 		for seed_value in SEEDS:
 			var s: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS[skill_name], seed_value + 1, MAX_TIME)
 			times.append(s.time)
@@ -25,7 +25,7 @@ func _initialize() -> void:
 				deaths[s.death] = deaths.get(s.death, 0) + 1
 		times.sort()
 		print("| %s | %.0f | %.0f | %.0f | %s | %s | %s | %s |" % [skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4],
-				_rate(total.line_ok, total.line_try), _rate(total.pole_ok, total.pole_try),
+				_rate(total.tramp_ok, total.tramp_try), _rate(total.pole_ok, total.pole_try),
 				_rate(total.get("touch_ok", 0), total.get("touch_try", 0)), str(deaths)])
 	quit(0)
 

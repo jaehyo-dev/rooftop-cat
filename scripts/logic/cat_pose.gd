@@ -34,6 +34,9 @@ static func _pose(sim: RunnerSim) -> Dictionary:
 	if sim.rescuing:
 		# 종이상자에 실려 올라가는 중: 올라가는 자세로 코를 살짝 든다
 		return {"frame": "rise", "scale": Vector2.ONE, "tilt": -6.0}
+	if sim.is_riding():
+		# 트램펄린·줄을 밟아 눌러 내려가는 중: 웅크려 힘을 모은 모습
+		return {"frame": "crouch", "scale": Vector2(1.08, 0.88), "tilt": 0.0}
 	if sim.on_ground:
 		if sim.time_since_land < Balance.CAT_LAND_TIME:
 			# 착지: 앞발부터 닿고 몸이 푹 눌렸다가 돌아온다 (납작함은 Squash와 같은 곡선)

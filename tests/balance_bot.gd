@@ -5,8 +5,8 @@ extends RefCounted
 ## 더블점프: 점프 한 번으로 못 닿는 틈(전봇대 판까지 포함)은 처음부터 "점프 + 꼭대기에서 더블점프" 거리로 계획하고,
 ##   실수한 점프가 다음 발판에 못 미칠 것으로 계산돼도 쓴다. 쓰는 때는 가장 멀리 가는 때가 아니라 첫 점프 꼭대기 + timing 실수
 ##   (사람처럼, 난이도를 낮게 재지 않게).
-## 특수 틈: 빨래줄 틈은 옥상 끝에서 마지막에 최대로 뛰어 줄 위에 내리고, 줄에 닿을 때마다 닿는 순간 + timing 실수에 톡 누른다
-##   (판정 창 밖이면 실패해 떨어짐. 실패 뒤 남은 더블점프로 살리려 하지는 않음).
+## 특수 틈: 트램펄린 틈은 뛰지 않고 달려 들어가, 닿는 순간 + timing 실수에 톡 누른다 (판정 창 밖이면 실패해 떨어짐.
+##   실패 뒤 남은 더블점프로 살리려 하지는 않음). 빨래줄 틈(은퇴, 켜면)은 옥상 끝에서 마지막에 최대로 뛰어 줄 위에 내리고 같은 방식으로 누른다.
 ##   전봇대 틈은 판 가운데로 뛰어 올라선 뒤 판에서 다음 옥상으로 뛴다. 착지할 때마다 다시 계획한다.
 ## 실력(skill)은 두 가지 실수로 나타낸다 (시드로 고정된 무작위 값):
 ## - timing: 누르는 순간이 어긋나는 정도 (초, 표준편차). 빠를수록 같은 시간 실수가 더 먼 거리가 된다
@@ -14,7 +14,7 @@ extends RefCounted
 ## shortcut: 사람의 반응 속도·피로는 흉내 내지 않음. 실제 플레이 기록이 생기면 그 값으로 실력 수치를 맞춘다
 
 const DT := 1.0 / 120.0
-## 줄에 닿는 때를 이만큼 앞에서 보고 누를 때를 정한다 (초)
+## 줄·트램펄린에 닿는 때를 이만큼 앞에서 보고 누를 때를 정한다 (초)
 const LINE_LOOK := 0.6
 
 ## 실력별 실수 크기. 초보 = 처음 해 보는 사람, 익숙함 = 몇 판 해 본 사람, 숙련 = 많이 해 본 사람
@@ -31,11 +31,11 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 	return play_stats(skill, seed_value, max_time, start_speed, accelerate).time
 
 
-## play와 같지만 특수 틈 성적도 돌려준다: time, line_try/line_ok(줄 틈 들어감/건넘), pole_try/pole_ok(전봇대 틈),
-## touch_try/touch_ok(줄에 닿은 횟수/누름·퍼펙트로 튕긴 횟수), doubles(더블점프 쓴 횟수), death(떨어진 곳: line/pole/plain).
+## play와 같지만 특수 틈 성적도 돌려준다: time, tramp_try/tramp_ok(트램펄린 틈 들어감/건넘), line_try/line_ok(줄 틈), pole_try/pole_ok(전봇대 틈),
+## touch_try/touch_ok(줄·트램펄린에 닿은 횟수/누름·퍼펙트로 튕긴 횟수), doubles(더블점프 쓴 횟수), death(떨어진 곳: tramp/line/pole/plain).
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
 static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true) -> Dictionary:
-	var stats := {"time": 0.0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0}
+	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0}
 	var seen := {}         # 이미 센 특수 틈 (다음 옥상 왼쪽 x)
 	var gap_roof := {}     # 지금 건너는 중인 특수 틈의 다음 옥상
 	var gap_kind := ""
@@ -79,8 +79,8 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		if sim.elapsed >= dj_at:
 			dj_at = INF
 			hold_left = dj_hold + DT
-		# 줄: 닿는 때를 보고 그 순간 + timing 실수에 톡 누른다 (튕길 때마다 다시)
-		if tap_at == INF and not tapped and not sim.on_ground and hold_left <= 0.0:
+		# 줄·트램펄린: 닿는 때를 보고 그 순간 + timing 실수에 톡 누른다 (튕길 때마다 다시. 땅 위에서는 달려 들어가는 트램펄린만 잡힘)
+		if tap_at == INF and not tapped and hold_left <= 0.0:
 			var touch := sim.line_touch_eta(LINE_LOOK)
 			if not touch.is_empty() and not sim.is_riding():
 				tap_at = sim.elapsed + touch.t + rng.randfn(0.0, skill.timing)
@@ -102,11 +102,11 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 				var r: Dictionary = sim.roofs[i]
 				if not r.get("no_ghost", false) or seen.has(r.left) or i < 2:
 					continue
-				var start: float = r.line.left if r.has("line") else sim.roofs[i - 2].right
+				var start: float = r.line.left if r.has("line") else (r.tramp.left if r.has("tramp") else sim.roofs[i - 2].right)
 				if sim.x > start and sim.x < r.left:
 					seen[r.left] = true
 					gap_roof = r
-					gap_kind = "line" if r.has("line") else "pole"
+					gap_kind = "line" if r.has("line") else ("tramp" if r.has("tramp") else "pole")
 					stats[gap_kind + "_try"] += 1
 		elif sim.landed and is_same(sim.get("_ground_roof"), gap_roof):
 			stats[gap_kind + "_ok"] += 1
@@ -115,13 +115,13 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			gap_roof = {}
 	stats.time = minf(sim.elapsed, max_time)
 	if sim.game_over:
-		# 어디서 떨어졌는지 (보고용): line / pole / plain
+		# 어디서 떨어졌는지 (보고용): tramp / line / pole / plain
 		var here := {}
 		for r in sim.roofs:
 			if r.right >= sim.x - Balance.CAT_FOOT_HALF:
 				here = r
 				break
-		stats.death = "line" if here.has("line") else ("pole" if here.get("no_ghost", false) or here.get("platform", false) else "plain")
+		stats.death = "tramp" if here.has("tramp") else "line" if here.has("line") else ("pole" if here.get("no_ghost", false) or here.get("platform", false) else "plain")
 	return stats
 
 
@@ -140,6 +140,8 @@ static func _plan(sim: RunnerSim) -> Dictionary:
 	var roof: Dictionary = sim.roofs[here]
 	var next: Dictionary = sim.roofs[here + 1]
 	var latest: float = roof.right + Balance.CAT_FOOT_HALF - 10.0  # 이보다 늦으면 발밑이 빔
+	if next.has("tramp"):
+		return {"x": INF, "dj": false}  # 트램펄린 틈: 뛰지 않고 달려 들어감
 	if next.has("line"):
 		# 줄 틈: 틈 시작 조금 안쪽 줄 위에 내리도록 최대로 뛴다. 일찍 뛰면 옥상에 다시 내릴 뿐이라 늦는 쪽이 위험하다
 		var land_x: float = roof.right + 90.0
@@ -159,10 +161,10 @@ static func _plan(sim: RunnerSim) -> Dictionary:
 	return {"x": minf((dj_earliest + latest) * 0.5, latest), "dj": true}
 
 
-## press_x에서 hold초 누른 점프 한 번이 다음 발판(줄 틈 제외)에 못 미치는지
+## press_x에서 hold초 누른 점프 한 번이 다음 발판(줄·트램펄린 틈 제외)에 못 미치는지
 static func _falls_short(sim: RunnerSim, press_x: float, hold: float) -> bool:
 	var here := sim.roofs.find(sim.get("_ground_roof"))
-	if here < 0 or here + 1 >= sim.roofs.size() or sim.roofs[here + 1].has("line"):
+	if here < 0 or here + 1 >= sim.roofs.size() or sim.roofs[here + 1].has("line") or sim.roofs[here + 1].has("tramp"):
 		return false
 	var next: Dictionary = sim.roofs[here + 1]
 	var t := JumpModel.air_time(hold, next.top - sim.roofs[here].top)

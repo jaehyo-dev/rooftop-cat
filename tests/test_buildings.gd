@@ -78,3 +78,33 @@ func test_건물_그림은_배경색_마젠타가_남지_않았다() -> void:
 					if c.a > 0.2 and minf(c.r, c.b) - c.g > 0.2:
 						bad += 1
 			assert_true(bad <= 3, "%s 조각에 마젠타 픽셀 %d개" % [BuildingArt.STYLE_NAMES[i], bad])
+
+
+func test_고양이_발_내림은_건물_3종_지붕_턱_윗면_가운데() -> void:
+	# 지붕 턱 윗면 = 위쪽 어두운 뒤 선 ~ 아래쪽 어두운 앞 선 (가운데 조각의 가운데 세로줄 밝기로 찾음)
+	var sink: float = load("res://scripts/world_view.gd").FOOT_SINK
+	for style in BuildingArt.STYLE_NAMES.size():
+		for tex in BuildingArt.style_textures(style).mids:
+			var img: Image = tex.get_image()
+			var x := img.get_width() / 2
+			var back := _darkest_row(img, x, 0, 10)
+			var front := _darkest_row(img, x, 20, 40)
+			var mid := (back + front) * 0.5
+			assert_true(absf(sink - mid) <= 2.0, "%s: 윗면 %d~%d줄, 가운데 %.1f, 내림 %.0f" % [BuildingArt.STYLE_NAMES[style], back, front, mid, sink])
+
+
+func _darkest_row(img: Image, x: int, from: int, to: int) -> int:
+	var best := from
+	for y in range(from, to):
+		if img.get_pixel(x, y).get_luminance() < img.get_pixel(x, best).get_luminance():
+			best = y
+	return best
+
+
+func test_고양이와_그림자는_판정선보다_발_내림만큼_아래에_그린다() -> void:
+	var world: Node2D = load("res://scripts/world_view.gd").new()
+	add_child(world)
+	await wait_frames(2)
+	var ground: float = world.call("_ground_y")
+	assert_eq(world.cat.position.y, ground - world.sim.y + world.FOOT_SINK, "고양이 발끝")
+	world.queue_free()
