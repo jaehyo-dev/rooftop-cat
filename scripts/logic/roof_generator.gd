@@ -78,7 +78,7 @@ static func gap_safety(speed: float) -> float:
 	return lerpf(Balance.ROOF_GAP_SAFETY_START, Balance.ROOF_GAP_SAFETY, clampf(t, 0.0, 1.0))
 
 
-## 옥상에 도착할 때의 속도 = 다음 단계 속도: 옥상은 ROOF_LOOKAHEAD 앞에서 만들고, 그 거리는 많아야 5.1초라 가장 짧은 단계(15초)보다 짧아 한 단계만 넘는다
+## 옥상에 도착할 때의 속도 = 다음 단계 속도: 옥상은 ROOF_LOOKAHEAD 앞에서 만들고, 그 거리는 많아야 5.1초라 가장 짧은 단계(14초)보다 짧아 한 단계만 넘는다
 static func arrival_speed(speed: float) -> float:
 	return SpeedCurve.next_speed(speed)
 

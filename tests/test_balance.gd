@@ -29,6 +29,6 @@ func test_같은_시드면_같은_결과() -> void:
 
 func test_실수하지_않는_봇은_최대_속도까지_버틴다() -> void:
 	# 옥상이 실제로 넘을 수 있게 만들어지는지: 실수 없는 봇은 최대 속도에 닿은 뒤에도 떨어지지 않는다
-	var reach_max: float = Balance.SPEED_STAGES[9][0] + 60.0  # 단계 10(최고 속도)에 닿고 1분 더
+	var reach_max: float = Balance.SPEED_STAGES[8][0] + 60.0  # 단계 9(최고 속도)에 닿고 1분 더
 	for seed_value in 3:
 		assert_eq(BalanceBot.play({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, reach_max), reach_max, "시드 %d" % (seed_value + 1))

@@ -28,7 +28,7 @@ static func next_speed(speed: float) -> float:
 	return Balance.SPEED_MAX
 
 
-## 이 단계로 오를 때 실제로 빨라지는지 (단계 11·12는 밀도만 올라서 "빨라진다!" 신호를 내지 않는다)
+## 이 단계로 오를 때 실제로 빨라지는지 (단계 10~12는 밀도만 올라서 "빨라진다!" 신호를 내지 않는다)
 static func rises(stage: int) -> bool:
 	return stage > 1 and Balance.SPEED_STAGES[stage - 1][1] > Balance.SPEED_STAGES[stage - 2][1]
 
@@ -42,7 +42,7 @@ static func music_pitch(stage: int) -> float:
 static func line_strength(stage: int, since_rise: float) -> float:
 	var rest := 0.0
 	if stage >= Balance.SPEED_LINE_STAGE:
-		rest = lerpf(Balance.SPEED_LINE_REST_MIN, Balance.SPEED_LINE_REST_MAX, clampf(inverse_lerp(float(Balance.SPEED_LINE_STAGE), 10.0, float(stage)), 0.0, 1.0))
+		rest = lerpf(Balance.SPEED_LINE_REST_MIN, Balance.SPEED_LINE_REST_MAX, clampf(inverse_lerp(float(Balance.SPEED_LINE_STAGE), 9.0, float(stage)), 0.0, 1.0))
 	if since_rise >= Balance.SPEED_RAMP_TIME:
 		return rest
 	return lerpf(1.0, rest, smoothstep(Balance.SPEED_RAMP_TIME - Balance.SPEED_LINE_FADE, Balance.SPEED_RAMP_TIME, since_rise))

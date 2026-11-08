@@ -9,7 +9,14 @@ var record_path := BestRecord.DEFAULT_PATH
 const MUSIC := preload("res://assets/audio/mochi_walk.ogg")
 const MUSIC_VOLUME_DB := -5.0  # 곡 자체가 -21.4 LUFS라 -26.4 (효과음 world_view.gd SFX_VOLUME_DB와 맞춤)
 
+## 웹(샘플 재생)은 곡이 한 바퀴 돌거나 멈췄다 이어질 때 새 재생 소스를 만들며 빠르기를 1.0으로 되돌리고 게임에 알려 주지 않는다.
+## 그래서 바뀔 때만 넘기지 않고 이 간격(초)마다 다시 넘긴다 (tools/web_music_check.mjs로 실제 브라우저에서 확인)
+const MUSIC_PITCH_RESEND := 0.1
+
 var _best := 0
+var _pitch_wait := 0.0
+## 지금까지 곡에 빠르기를 넘긴 횟수 (테스트용: 웹에서 풀린 빠르기는 headless에서 볼 수 없다)
+var pitch_sends := 0
 var _music := AudioStreamPlayer.new()
 
 @onready var _world: Node2D = $World
@@ -32,14 +39,17 @@ func _ready() -> void:
 	_music.play()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	$DistanceLabel.text = "%d m" % _world.sim.distance()
 	$FishLabel.text = str(_world.sim.fish)
 	$BoxIcon.visible = _world.sim.has_box
-	# 단계마다 곡이 조금씩 빨라진다 (바뀔 때만 넘겨 웹 오디오를 매 프레임 건드리지 않음)
+	# 단계마다 곡이 조금씩 빨라진다
 	var pitch := SpeedCurve.music_pitch(_world.sim.stage)
-	if not is_equal_approx(_music.pitch_scale, pitch):
+	_pitch_wait -= delta
+	if _pitch_wait <= 0.0 or not is_equal_approx(_music.pitch_scale, pitch):
 		_music.pitch_scale = pitch
+		_pitch_wait = MUSIC_PITCH_RESEND
+		pitch_sends += 1
 
 
 func _on_game_over(meters: int) -> void:

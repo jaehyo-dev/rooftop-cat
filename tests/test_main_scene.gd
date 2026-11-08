@@ -42,6 +42,25 @@ func test_단계가_오르면_음악이_빨라지고_새_판에서_돌아온다(
 	main.queue_free()
 
 
+func test_판_안에서는_같은_단계여도_곡_빠르기를_계속_다시_넘긴다() -> void:
+	# 웹은 곡이 한 바퀴 돌면 빠르기가 1.0으로 풀린다 (재현: tools/web_music_check.mjs). 게임은 그걸 알 수 없으니 계속 다시 넘겨야 곧 돌아온다
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	world.set_process(false)
+	main.set_process(false)
+	await wait_frames(1)
+	for stage in [3, 9, 11, 12]:  # 단계 10~12는 단계가 올라도 신호가 없어 "바뀔 때만"이면 다시는 안 넘어간다
+		world.sim.stage = stage
+		main._process(main.MUSIC_PITCH_RESEND)
+		var sends: int = main.pitch_sends
+		for i in 5:
+			main._process(main.MUSIC_PITCH_RESEND)
+		assert_eq(main.pitch_sends - sends, 5, "단계 %d: 간격마다 다시 넘김" % stage)
+		assert_true(is_equal_approx(main.get_node("Music").pitch_scale, SpeedCurve.music_pitch(stage)), "단계 %d 빠르기" % stage)
+	main.queue_free()
+
+
 func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시작() -> void:
 	const PATH := "user://test_main_best.cfg"
 	DirAccess.remove_absolute(PATH)

@@ -7,11 +7,11 @@ const PATH := "user://test_best_record.cfg"
 func test_속도는_단계_표를_따르고_최대에서_멈춘다() -> void:
 	assert_eq(SpeedCurve.speed_at(0.0), 430.0, "처음 속도")
 	assert_eq(SpeedCurve.speed_at(-5.0), 430.0, "음수 시간은 처음 속도")
-	assert_eq(SpeedCurve.speed_at(14.9), 430.0, "단계 2 전")
-	assert_eq(SpeedCurve.speed_at(60.0), 610.0, "1분 뒤")
+	assert_eq(SpeedCurve.speed_at(13.9), 430.0, "단계 2 전")
+	assert_eq(SpeedCurve.speed_at(60.0), 640.0, "1분 뒤")
 	assert_eq(SpeedCurve.speed_at(100000.0), 950.0, "최대 속도에서 멈춤")
 	assert_eq(Balance.SPEED_STAGES.size(), 12, "단계 12개")
-	assert_eq(Balance.SPEED_STAGES[9][0], 300.0, "단계 10은 300초")
+	assert_eq(Balance.SPEED_STAGES[8][0], 200.0, "단계 9는 200초에 최고 속도")
 	var prev := 0.0
 	var prev_start := -1.0
 	for stage in Balance.SPEED_STAGES:
@@ -22,9 +22,9 @@ func test_속도는_단계_표를_따르고_최대에서_멈춘다() -> void:
 
 
 func test_단계가_오르면_정해진_시간에_걸쳐_끊김_없이_빨라진다() -> void:
-	assert_eq(SpeedCurve.speed_at(15.0), 430.0, "오르는 순간은 앞 단계 속도")
-	assert_true(absf(SpeedCurve.speed_at(15.0 + Balance.SPEED_RAMP_TIME * 0.5) - 460.0) < 0.001, "가운데는 앞뒤 단계의 중간")
-	assert_eq(SpeedCurve.speed_at(15.0 + Balance.SPEED_RAMP_TIME), 490.0, "끝나면 다음 단계 속도")
+	assert_eq(SpeedCurve.speed_at(14.0), 430.0, "오르는 순간은 앞 단계 속도")
+	assert_true(absf(SpeedCurve.speed_at(14.0 + Balance.SPEED_RAMP_TIME * 0.5) - 465.0) < 0.001, "가운데는 앞뒤 단계의 중간")
+	assert_eq(SpeedCurve.speed_at(14.0 + Balance.SPEED_RAMP_TIME), 500.0, "끝나면 다음 단계 속도")
 	var prev := Balance.RUN_SPEED
 	for i in 660 * 120:
 		var v := SpeedCurve.speed_at(i / 120.0)
@@ -34,12 +34,12 @@ func test_단계가_오르면_정해진_시간에_걸쳐_끊김_없이_빨라진
 
 func test_단계_번호와_다음_단계_속도() -> void:
 	assert_eq(SpeedCurve.stage_at(0.0), 1)
-	assert_eq(SpeedCurve.stage_at(14.99), 1)
-	assert_eq(SpeedCurve.stage_at(15.0), 2)
+	assert_eq(SpeedCurve.stage_at(13.99), 1)
+	assert_eq(SpeedCurve.stage_at(14.0), 2)
 	assert_eq(SpeedCurve.stage_at(100000.0), 12)
-	assert_eq(RoofGenerator.arrival_speed(430.0), 490.0, "단계 1 → 2")
-	assert_eq(RoofGenerator.arrival_speed(460.0), 490.0, "오르는 중에는 오르는 단계의 속도")
-	assert_eq(RoofGenerator.arrival_speed(900.0), 950.0, "단계 9 → 10")
+	assert_eq(RoofGenerator.arrival_speed(430.0), 500.0, "단계 1 → 2")
+	assert_eq(RoofGenerator.arrival_speed(460.0), 500.0, "오르는 중에는 오르는 단계의 속도")
+	assert_eq(RoofGenerator.arrival_speed(910.0), 950.0, "단계 8 → 9")
 	assert_eq(RoofGenerator.arrival_speed(950.0), 950.0, "최고 속도에서는 그대로")
 
 
@@ -52,8 +52,9 @@ func test_옥상에_도착하기_전에_단계가_많아야_하나_오른다() -
 
 func test_속도_단계_신호_값() -> void:
 	assert_false(SpeedCurve.rises(1), "단계 1은 오름이 아님")
-	for i in range(2, 11):
+	for i in range(2, 10):
 		assert_true(SpeedCurve.rises(i), "단계 %d는 빨라짐" % i)
+	assert_false(SpeedCurve.rises(10), "단계 10은 밀도만")
 	assert_false(SpeedCurve.rises(11), "단계 11은 밀도만")
 	assert_false(SpeedCurve.rises(12), "단계 12는 밀도만")
 	assert_eq(SpeedCurve.music_pitch(1), 1.0, "단계 1은 원래 곡")
