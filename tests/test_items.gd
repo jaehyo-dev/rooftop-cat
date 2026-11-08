@@ -49,10 +49,10 @@ func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있
 			assert_true(item.y - floor_top >= Balance.ITEM_LIFT - 0.01, "옥상 %d: 옥상에 묻히지 않음 (%.0f)" % [i, item.y - floor_top])
 			# 높은 쪽 옥상에서 최대로 뛰면 몸 가운데가 닿는 높이 안
 			var above: float = item.y - maxf(prev.top, roof.top)
-			# (빨래줄 틈 위 생선 줄은 더 높이 튕겨야 닿는 높이)
+			# (빨래줄 틈 위 생선 줄은 퍼펙트 튕김 + 더블점프로 닿는 높이)
 			var reach := Balance.JUMP_MAX_HEIGHT
 			if roof.has("line"):
-				reach = Balance.LINE_HEIGHT + Balance.LINE_BOOST_HEIGHT
+				reach = Balance.LINE_HEIGHT + Balance.LINE_PERFECT_HEIGHT + Balance.DOUBLE_JUMP_MAX_HEIGHT
 			assert_true(above <= reach + Balance.ITEM_LIFT, "옥상 %d: 뛰면 닿는 높이 (%.0f)" % [i, above])
 			if item.kind == "fish":
 				fish += 1

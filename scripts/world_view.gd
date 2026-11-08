@@ -2,6 +2,8 @@ extends Node2D
 ## 게임 화면: 입력을 모아 RunnerSim을 고정 간격으로 진행시키고, 옥상(임시 그림)·아이템을 그리고 고양이(CatView)를 움직인다.
 ## 충돌 판정은 로직(RunnerSim)이 Balance.CAT_BODY_SIZE·CAT_FOOT_HALF로 하고, 고양이 그림은 같은 크기로 그리기만 한다.
 ## 떨어지면 game_over를 알리고, 잠시(Balance.RESTART_DELAY) 뒤 새로 누르면 새 판을 시작한다.
+## 세로 카메라(CameraFollow): 고양이가 높이 오르면 화면 전체를 아래로 내려 그린다(그림만, 판정과 무관). 하늘·구름·안개는 시차만큼만.
+## 빨래줄 안내: 매 판 처음 GUIDE_LINES개 줄 틈에서 닿을 자리에 줄어드는 동그라미와 "눌러!" 말풍선, 줄 판정 결과 글자는 늘.
 
 ## 떨어져서 게임이 끝남 (meters = 이번 거리 점수)
 signal game_over(meters: int)
@@ -61,6 +63,18 @@ const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
 const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
 const POP_TIME := 0.3            # 먹은 아이템이 떠오르며 사라지는 시간
+## 빨래줄 "눌러!" 안내: 닿기 GUIDE_TIME초 전부터 줄어드는 동그라미가 닿는 순간 발 크기(GUIDE_PAW)에 딱 맞음
+const GUIDE_LINES := 2
+const GUIDE_TIME := 0.5
+const GUIDE_PAW := 22.0
+const GUIDE_START := 110.0
+const HUD_BROWN := Color(0.353, 0.275, 0.212)
+const HUD_CREAM := Color(1, 0.97, 0.9)
+const HUD_FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
+## 줄 판정 결과 글자 (0.4초 떠올랐다 사라짐). miss(안 누름)는 글자 없이 줄이 처지는 것으로 보여 줌
+const RESULT_TEXT := {"perfect": "퍼펙트!", "good": "좋아!", "early": "빨랐어!"}
+const RESULT_TIME := 0.4
+const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
 
 var sim := RunnerSim.new(randi())
 var cat := CatView.new()
@@ -75,6 +89,9 @@ var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", 
 var _was_rescuing := false
 var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
 var _front_mist := Node2D.new()  # 가장 가까운 안개: 고양이보다 앞에 그려 떨어지면 안개 속으로 사라짐
+var _overlay := Node2D.new()     # 맨 앞: 빨래줄 안내·결과 글자
+var _cam_lift := 0.0             # 세로 카메라: 화면을 아래로 내려 그리는 픽셀 (CameraFollow)
+var _guided: Array[float] = []   # 이번 판에 안내를 보여 준 줄 (왼쪽 x)
 
 
 func _ready() -> void:
@@ -84,6 +101,9 @@ func _ready() -> void:
 	_front_mist.name = "FrontMist"
 	_front_mist.draw.connect(func() -> void: _draw_mist(_front_mist, Backdrop.MISTS[-1], get_viewport_rect().size))
 	add_child(_front_mist)
+	_overlay.name = "Overlay"
+	_overlay.draw.connect(_draw_overlay)
+	add_child(_overlay)
 	_place_cat(0.0)
 
 
@@ -117,14 +137,20 @@ func _process(delta: float) -> void:
 	for pop in _pops:
 		pop.t += delta
 	_pops = _pops.filter(func(pop: Dictionary) -> bool: return pop.t < POP_TIME)
+	# 이번 판 처음 GUIDE_LINES개 줄 틈에만 안내 (닿을 것으로 보이는 순간 그 줄을 셈)
+	var touch := sim.line_touch_eta(GUIDE_TIME)
+	if not touch.is_empty() and not _guided.has(touch.line.left) and _guided.size() < GUIDE_LINES:
+		_guided.append(touch.line.left)
+	_cam_lift = CameraFollow.follow(_cam_lift, CameraFollow.target(sim.y, sim.landing_top(), get_viewport_rect().size.y), delta)
 	_place_cat(delta)
 	queue_redraw()
 	_front_mist.queue_redraw()
+	_overlay.queue_redraw()
 
 
 ## 고양이를 로직 위치(발끝)에 놓고 자세를 맞춘다
 func _place_cat(delta: float) -> void:
-	cat.position = Vector2(Balance.CAT_SCREEN_X, get_viewport_rect().size.y - sim.y)
+	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y)
 	cat.show_state(sim, delta)
 
 
@@ -135,6 +161,8 @@ func restart() -> void:
 	_pops.clear()
 	_was_rescuing = false
 	_wait_release = true
+	_cam_lift = 0.0
+	_guided.clear()
 	_place_cat(0.0)
 	restarted.emit()
 	queue_redraw()
@@ -163,9 +191,14 @@ func is_pressed() -> bool:
 	return _tap_pending or not _touches.is_empty() or Input.is_physical_key_pressed(KEY_SPACE)
 
 
+## 로직 높이 0이 그려지는 화면 y (화면 맨 아래 + 세로 카메라)
+func _ground_y() -> float:
+	return get_viewport_rect().size.y + _cam_lift
+
+
 func _draw() -> void:
 	var size := get_viewport_rect().size
-	var ground := size.y  # 로직 높이 0 = 화면 맨 아래
+	var ground := _ground_y()  # 로직 높이 0 = 화면 맨 아래 (+ 세로 카메라)
 	var offset := Balance.CAT_SCREEN_X - sim.x  # 로직 x → 화면 x
 
 	# 하늘 (위아래 두 색)
@@ -210,8 +243,8 @@ func _draw_backdrop(size: Vector2) -> void:
 	for cloud in Backdrop.CLOUDS:
 		var tex: Texture2D = CLOUD_TEXTURES[cloud[0]]
 		var x := Backdrop.cloud_x(cloud[1], sim.x, sim.elapsed, tex.get_width())
-		draw_texture(tex, Vector2(x, size.y * cloud[2]))
-	var top := size.y * TOWN_BOTTOM - TOWN_TEXTURE.get_height()
+		draw_texture(tex, Vector2(x, size.y * cloud[2] + _cam_lift * Backdrop.CLOUD_PARALLAX))
+	var top := size.y * TOWN_BOTTOM - TOWN_TEXTURE.get_height() + _cam_lift * Backdrop.TOWN_PARALLAX
 	_draw_strip(self, TOWN_TEXTURE, top, Backdrop.TOWN_PARALLAX, size.x, Color.WHITE)
 	for mist in Backdrop.MISTS.slice(0, -1):
 		_draw_mist(self, mist, size)
@@ -231,7 +264,7 @@ func _draw_strip(canvas: CanvasItem, tex: Texture2D, top: float, parallax: float
 ## 안개 한 겹: 띠 그림 + 띠 아래는 같은 색으로 화면 바닥까지 채움 (틈 아래가 안개 속 낭떠러지로 보이게)
 func _draw_mist(canvas: CanvasItem, mist: Array, size: Vector2) -> void:
 	var tex: Texture2D = MIST_TEXTURES[mist[0]]
-	var top: float = size.y * mist[2]
+	var top: float = size.y * mist[2] + _cam_lift * minf(1.0, mist[1])  # 세로 카메라도 시차만큼 (가까운 안개는 건물과 같이)
 	var tint := Color(1, 1, 1, mist[3])
 	_draw_strip(canvas, tex, top, mist[1], size.x, tint)
 	var bottom := top + tex.get_height() - 1.0
@@ -350,6 +383,8 @@ func _draw_line(line: Dictionary, offset: float, ground: float) -> void:
 	var squash := 1.0
 	if line == sim.bounced_line and sim.time_since_bounce < LINE_BOUNCE_ANIM:
 		squash = 1.0 - 0.18 * sin(PI * sim.time_since_bounce / LINE_BOUNCE_ANIM)
+	if sim.is_slack(line) or (sim.is_riding() and is_same(sim.line_touch_eta(0.0).line, line)):
+		squash = minf(squash, LINE_SAG)  # 실린 동안·느슨해진 뒤에는 처져 있음 (그림만)
 	var mid_src_w: float = LINE_TEXTURE.get_width() - 2.0 * LINE_POST_SRC
 	var length: float = right - left
 	var count := maxi(1, roundi(length / (mid_src_w * k * LINE_TILE_STRETCH)))  # 빨래가 너무 촘촘해지지 않게 조금 넓게 편다
@@ -371,3 +406,45 @@ func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
 	var w := (FISH_WIDTH if kind == "fish" else BOX_WIDTH) * zoom
 	var h := w * texture.get_height() / texture.get_width()
 	draw_texture_rect(texture, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, Color(1, 1, 1, alpha))
+
+
+## 맨 앞 안내: 처음 GUIDE_LINES개 줄 틈의 줄어드는 동그라미와 "눌러!" 말풍선, 줄 판정 결과 글자
+func _draw_overlay() -> void:
+	var ground := _ground_y()
+	var offset := Balance.CAT_SCREEN_X - sim.x
+	var touch := sim.line_touch_eta(GUIDE_TIME)
+	if not touch.is_empty() and not sim.game_over:
+		# 첫 점프를 누르고 있는 동안은 그리지 않는다 (누름이 끝난 뒤부터)
+		if _guided.has(touch.line.left) and not sim.is_holding():
+			var at := Vector2(touch.x + offset, ground - touch.line.top)
+			var r := lerpf(GUIDE_PAW, GUIDE_START, touch.t / GUIDE_TIME)
+			_overlay.draw_arc(at, GUIDE_PAW, 0.0, TAU, 32, Color(HUD_BROWN, 0.45), 3.0)
+			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
+			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
+			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
+		var k := sim.time_since_bounce / RESULT_TIME
+		var line_top: float = sim.bounced_line.top
+		var at := Vector2(Balance.CAT_SCREEN_X - sim.speed * sim.time_since_bounce, ground - line_top - 150.0 - 50.0 * k)
+		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
+
+
+## 말풍선 (HUD와 같은 갈색 글자·밝은 테두리, 크림색 바탕)
+func _draw_bubble(center: Vector2, text: String) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = HUD_CREAM
+	box.border_color = HUD_BROWN
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(16)
+	var w := 118.0
+	var h := 50.0
+	_overlay.draw_style_box(box, Rect2(center - Vector2(w, h) * 0.5, Vector2(w, h)))
+	_draw_text(center + Vector2(0.0, 2.0), text, 34, 1.0)
+
+
+## 가운데 정렬 글자 (center = 글자 가운데)
+func _draw_text(center: Vector2, text: String, size: int, alpha: float) -> void:
+	var width := HUD_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var pos := center + Vector2(-width * 0.5, size * 0.35)
+	_overlay.draw_string_outline(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 8, Color(HUD_CREAM, alpha))
+	_overlay.draw_string(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(HUD_BROWN, alpha))

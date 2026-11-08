@@ -10,8 +10,15 @@ extends RefCounted
 ##   - 달리다 부딪혔거나, 점프했는데 살짝 모자라 몸이 모서리에 걸렸으면(몸 높이 안쪽) 잠시 투명해져(ghost_time)
 ##     벽을 통과하고, 발 범위가 그 옥상에 걸치면 옥상 위로 떠올라 올라선다.
 ##   - 점프 없이 틈으로 떨어지는 중이거나 너무 낮게 부딪혔으면 벽에 막혀 그대로 떨어진다 (투명화가 남아 있어도).
-## 구조물(넓은 틈, RoofGenerator): 빨래줄(structures)은 틈을 가로지르는 줄로, 위에서 내려와 밟으면 튕겨 오르고(밟기 직전에
-##   새로 누르면 더 높이) 튕긴 뒤에도 틈 위면 또 밟아 튕긴다. 전봇대는 틈 한가운데 판(roofs에 들어 있는 platform 옥상)으로,
+## 더블점프: 공중에서 새로 누르면 1회 (첫 점프와 같은 방식, 최대 DOUBLE_JUMP_MAX_HEIGHT, 꼭대기에서 잠깐 떠 있음).
+##   옥상·판에 서거나(투명화·구제 뒤 착지 포함) 줄을 눌러 튕기면 다시 생긴다. 점프 없이 떨어지다 코요테가 지나 쓴 것도 "점프함".
+##   누른 순간 아래 발판에 곧(옥상·판 JUMP_BUFFER_TIME, 줄 LINE_BLOCK_EARLY 안) 닿을 것으로 계산되면 더블점프로 쓰지 않고
+##   착지 점프·줄 누름으로 남긴다. 예측이 빗나가 그 발판 높이를 지나 내려갔는데 못 서면 그 step에 바로 더블점프로 바꾼다.
+##   투명화로 떠오르는 중·구제 중에는 쓰지 않는다.
+## 구조물(넓은 틈, RoofGenerator): 빨래줄(structures)은 틈을 가로지르는 줄로, 위에서 내려와 닿으면 줄에 실렸다가
+##   누름 타이밍(닿기 LINE_PRESS_EARLY 전 ~ 닿은 뒤 LINE_RIDE_TIME, 새로 누른 것만)에 따라 튕긴다: 퍼펙트·누름은 높이 튕기고
+##   더블점프가 다시 생김, 안 누름·너무 이른 누름은 낮게 튕기고 줄이 느슨해져 다시 받아 주지 않는다.
+##   실려 있는 동안 발이 다음 옥상에 걸치면 바로 착지. 전봇대는 틈 한가운데 판(roofs에 들어 있는 platform 옥상)으로,
 ##   위에서 내려앉으면 서고 올라서면 다시 뛸 수 있다. 판은 벽 판정이 없다(몸이 닿아도 막히지 않음).
 ##   특수 틈 다음 옥상(no_ghost)은 벽에 닿아도 투명화 구제가 없다.
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
@@ -23,8 +30,8 @@ var landed := false
 var fell := false             # 떨어져서 이번 step에 게임이 끝남
 var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
 var rescued := false  # 종이상자로 구제가 시작됨
-var bounced := false  # 빨래줄을 밟아 튕김
-var boosted := false  # 이번 튕김이 더 높이 튕기는 것이었는지
+var bounced := false  # 빨래줄에서 튕김 (결과는 bounce_result)
+var double_jumped := false  # 더블점프를 씀
 ## 이번 step에 먹은 아이템들 (먹는 연출용)
 var picked: Array[Dictionary] = []
 
@@ -59,6 +66,10 @@ var time_since_jump := 99.0
 ## 마지막으로 밟아 튕긴 빨래줄과 그 뒤 지난 시간 (줄이 출렁이는 연출용)
 var bounced_line := {}
 var time_since_bounce := 99.0
+## 마지막 줄 튕김 결과: "perfect", "good", "early"(너무 이른 누름), "miss"(안 누름). 다음 튕김까지 남아 있음
+var bounce_result := ""
+## 더블점프를 쓴 뒤 지난 시간 (공중제비 연출용). 쓰기 전이면 큰 값
+var time_since_double_jump := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
@@ -70,6 +81,14 @@ var _was_pressed := false
 var _jumped := false        # 마지막으로 옥상에 선 뒤 점프했는지
 var _holding := false       # 점프 중 아직 누르고 있어 속도를 유지하는 중
 var _hold_time := 0.0
+var _hold_max := JumpModel.max_hold_time()  # 이번 점프에서 속도를 유지할 수 있는 최대 시간 (첫 점프·더블점프가 다름)
+var _double_used := false   # 이번 공중에서 더블점프를 썼는지 (서거나 줄을 눌러 튕기면 다시 생김)
+var _floating := false      # 더블점프 궤적이라 꼭대기에서 중력이 줄어드는 중
+var _press_age := 99.0      # 마지막으로 새로 누른 뒤 지난 시간, 이번 step 시작 기준 (줄 누름 판정)
+var _held_top := NAN        # 착지·줄 누름으로 남겨 둔 공중 누름: 이 높이를 지나 내려갔는데 못 서면 더블점프로 바꾼다
+var _ride_line := {}        # 지금 실려 있는 빨래줄 (닿은 뒤 튕기기 전)
+var _ride_time := 0.0       # 줄에 실린 뒤 지난 시간
+var _slack_line := {}       # 실패 튕김으로 느슨해진 줄 (이 줄은 다시 받아 주지 않음)
 var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
 var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 남은 시간
 
@@ -95,6 +114,7 @@ func step(dt: float, pressed: bool) -> void:
 	ghosted = false
 	rescued = false
 	bounced = false
+	double_jumped = false
 	picked.clear()
 	if game_over:
 		return
@@ -107,6 +127,8 @@ func step(dt: float, pressed: bool) -> void:
 	time_since_land += dt
 	time_since_jump += dt
 	time_since_bounce += dt
+	time_since_double_jump += dt
+	_press_age = 0.0 if press_started else _press_age + dt
 
 	_move_forward(speed * dt)
 	_fill_roofs()
@@ -123,8 +145,14 @@ func step(dt: float, pressed: bool) -> void:
 
 	if (on_ground or _coyote > 0.0) and _buffer > 0.0:
 		_start_jump(pressed)
+	elif press_started and not on_ground:
+		_air_press(pressed)
 
 	if ghost_time > 0.0 and _ghost_rise(dt):
+		return
+
+	if not _ride_line.is_empty():
+		_ride(dt, press_started)
 		return
 
 	if on_ground:
@@ -135,8 +163,8 @@ func step(dt: float, pressed: bool) -> void:
 		return
 
 	_coyote = maxf(0.0, _coyote - dt)
-	if _holding and pressed and _hold_time < JumpModel.max_hold_time():
-		var hold_dt := minf(dt, JumpModel.max_hold_time() - _hold_time)
+	if _holding and pressed and _hold_time < _hold_max:
+		var hold_dt := minf(dt, _hold_max - _hold_time)
 		_hold_time += hold_dt
 		vy = JumpModel.jump_speed()
 		y += vy * hold_dt
@@ -144,11 +172,17 @@ func step(dt: float, pressed: bool) -> void:
 	else:
 		_holding = false
 	if dt > 0.0:
-		# 등가속도 운동을 정확히 적분해 프레임 간격과 상관없이 같은 높이가 나오게 한다
+		# 등가속도 운동을 정확히 적분해 프레임 간격과 상관없이 같은 높이가 나오게 한다 (떠 있는 구간 경계에서 쪼갬)
 		var prev_y := y
-		y += vy * dt - 0.5 * Balance.GRAVITY * dt * dt
-		vy -= Balance.GRAVITY * dt
-		_check_landing(prev_y)
+		var moved := JumpModel.integrate(y, vy, dt, _floating)
+		y = moved.x
+		vy = moved.y
+		_check_landing(prev_y, dt)
+	# 착지·줄 누름으로 남겨 둔 누름이 빗나감: 그 발판 높이를 지나 내려갔는데 서지 못했으면 지금 더블점프로
+	if not is_nan(_held_top) and not on_ground and _ride_line.is_empty() and not bounced and y < _held_top:
+		_held_top = NAN
+		if _can_double():
+			_start_double(pressed)
 
 	if has_box and y < Balance.RESCUE_HEIGHT:
 		# 종이상자가 받쳐 준다 (한 번만)
@@ -156,6 +190,8 @@ func step(dt: float, pressed: bool) -> void:
 		rescuing = true
 		rescued = true
 		_holding = false
+		_floating = false
+		_held_top = NAN
 		_buffer = 0.0  # 구제 중에는 입력을 받지 않으니, 직전에 누른 입력이 복귀 뒤 점프로 남지 않게 지운다
 		vy = 0.0
 		ghost_time = 0.0
@@ -184,13 +220,13 @@ func is_holding() -> bool:
 
 ## 지금 점프에서 누른 시간의 비율 (0 = 톡, 1 = 최대로 누름)
 func hold_ratio() -> float:
-	return clampf(_hold_time / JumpModel.max_hold_time(), 0.0, 1.0)
+	return clampf(_hold_time / _hold_max, 0.0, 1.0)
 
 
 ## 이제 어떤 옥상에도 올라설 수 없이 떨어지는 중인지 (허우적거리는 연출용).
 ## 발밑이나 바로 앞 옥상보다 아래로 내려가 착지도, 투명화 통과(몸 높이 안쪽)도 못 하는 경우.
 func is_doomed() -> bool:
-	if on_ground or rescuing or vy >= 0.0:
+	if on_ground or rescuing or vy >= 0.0 or not _ride_line.is_empty():
 		return false
 	for roof in roofs:
 		if roof.right < x - Balance.CAT_FOOT_HALF:
@@ -200,8 +236,18 @@ func is_doomed() -> bool:
 		if roof.get("platform", false) and y < roof.top:
 			continue  # 판은 위에서만 서니, 판 높이 아래로 내려왔으면 판은 이제 상관없다 (그 뒤 옥상으로 판단)
 		var margin: float = Balance.CAT_BODY_SIZE.y if _jumped and not _feet_over(roof) and not roof.get("no_ghost", false) else 0.0
+		if _can_double():
+			margin += Balance.DOUBLE_JUMP_MAX_HEIGHT  # 더블점프가 남아 있으면 아직 오를 수 있음 (그림용 대략값)
 		return y < roof.top - margin
 	return true
+
+
+## 고양이가 내려앉을 옥상(발 범위가 아직 다 지나가지 않은 가장 가까운 옥상·판)의 높이 (세로 카메라용). 없으면 0
+func landing_top() -> float:
+	for roof in roofs:
+		if roof.right >= x - Balance.CAT_FOOT_HALF:
+			return roof.top
+	return 0.0
 
 
 ## 몸 앞쪽 끝의 가로 위치
@@ -240,6 +286,7 @@ func _ghost_rise(dt: float) -> bool:
 		return false
 	on_ground = false
 	_holding = false
+	_held_top = NAN
 	vy = 0.0
 	y = minf(roof.top, y + Balance.GHOST_RISE_SPEED * dt)
 	if y >= roof.top:
@@ -288,41 +335,182 @@ func _start_jump(pressed: bool) -> void:
 	on_ground = false
 	_coyote = 0.0
 	_buffer = 0.0
+	_held_top = NAN
 	vy = JumpModel.jump_speed()
 	_jumped = true
+	_floating = false
 	# 눌렀다 이미 뗀 입력(버퍼)이면 최소 높이로 뛴다
 	_holding = pressed
 	_hold_time = 0.0
+	_hold_max = JumpModel.max_hold_time()
 	time_since_jump = 0.0
 	jumped = true
 
 
-func _check_landing(prev_y: float) -> void:
+## 더블점프: 떨어지던 속도를 지우고 첫 점프와 같은 속도로 다시 올라간다 (누르는 동안 double_max_hold까지 유지)
+func _start_double(pressed: bool) -> void:
+	_double_used = true
+	_floating = true
+	_jumped = true  # 점프 없이 떨어지다 썼어도 모서리 투명화 구제를 받는다
+	_coyote = 0.0
+	_buffer = 0.0
+	_held_top = NAN
+	vy = JumpModel.jump_speed()
+	_holding = pressed
+	_hold_time = 0.0
+	_hold_max = JumpModel.double_max_hold()
+	time_since_double_jump = 0.0
+	double_jumped = true
+
+
+## 더블점프를 쓸 수 있는지 (공중, 아직 안 씀, 투명화로 떠오르는 중·구제 중·줄에 실린 중이 아님)
+func _can_double() -> bool:
+	if on_ground or rescuing or _double_used or not _ride_line.is_empty():
+		return false
+	return not (ghost_time > 0.0 and not _ghost_roof.is_empty() and _feet_over(_ghost_roof) and _ghost_roof.top > y)
+
+
+## 코요테가 지난 공중에서 새로 누름: 곧 닿을 발판이 있으면 착지 점프·줄 누름으로 남기고, 아니면 더블점프
+func _air_press(pressed: bool) -> void:
+	var touch := line_touch_eta(Balance.LINE_BLOCK_EARLY)
+	if not touch.is_empty():
+		_held_top = touch.line.top  # 줄 누름 판정은 닿을 때 _press_age로 (_buffer는 쓰지 않음)
+		_buffer = 0.0
+		return
+	var land := _surface_eta(Balance.JUMP_BUFFER_TIME, false)
+	if not land.is_empty():
+		_held_top = land.surface.top  # _buffer가 남아 있어 착지하자마자 뛴다
+		return
+	if _can_double():
+		_start_double(pressed)
+
+
+## 지금 움직임 그대로 within초 안에 위에서 내려와 닿는 첫 발판. {"surface", "t", "x"} 또는 빈 Dictionary.
+## lines_only면 받아 주는 빨래줄만, 아니면 옥상·판만 본다. 앞으로 갈 거리는 지금 속도로 계산
+func _surface_eta(within: float, lines_only: bool) -> Dictionary:
+	if on_ground or not _ride_line.is_empty() or rescuing:
+		return {}
+	var candidates: Array = []
+	if lines_only:
+		for line in structures:
+			if not is_same(line, _slack_line):
+				candidates.append(line)
+	else:
+		candidates = roofs
+	var best := {}
+	for surface in candidates:
+		if surface.top > y:
+			continue  # 이미 그 높이 아래 (아래에서는 서지 않음)
+		var t := JumpModel.fall_to(y, vy, surface.top, _floating)
+		if t < 0.0 or t > within:
+			continue
+		var at_x := x + speed * t
+		# step은 앞으로 먼저 간 뒤 착지를 보므로, 닿는 자리는 최대 한 프레임(1/60초) 거리만큼 앞일 수 있다
+		var slop := speed / 60.0
+		if at_x + Balance.CAT_FOOT_HALF + slop >= surface.left and at_x - Balance.CAT_FOOT_HALF <= surface.right and (best.is_empty() or t < best.t):
+			best = {"surface": surface, "t": t, "x": at_x}
+	return best
+
+
+## 지금 움직임 그대로 within초 안에 닿을 빨래줄 {"line", "t"(남은 시간), "x"(닿는 가로 위치)}. 줄에 실려 있으면 t = 0. 없으면 빈 Dictionary
+## (화면의 "눌러!" 안내와 공중 누름 판정에 씀)
+func line_touch_eta(within: float) -> Dictionary:
+	if not _ride_line.is_empty():
+		return {"line": _ride_line, "t": 0.0, "x": x}
+	var hit := _surface_eta(within, true)
+	return {} if hit.is_empty() else {"line": hit.surface, "t": hit.t, "x": hit.x}
+
+
+## 지금 줄에 실려 있는지 (닿은 뒤 튕기기 전)
+func is_riding() -> bool:
+	return not _ride_line.is_empty()
+
+
+## 실패 튕김으로 느슨해져 더 받아 주지 않는 줄인지
+func is_slack(line: Dictionary) -> bool:
+	return is_same(line, _slack_line)
+
+
+func _check_landing(prev_y: float, dt: float) -> void:
 	if vy > 0.0:
 		return
 	# 위에서 지나 내려온 발판 중 가장 높은 것에 선다 (옥상과 구조물)
 	var best := {}
 	for surface in roofs + structures:
+		if is_same(surface, _slack_line):
+			continue  # 느슨해진 줄은 받아 주지 않는다
 		# 위에서 높이를 지나 내려왔을 때만 선다 (아래에서 벽에 부딪힌 경우는 계속 떨어짐)
 		if _feet_over(surface) and prev_y >= surface.top and y <= surface.top and (best.is_empty() or surface.top > best.top):
 			best = surface
 	if best.is_empty():
 		return
 	if best.get("kind", "") == "line":
-		_bounce(best)
+		# 이번 step 안에서 줄에 닿은 뒤 지난 시간 (높이가 줄을 지난 비율로 나눔): 판정이 프레임 간격에 덜 흔들리게
+		var after: float = dt * (best.top - y) / maxf(prev_y - y, 0.0001)
+		_touch_line(best, after, dt)
 	else:
 		_land_on(best)
 
 
-## 빨래줄을 밟아 튕긴다. 밟기 직전에 새로 누른 입력이 있으면(버퍼) 더 높이
-func _bounce(line: Dictionary) -> void:
-	boosted = _buffer > 0.0
+## 줄에 닿음: 닿기 전 누름이면 바로 판정해 튕기고, 아니면 줄에 실려 닿은 뒤 누름을 기다린다. after = 닿은 뒤 이미 지난 시간
+func _touch_line(line: Dictionary, after: float, dt: float) -> void:
 	y = line.top
-	vy = sqrt(2.0 * Balance.GRAVITY * (Balance.LINE_BOOST_HEIGHT if boosted else Balance.LINE_BOUNCE_HEIGHT))
+	vy = 0.0
+	_holding = false
+	_held_top = NAN
+	# 닿는 순간에서 본 마지막 새 누름 (_press_age는 이번 step 시작 기준, 닿은 때는 step 시작 + (dt - after))
+	var age := _press_age + dt - after
+	if age >= 0.0 and age <= Balance.LINE_BLOCK_EARLY:
+		if age <= Balance.LINE_PERFECT:
+			_bounce(line, "perfect")
+		elif age <= Balance.LINE_PRESS_EARLY:
+			_bounce(line, "good")
+		else:
+			_bounce(line, "early")
+		return
+	_ride_line = line
+	_ride_time = after
+	_ride(0.0, false)
+
+
+## 줄에 실려 있는 동안: 닿은 뒤 새로 누르면 판정해 튕기고, LINE_RIDE_TIME이 지나면 실패 튕김. 발이 다음 옥상에 걸치면 착지
+func _ride(dt: float, press_started: bool) -> void:
+	var line := _ride_line
+	_ride_time += dt
+	y = line.top
+	vy = 0.0
+	for roof in roofs:
+		if roof.left >= line.right - 0.001 and _feet_over(roof) and not roof.get("platform", false):
+			_ride_line = {}
+			_land_on(roof)
+			return
+	if press_started:
+		_ride_line = {}
+		_bounce(line, "perfect" if _ride_time <= Balance.LINE_PERFECT else "good")
+	elif _ride_time > Balance.LINE_RIDE_TIME:
+		_ride_line = {}
+		_bounce(line, "miss")
+
+
+## 빨래줄에서 튕긴다. result: perfect / good (더블점프 다시 생김) / early / miss (낮게, 줄이 느슨해짐)
+func _bounce(line: Dictionary, result: String) -> void:
+	var height := Balance.LINE_MISS_HEIGHT
+	if result == "perfect":
+		height = Balance.LINE_PERFECT_HEIGHT
+	elif result == "good":
+		height = Balance.LINE_GOOD_HEIGHT
+	if result == "perfect" or result == "good":
+		_double_used = false
+	else:
+		_slack_line = line
+	y = line.top
+	vy = RoofGenerator.line_bounce_speed(height)
 	_buffer = 0.0
 	_holding = false
+	_floating = false
 	_jumped = true  # 튕겨 오르다 살짝 모자라 모서리에 걸려도 투명화로 구제됨 (점프와 같은 취급)
 	bounced = true
+	bounce_result = result
 	bounced_line = line
 	time_since_bounce = 0.0
 
@@ -334,6 +522,10 @@ func _land_on(roof: Dictionary) -> void:
 	_ground_roof = roof
 	_holding = false
 	_jumped = false
+	_double_used = false
+	_floating = false
+	_held_top = NAN
+	_ride_line = {}
 	landed = true
 	time_since_land = 0.0
 

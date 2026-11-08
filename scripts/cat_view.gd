@@ -27,10 +27,17 @@ func _ready() -> void:
 		_textures[frame] = load(FRAME_DIR + frame + ".png")
 	_sprite.name = "Sprite"
 	_sprite.centered = false
-	_sprite.offset = -ANCHOR
+	# 그림을 몸 가운데(발끝 위 몸 높이의 절반)에 두고 그 점을 축으로 돌린다 (공중제비). 회전이 0이면 전과 같은 자리
+	_sprite.position = spin_center()
+	_sprite.offset = -ANCHOR - spin_center()
 	_sprite.texture = _textures[frame_name]
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
+
+
+## 공중제비 회전축: 발끝(원점)에서 몸 높이의 절반 위 (프레임 픽셀)
+static func spin_center() -> Vector2:
+	return Vector2(0.0, -Balance.CAT_BODY_SIZE.y * 0.5 / art_scale())
 
 
 ## 프레임 픽셀 → 게임 픽셀 배율
@@ -49,6 +56,7 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	# 발끝(원점)을 기준으로 늘이고 줄이고 기울여서 옥상에 붙어 있게 한다
 	scale = _scale * art_scale()
 	rotation_degrees = _tilt
+	_sprite.rotation = pose.spin
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
 	modulate.a = 1.0
 	if sim.ghost_time > 0.0:

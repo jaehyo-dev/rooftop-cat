@@ -5,7 +5,9 @@ extends RefCounted
 ## 같은 시드면 항상 같은 옥상이 나온다.
 ##
 ## 특수 틈: 일부 틈은 점프 한 번으로 못 건너게 넓히고 구조물을 둔다 (별도 난수로 정하니 일반 틈의 난수 흐름은 그대로).
-## - 빨래줄 틈: 두 옥상 높이를 같게 하고, 틈 전체를 줄이 가로지른다. 다음 옥상(roof.line = 줄 판정)은 튕김이 넘치지 않게 넓다.
+## 넓은 틈은 "점프 + 더블점프를 다 써도" 못 건너는 너비다.
+## - 빨래줄 틈: 두 옥상 높이를 같게 하고(LINE_TOP_MAX 이하에서만), 틈 전체를 줄이 가로지른다.
+##   다음 옥상(roof.line = 줄 판정)은 퍼펙트 튕김 + 더블점프로도 지나치지 않게 넓다.
 ## - 전봇대 틈: 틈 한가운데 작은 판 옥상(platform = true, 벽 판정 없는 발판)이 끼고, 그 다음 옥상이 이어진다.
 ## 특수 틈 다음 옥상은 no_ghost = true (벽에 닿아도 투명화 구제 없음: 줄·판을 거치지 않고 건너는 걸 막는다).
 
@@ -35,6 +37,7 @@ func next_roof(prev: Dictionary, speed: float) -> Dictionary:
 	var t := _special_rng.randf()
 	_made += 1
 	if wants_special and _made > Balance.SPECIAL_GAP_AFTER:
+		# 줄 틈을 못 만드는 높이(LINE_TOP_MAX 위)면 일반 틈 (전봇대로 바꾸면 전봇대가 v0.4.1보다 잦아짐)
 		var special := _line_roof(prev, roof, speed, t) if is_line else _pole_roofs(prev, roof, speed, t)
 		if not special.is_empty():
 			return special
@@ -73,25 +76,42 @@ static func arrival_speed(speed: float) -> float:
 	return minf(Balance.SPEED_MAX, speed + Balance.SPEED_GAIN * Balance.ROOF_LOOKAHEAD / speed)
 
 
-## 점프 한 번(최대)으로 높이 차 rise의 옥상을 못 건너는 가장 좁은 틈. 옥상 끝에서 마지막으로 뛸 수 있는 위치
-## (발 범위 + 코요테 + 한 칸)에서 뛴 최대 점프가 다음 옥상 발 범위에 닿는 거리보다 여유만큼 더 넓다
+## 점프 + 더블점프(둘 다 최대, 가장 멀리 가는 때)로도 높이 차 rise의 옥상을 못 건너는 가장 좁은 틈. 옥상 끝에서 마지막으로
+## 뛸 수 있는 위치(발 범위 + 코요테 + 한 칸)에서 뛴 거리가 다음 옥상 발 범위에 닿는 거리보다 여유만큼 더 넓다
 static func clear_gap(speed: float, rise: float) -> float:
 	var v := arrival_speed(speed)
-	return JumpModel.max_reach(v, rise) + 2.0 * Balance.CAT_FOOT_HALF + v * (Balance.COYOTE_TIME + 1.0 / 120.0) + Balance.SPECIAL_GAP_MARGIN
+	return JumpModel.max_double_reach(v, rise) + 2.0 * Balance.CAT_FOOT_HALF + v * (Balance.COYOTE_TIME + 1.0 / 120.0) + Balance.SPECIAL_GAP_MARGIN
 
 
-## 빨래줄 틈: base(일반 옥상)의 너비를 쓰되 높이는 prev와 같게, 틈은 못 건너는 최소 ~ 최소 + 튕김 한 번의 거리
+## 빨래줄 틈: base(일반 옥상)의 너비를 쓰되 높이는 prev와 같게, 틈은 못 건너는 최소 ~ 최소 + 누름 튕김 한 번의 거리 x LINE_GAP_SPAN.
+## 옥상이 LINE_TOP_MAX보다 높으면 빈 Dictionary
 func _line_roof(prev: Dictionary, base: Dictionary, speed: float, t: float) -> Dictionary:
+	if prev.top > Balance.LINE_TOP_MAX:
+		return {}
 	var v := arrival_speed(speed)
 	var rope: float = prev.top + Balance.LINE_HEIGHT
-	var normal_flight := v * JumpModel.fall_time(rope, sqrt(2.0 * Balance.GRAVITY * Balance.LINE_BOUNCE_HEIGHT), prev.top)
-	var boost_flight := v * JumpModel.fall_time(rope, sqrt(2.0 * Balance.GRAVITY * Balance.LINE_BOOST_HEIGHT), prev.top)
+	var good_flight := v * JumpModel.fall_time(rope, line_bounce_speed(Balance.LINE_GOOD_HEIGHT), prev.top)
 	var min_gap := clear_gap(speed, 0.0)
-	var left: float = prev.right + lerpf(min_gap, min_gap + normal_flight * Balance.LINE_GAP_SPAN, t)
-	# 줄 끝에서 더 높이 튕겨도 이 옥상 안에 내려앉을 너비
-	var width := maxf(base.right - base.left, Balance.CAT_FOOT_HALF + boost_flight + 120.0)
+	var left: float = prev.right + lerpf(min_gap, min_gap + good_flight * Balance.LINE_GAP_SPAN, t)
+	var width := maxf(base.right - base.left, line_landing_width(v))
 	return {"left": left, "right": left + width, "top": prev.top, "no_ghost": true,
 			"line": {"kind": "line", "left": prev.right, "right": left, "top": rope, "base": prev.top}}
+
+
+## 줄에서 height만큼 튕겨 오르는 세로 속도
+static func line_bounce_speed(height: float) -> float:
+	return sqrt(2.0 * Balance.GRAVITY * height)
+
+
+## 줄 끝(가장 늦게 실려 있다 튕긴 자리)에서 퍼펙트로 튕기고 더블점프까지 가장 멀리 써도 줄 다음 옥상 안에 내려앉는 너비 (도착 속도 v)
+static func line_landing_width(v: float) -> float:
+	var flight := JumpModel.best_double(line_bounce_speed(Balance.LINE_PERFECT_HEIGHT), 0.0, -Balance.LINE_HEIGHT).x
+	return Balance.CAT_FOOT_HALF + v * (Balance.LINE_RIDE_TIME + flight) + 120.0
+
+
+## 전봇대 판 앞이나 뒤 틈의 상한: 점프 + 더블점프 최대 거리 x POLE_GAP_SAFETY, 화면에 보이는 거리(POLE_GAP_VIEW_MAX) 이하
+static func pole_gap_max(speed: float, rise: float) -> float:
+	return minf(Balance.POLE_GAP_SAFETY * JumpModel.max_double_reach(speed, rise), Balance.POLE_GAP_VIEW_MAX)
 
 
 ## 전봇대 틈: 판 옥상을 돌려주고 그 다음 옥상(base 너비·높이)은 _pending에 둔다. 못 만들면 빈 Dictionary
@@ -100,8 +120,8 @@ func _pole_roofs(prev: Dictionary, base: Dictionary, speed: float, t: float) -> 
 	var plate_top := maxf(prev.top, top)
 	var plate_width := lerpf(Balance.POLE_WIDTH_START, Balance.POLE_WIDTH_MIN,
 			clampf(inverse_lerp(Balance.RUN_SPEED, Balance.SPEED_MAX, speed), 0.0, 1.0))
-	var max1 := Balance.POLE_GAP_SAFETY * JumpModel.max_reach(speed, plate_top - prev.top)  # prev → 판
-	var max2 := Balance.POLE_GAP_SAFETY * JumpModel.max_reach(speed, top - plate_top)       # 판 → 다음
+	var max1 := pole_gap_max(speed, plate_top - prev.top)  # prev → 판
+	var max2 := pole_gap_max(speed, top - plate_top)       # 판 → 다음
 	var min_gap := clear_gap(speed, top - prev.top)
 	var cap := plate_width + max1 + max2
 	if cap < min_gap or max1 < Balance.ROOF_GAP_MIN or max2 < Balance.ROOF_GAP_MIN:

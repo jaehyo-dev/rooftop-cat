@@ -89,6 +89,9 @@ func test_더는_올라설_수_없으면_허우적거린다() -> void:
 	sim.on_ground = false
 	sim.x = 100.0  # 틈 위
 	sim.vy = -100.0
+	sim.y = 249.0 - Balance.DOUBLE_JUMP_MAX_HEIGHT + 1.0
+	assert_false(sim.is_doomed(), "더블점프가 남아 있으면 그만큼 아래여도 아직 오를 수 있음")
+	sim.set("_double_used", true)  # 아래부터는 더블점프를 이미 쓴 경우
 	sim.y = 260.0
 	assert_false(sim.is_doomed(), "앞 옥상보다 높으면 아직 내려앉을 수 있음")
 	sim.y = 249.0
@@ -134,7 +137,7 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝
 	add_child(cat)
 	await wait_frames(1)
 	var sprite: Sprite2D = cat.get_node("Sprite")
-	assert_eq(sprite.offset, -CatView.ANCHOR, "그림의 기준점이 노드 원점(발끝)")
+	assert_eq(sprite.position + sprite.offset, -CatView.ANCHOR, "그림의 기준점이 노드 원점(발끝) (공중제비 축으로 옮긴 만큼 offset을 되돌림)")
 	for frame in CatPose.ALL_FRAMES:
 		var texture: Texture2D = load(CatView.FRAME_DIR + frame + ".png")
 		assert_not_null(texture, frame)
@@ -178,4 +181,46 @@ func test_상태에_맞는_그림과_투명화() -> void:
 	sim.ghost_time = 1.0
 	cat.show_state(sim, DT)
 	assert_true(cat.modulate.a < 0.6, "투명화 중 반투명")
+	cat.queue_free()
+
+
+func test_더블점프_공중제비는_웅크린_그림으로_한_바퀴_돌고_착지하면_끊긴다() -> void:
+	var sim := _sim_on_roofs([{"left": -2000.0, "right": 0.0, "top": 200.0}, {"left": 100000.0, "right": 200000.0, "top": 0.0}])
+	sim.x = -10.0
+	sim.on_ground = false
+	sim.set("_jumped", true)
+	sim.y = 600.0
+	sim.vy = 0.0
+	sim.step(DT, true)  # 더블점프 (평소 점프는 회전 없음: 위 test_뛰어서_올라갈_때도_내려올_때도_기울지_않는다)
+	assert_true(sim.double_jumped)
+	var first := CatPose.pose(sim)
+	assert_eq(first.frame, "crouch", "웅크린 그림")
+	assert_true(first.spin >= 0.0 and first.spin < 1.0, "막 돌기 시작")
+	var last_spin: float = first.spin
+	while sim.time_since_double_jump < Balance.CAT_SPIN_TIME - DT:
+		sim.step(DT, true)
+		var p: Dictionary = CatPose.pose(sim)
+		assert_true(p.spin >= last_spin, "한 방향으로 돎")
+		last_spin = p.spin
+	assert_true(last_spin > TAU * 0.98, "한 바퀴 (%.2f)" % last_spin)
+	sim.step(DT * 2.0, true)
+	assert_eq(CatPose.pose(sim).spin, 0.0, "0.36초 뒤 끝")
+	# 도는 중에 착지하면 바로 끊김
+	sim.time_since_double_jump = 0.1
+	sim.on_ground = true
+	assert_eq(CatPose.pose(sim).spin, 0.0, "착지하면 끊김")
+	sim.on_ground = false
+	sim.ghost_time = 0.5
+	assert_eq(CatPose.pose(sim).spin, 0.0, "투명화면 끊김")
+
+
+func test_공중제비_회전축은_몸_가운데() -> void:
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames()
+	var sprite: Sprite2D = cat.get_node("Sprite")
+	# 회전 0이면 그림 자리가 예전과 같다 (기준점이 발끝)
+	assert_eq(sprite.position + sprite.offset, -CatView.ANCHOR)
+	# 축은 발끝 위 몸 높이의 절반 (게임 픽셀)
+	assert_true(absf(sprite.position.y * CatView.art_scale() + Balance.CAT_BODY_SIZE.y * 0.5) < 0.01)
 	cat.queue_free()

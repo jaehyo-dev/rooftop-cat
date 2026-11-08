@@ -1,6 +1,7 @@
 class_name CatPose
 ## 고양이 동작에 맞는 그림(프레임)과 그 위에 얹을 몸 전체의 늘어남·납작해짐·기울기 (화면과 분리된 순수 계산).
 ## 그림은 자세별 통그림이고(다리를 따로 움직이지 않음), 프레임 사이는 몸 전체의 배율·기울기로 부드럽게 잇는다.
+## 더블점프 공중제비(spin)는 기울기 금지의 예외: 웅크린 그림을 몸 가운데 기준으로 CAT_SPIN_TIME 동안 한 바퀴 돌린다.
 ## 배율은 발끝을 기준으로 적용하므로 발이 옥상에서 뜨지 않는다. 기울기는 도 단위, 양수 = 시계 방향(코가 아래로).
 
 ## 달리기 한 바퀴의 프레임 (모으기 → 박차기 → 앞발 디딤 → 뒷발 들어옴)
@@ -10,8 +11,22 @@ const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.04, 0.97), Vector2(1.02, 0.99
 const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail"]
 
 
-## sim의 상태로 자세를 정한다. 돌려주는 값: frame(그림 이름), scale(몸 전체 배율), tilt(기울기)
+## sim의 상태로 자세를 정한다. 돌려주는 값: frame(그림 이름), scale(몸 전체 배율), tilt(기울기), spin(공중제비 회전, 라디안)
 static func pose(sim: RunnerSim) -> Dictionary:
+	var result := _pose(sim)
+	result.spin = 0.0
+	var t := sim.time_since_double_jump
+	# 공중제비: 더블점프 뒤 착지·줄 튕김·투명화·구제가 없었을 때만 (그런 일이 생기면 바로 끊음)
+	if t < Balance.CAT_SPIN_TIME and not sim.on_ground and not sim.rescuing and sim.ghost_time == 0.0 and t < sim.time_since_bounce:
+		var k := t / Balance.CAT_SPIN_TIME
+		result.frame = "crouch"
+		result.scale = Vector2.ONE
+		result.tilt = 0.0
+		result.spin = TAU * (1.0 - (1.0 - k) * (1.0 - k))  # 빠르게 시작해 천천히 끝남
+	return result
+
+
+static func _pose(sim: RunnerSim) -> Dictionary:
 	if sim.is_doomed():
 		# 떨어져서 끝나는 중: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
 		var wobble := sin(sim.elapsed * TAU * 5.0)

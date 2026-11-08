@@ -35,6 +35,14 @@ const JUMP_BUFFER_TIME := 0.10
 ## 옥상 끝을 막 지난 뒤에도 점프를 받아 주는 시간
 const COYOTE_TIME := 0.08
 
+# --- 더블점프: 공중에서 새로 누르면 1회 (옥상·판에 서거나 줄을 눌러 튕기면 다시 생김) ---
+## 첫 점프와 같은 방식: 누르는 순간 JumpModel.jump_speed()로 다시 올라가고(떨어지던 속도는 지움), 누르는 동안 유지.
+## 높이(누른 자리에서 위로) = JUMP_MIN_HEIGHT ~ DOUBLE_JUMP_MAX_HEIGHT
+const DOUBLE_JUMP_MAX_HEIGHT := 130.0
+## 더블점프 뒤 꼭대기 근처(|세로 속도| < DOUBLE_FLOAT_SPEED)에서는 중력을 DOUBLE_FLOAT_GRAVITY배로 (잠깐 떠 있는 느낌)
+const DOUBLE_FLOAT_SPEED := 160.0
+const DOUBLE_FLOAT_GRAVITY := 0.5
+
 # --- 옥상 생성 ---
 const ROOF_WIDTH_MIN := 300.0
 const ROOF_WIDTH_MAX := 720.0
@@ -85,29 +93,45 @@ const SPECIAL_GAP_AFTER := 3
 const LINE_SHARE := 0.5
 ## 못 건너는 틈의 여유: 최대 점프로 닿는 거리 + 발 범위 + 코요테에 더하는 픽셀
 const SPECIAL_GAP_MARGIN := 40.0
-## 빨래줄: 틈 전체를 가로지르는 줄(옥상 위 LINE_HEIGHT 높이). 위에서 내려와 밟으면 튕겨 오른다 (달리다 지나가는 건 막지 않음).
-## 튕겨 오른 뒤 아직 틈 위면 줄을 또 밟아 튕기니, 한 번만 밟으면 건너간다
+## 빨래줄: 틈 전체를 가로지르는 줄(옥상 위 LINE_HEIGHT 높이). 위에서 내려와 닿을 때마다 누름 타이밍으로 판정해 튕긴다
+## (달리다 지나가는 건 막지 않음). 닿으면 LINE_RIDE_TIME 동안 줄에 실려 있어(높이는 줄에 고정) 닿은 뒤에 눌러도 된다
 const LINE_HEIGHT := 60.0
-## 틈 너비 범위: 못 건너는 최소 ~ 최소 + 튕김 한 번의 거리 x LINE_GAP_SPAN (1이면 튕김 1~2번 만에 건넘)
-const LINE_GAP_SPAN := 1.0
-## 튕겨 오르는 높이 (줄 위로). 밟기 직전 JUMP_BUFFER_TIME(0.1초) 안에 새로 누르면 더 높이 (최대 점프 높이 250보다 높게)
-const LINE_BOUNCE_HEIGHT := 170.0
-const LINE_BOOST_HEIGHT := 290.0
-## 줄 위 생선 줄의 높이 (줄에서 위로). 기본 튕김으로는 안 닿고 더 높이 튕겨야 먹는다
-const LINE_FISH_HEIGHT := 300.0
+## 줄 틈은 옥상 높이가 이 값 이하일 때만 (줄 위 생선까지 세로 카메라 안에 들게)
+const LINE_TOP_MAX := 240.0
+## 틈 너비 범위: 못 건너는 최소 ~ 최소 + 누름 튕김 한 번의 거리 x LINE_GAP_SPAN (닿는 횟수가 2번 안팎, PLAN 0.5 → 봇 조정 0.3)
+const LINE_GAP_SPAN := 0.3
+## 누름 판정 창 (닿는 순간 기준, 초): 닿기 LINE_PRESS_EARLY 전 ~ 닿은 뒤 LINE_RIDE_TIME. 새로 누른 것만 친다.
+## 닿은 뒤 창은 PLAN 0.08에서 밸런스 봇으로 0.15로 넓힘 (초보 실패가 거의 다 늦은 누름이었음)
+const LINE_PRESS_EARLY := 0.18
+const LINE_RIDE_TIME := 0.15
+## 퍼펙트 창: 닿기 전후 각각 이 시간 안
+const LINE_PERFECT := 0.04
+## 닿기 이만큼 전부터는 공중에서 눌러도 더블점프로 쓰지 않는다. LINE_PRESS_EARLY보다 이르면 "빨랐어!" 실패
+const LINE_BLOCK_EARLY := 0.28
+## 튕겨 오르는 높이 (줄 위로): 안 누름·실패(줄이 느슨해져 이 틈에서는 더 받아 주지 않음) / 누름 / 퍼펙트
+const LINE_MISS_HEIGHT := 80.0
+const LINE_GOOD_HEIGHT := 230.0
+const LINE_PERFECT_HEIGHT := 330.0
+## 줄 위 생선 줄의 높이 (줄에서 위로, 생선 가운데). 퍼펙트 튕김 꼭대기(330 + 몸 절반 46)에서 먹는 거리(46 + 24)보다 멀어
+## 더블점프를 더해야 닿는다 (PLAN의 420은 퍼펙트만으로 닿아서 460으로 올림)
+const LINE_FISH_HEIGHT := 460.0
 ## 전봇대: 틈 한가운데 판(꼭대기). 판 너비는 속도가 낮을수록 넓게 시작해 POLE_WIDTH_MIN까지 좁아진다.
-## 판 높이는 앞뒤 옥상 중 높은 쪽 (판에서 벽에 막히지 않고, 판에서 다음 옥상으로는 내려감)
-const POLE_WIDTH_START := 200.0
-const POLE_WIDTH_MIN := 120.0
-## 판까지·판에서 다음까지 각각 최대 점프 거리의 이 비율 안에 둔다 (일반 틈의 여유 0.5~0.8보다 넉넉히 어렵지 않게)
+## 판 높이는 앞뒤 옥상 중 높은 쪽 (판에서 벽에 막히지 않고, 판에서 다음 옥상으로는 내려감).
+## v0.5.0 2a: 판 앞뒤 틈이 한 번 점프 거리만큼 넓어져 200/120 → 240/140으로 넓힘 (밸런스 봇 초보 판 성공률)
+const POLE_WIDTH_START := 240.0
+const POLE_WIDTH_MIN := 140.0
+## 판까지·판에서 다음까지 각각 "점프 + 더블점프 최대 거리"의 이 비율 안에 둔다 (꼭대기에서 더블점프를 써도 0.86배 이상이라 넉넉)
 const POLE_GAP_SAFETY := 0.75
-## 틈 너비 범위: 못 건너는 최소 ~ 최소 + POLE_GAP_SPAN
-const POLE_GAP_SPAN := 200.0
+## 판 앞뒤 틈의 상한: 뛰는 순간 판(또는 다음 옥상)이 화면 안에 보이는 거리 (고양이 앞 940 - 발 범위 - 여유)
+const POLE_GAP_VIEW_MAX := 800.0
+## 틈 너비 범위: 못 건너는 최소 ~ 최소 + POLE_GAP_SPAN (v0.5.0 2a: 200 → 100)
+const POLE_GAP_SPAN := 100.0
 
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)
 const CAT_CROUCH_TIME := 0.06  # 뛰는 순간 웅크린 그림을 보여 주는 시간 (초)
 const CAT_LAND_TIME := 0.12    # 착지 그림(앞발부터 닿고 몸이 눌림)을 보여 주는 시간 (초)
+const CAT_SPIN_TIME := 0.36    # 더블점프 공중제비(웅크린 그림을 몸 가운데 기준으로 한 바퀴) 시간 (초)
 
 # --- 늘어남·납작해짐 연출 (가로, 세로 배율) ---
 const STRETCH_RISE := Vector2(0.84, 1.2)   # 가장 빠르게 올라갈 때
