@@ -424,8 +424,8 @@ func _draw_overlay() -> void:
 			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
-		var line_top: float = sim.bounced_line.top
-		var at := Vector2(Balance.CAT_SCREEN_X - sim.speed * sim.time_since_bounce, ground - line_top - 150.0 - 50.0 * k)
+		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
+		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 
 

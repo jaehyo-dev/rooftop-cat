@@ -29,11 +29,14 @@ func _init() -> void:
 	var dj_after := 0.30          # 점프(또는 줄 튕김) 뒤 더블점프까지 (초), 음수 = 안 씀
 	if scene.begins_with("line"):
 		dj_after = -1.0
+	elif scene == "camera":
+		dj_after = 0.40  # 퍼펙트 튕김 꼭대기 무렵
 	var press_left := 0
 	var jumped_at := -1.0
 	var bounced_at := -1.0
 	var dj_done := false
 	var tap_index := 0
+	var on_plate := false
 	var tapped := false
 	var log := FileAccess.open(out + "/frames.csv", FileAccess.WRITE)
 	log.store_line("i,t,y,vy,lift,frame,result,doubled,x,pressed")
@@ -42,7 +45,8 @@ func _init() -> void:
 		var pressed := false
 		if sim.on_ground and sim.x >= press_x and jumped_at < 0.0:
 			press_left = jump_frames
-		if sim.landed and scene == "pole" and is_same(sim.get("_ground_roof"), sim.roofs[1]):
+		if scene == "pole" and not on_plate and sim.on_ground and is_same(sim.get("_ground_roof"), sim.roofs[1]):
+			on_plate = true
 			# 판에 섬: 판 끝 무렵 다시 점프 + 더블점프
 			press_x = sim.roofs[1].right - 20.0
 			jumped_at = -1.0
@@ -58,7 +62,7 @@ func _init() -> void:
 		elif tap_index < taps.size() and not tapped:
 			var touch := sim.line_touch_eta(0.6)
 			var plan = taps[tap_index]
-			if plan != null and not touch.is_empty() and not sim.is_riding() and touch.t <= -plan + dt * 0.5 and plan <= 0.0:
+			if plan != null and not touch.is_empty() and not sim.is_riding() and touch.t <= -plan + dt and plan <= 0.0:
 				pressed = true
 				tapped = true
 			elif plan != null and plan > 0.0 and sim.is_riding():
@@ -81,7 +85,8 @@ func _init() -> void:
 			tapped = false
 			tap_index += 1
 		await process_frame
-		await process_frame
+		# 창이 가려지면 macOS가 그리기를 건너뛰어 이전 화면이 저장될 수 있으니 직접 한 번 그린다
+		RenderingServer.force_draw(false)
 		root.get_texture().get_image().save_png(out + "/f%03d.png" % i)
 		log.store_line("%d,%.3f,%.1f,%.0f,%.1f,%s,%s,%s,%s,%s" % [i, sim.elapsed, sim.y, sim.vy, world.get("_cam_lift"), world.cat.frame_name,
 				sim.bounce_result, str(sim.time_since_double_jump < dt), "%.0f" % sim.x, str(pressed)])
