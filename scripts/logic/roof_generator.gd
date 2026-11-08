@@ -107,7 +107,7 @@ func _line_roof(prev: Dictionary, base: Dictionary, speed: float, t: float) -> D
 
 ## 줄에서 height만큼 튕겨 오르는 세로 속도
 static func line_bounce_speed(height: float) -> float:
-	return sqrt(2.0 * JumpModel.gravity() * height)
+	return sqrt(2.0 * Balance.GRAVITY * height)
 
 
 ## 줄 끝(가장 늦게 실려 있다 튕긴 자리)에서 퍼펙트로 튕기고 더블점프까지 가장 멀리 써도 줄 다음 옥상 안에 내려앉는 너비 (도착 속도 v)

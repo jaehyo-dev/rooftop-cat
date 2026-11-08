@@ -63,3 +63,9 @@ func _peak_for_hold(hold: float, dt: float = DT) -> float:
 func assert_near(actual: float, expected: float, tolerance: float, message: String = "") -> void:
 	if absf(actual - expected) > tolerance:
 		_fail("기대값 %.2f ± %.2f, 실제값 %.2f" % [expected, tolerance, actual], message)
+
+
+func test_점프_무게는_사용자가_고른_A_값() -> void:
+	assert_eq(Balance.GRAVITY, 3200.0)
+	assert_eq(Balance.DOUBLE_FLOAT_GRAVITY, 0.5)
+	assert_true(absf(JumpModel.jump_speed() - sqrt(2.0 * 3200.0 * 70.0)) < 0.001, "누르는 동안 일정한 속도")

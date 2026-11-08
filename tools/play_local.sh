@@ -16,7 +16,6 @@ IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null ||
 echo "브랜치: $(git rev-parse --abbrev-ref HEAD) ($(git rev-parse --short HEAD))"
 echo "PC(이 맥):        http://localhost:$PORT/"
 echo "휴대폰(같은 와이파이): http://$IP:$PORT/   (가로로 돌려서)"
-echo "설정 바꾸기: PC 숫자 키 1·2·3 = 점프 A·B·C (다음 판부터), 4·5·6 = 안개 M1·M2·M3 (바로). 휴대폰은 화면 오른쪽 위 버튼"
 echo "끝내려면 Ctrl+C"
 # 스레드 없는 웹 내보내기라 특별한 헤더 없이 기본 웹 서버로 열린다
 python3 -m http.server "$PORT" --bind 0.0.0.0 --directory build/web

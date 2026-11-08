@@ -1,6 +1,9 @@
 extends TestCase
 ## 먼 배경: 동네 띠 이어 붙이기(번갈아 뒤집기), 구름 위치와 시차.
 
+const WORLD := preload("res://scripts/world_view.gd")
+
+
 func test_동네_띠는_화면을_빈틈없이_덮는다() -> void:
 	for scroll in [0.0, 1.0, 777.7, 12345.6, 99999.9]:
 		var tiles := Backdrop.town_tiles(scroll, 1536.0, 1280.0)
@@ -55,3 +58,25 @@ func test_구름은_화면_가운데_높이까지_내려온다() -> void:
 	for cloud in Backdrop.CLOUDS:
 		lowest = maxf(lowest, cloud[2])
 	assert_true(lowest >= 0.35 and lowest < Backdrop.MISTS[0][2], "가장 낮은 구름이 가운데쯤, 안개보다 위")
+
+
+func test_안개는_M2_값이고_고양이보다_채도가_낮고_채움_색이_그림_아랫줄과_이어진다() -> void:
+	assert_true(absf((1.0 - Backdrop.MISTS[-1][2]) - 0.15 * 2.0 / 3.0) < 0.001, "맨 앞 안개가 덮는 높이 2/3")
+	var cat: Image = load("res://assets/sprites/cat_base_run.png").get_image()
+	var total := 0.0
+	var count := 0
+	for y in range(0, cat.get_height(), 8):
+		for x in range(0, cat.get_width(), 8):
+			var c := cat.get_pixel(x, y)
+			if c.a > 0.9:
+				total += c.s
+				count += 1
+	var cat_sat := total / count
+	for layer in ["far", "mid", "near"]:
+		var fill: Color = WORLD.MIST_FILLS[layer]
+		assert_true(fill.s < cat_sat, "%s 채도 %.2f < 고양이 %.2f" % [layer, fill.s, cat_sat])
+		var image: Image = WORLD.MIST_TEXTURES[layer].get_image()
+		var average := Color(0, 0, 0)
+		for x in range(0, image.get_width(), 16):
+			average += image.get_pixel(x, image.get_height() - 1) / (image.get_width() / 16.0)
+		assert_true(absf(average.r - fill.r) + absf(average.g - fill.g) + absf(average.b - fill.b) < 0.06, "%s 이음 %s %s" % [layer, average, fill])

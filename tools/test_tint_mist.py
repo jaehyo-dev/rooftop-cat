@@ -13,7 +13,7 @@ class TintTest(unittest.TestCase):
         rgba = np.array([[[0xfe, 0xc4, 0xbd, 77]]], dtype=np.uint8)
         out = tint(rgba, 0.45)[0, 0]
         self.assertEqual(out[3], 77)
-        self.assertEqual(list(out[:3]), [0xfe, 0xda, 0xd2])  # world_view.gd MIST_LOOKS.M1.mid_fill과 같은 값
+        self.assertEqual(list(out[:3]), [0xfe, 0xda, 0xd2])  # 45% 섞기의 기대값 (v0.5.0 2b 안개 판)
 
     def test_다른_색_쪽으로도_섞는다(self):
         rgba = np.array([[[100, 100, 100, 200]]], dtype=np.uint8)

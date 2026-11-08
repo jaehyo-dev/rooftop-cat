@@ -67,10 +67,9 @@ static func tramp_fish(tramp: Dictionary) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	var vy := RoofGenerator.line_bounce_speed(Balance.TRAMP_PERFECT_HEIGHT)
 	var vx: float = tramp.perfect_vx
-	var g := JumpModel.gravity()
 	var t := 0.0
-	while t <= 2.0 * vy / g:
-		var h := vy * t - 0.5 * g * t * t
+	while t <= 2.0 * vy / Balance.GRAVITY:
+		var h := vy * t - 0.5 * Balance.GRAVITY * t * t
 		if h >= Balance.TRAMP_GOOD_HEIGHT + Balance.TRAMP_FISH_ABOVE_GOOD:
 			items.append({"kind": "fish", "x": RunnerSim.run_in_x(tramp) + vx * t, "y": tramp.top + h + Balance.ITEM_LIFT})
 		t += Balance.FISH_SPACING / vx

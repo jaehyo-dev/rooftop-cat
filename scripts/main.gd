@@ -30,9 +30,6 @@ func _ready() -> void:
 	player.volume_db = MUSIC_VOLUME_DB
 	add_child(player)
 	player.play()
-	# shortcut: 로컬 빌드 전용 설정 패널, 사용자가 점프·안개를 고르면 이 두 줄과 tuning_panel.gd를 지운다
-	if TuningPanel.allowed():
-		add_child(TuningPanel.new(_world))
 
 
 func _process(_delta: float) -> void:
