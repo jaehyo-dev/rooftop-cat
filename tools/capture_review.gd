@@ -5,6 +5,8 @@ extends SceneTree
 ##       pole(판까지 점프+더블점프, 판에서 다시), camera(퍼펙트 + 더블점프로 높이 → 세로 카메라),
 ##       tramp_miss·tramp_good·tramp_perfect·tramp_early(트램펄린에 달려 들어가 안 누름·누름·퍼펙트·너무 이른 누름),
 ##       jump(달리기 → 최대 점프 → 착지 → 달리기, 전후 비교용)
+##       jump_max·jump_short·jump_double(점프 설정 비교: 같은 입력), mist(넓은 틈 앞 같은 장면을 안개 M1·M2·M3로 mist_M1.png 등에 저장)
+##       셋째 인자로 점프 설정 이름을 받는다 (기본 A)
 ## (line_*·camera 장면은 빨래줄 생성이 꺼져 있어 지금은 쓰지 않음)
 ## 저장: <출력 폴더>/f000.png ... (프레임마다), frames.csv(시간, 높이, 카메라, 판정)
 
@@ -16,6 +18,7 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var scene: String = args[0]
 	var out: String = args[1]
+	JumpModel.use_preset(args[2] if args.size() > 2 else "A")
 	DirAccess.make_dir_recursive_absolute(out)
 	AudioServer.set_bus_mute(0, true)  # 캡처 중에는 소리를 내지 않는다
 	var main: Control = load("res://scenes/main.tscn").instantiate()
@@ -36,6 +39,15 @@ func _init() -> void:
 		press_x = -400.0
 		jump_frames = 21  # 최대 점프 (0.35초 누름)
 		dj_after = -1.0
+	elif scene.begins_with("jump_"):
+		# 설정 비교: 어느 설정이든 같은 입력 (최대 = 0.5초 누름, 짧게 = 3프레임, 더블 = 0.2초 누름 + 0.35초에 0.2초 누름)
+		press_x = -700.0
+		jump_frames = {"jump_max": 30, "jump_short": 3, "jump_double": 12}[scene]
+		dj_after = 0.35 if scene == "jump_double" else -1.0
+	elif scene == "mist":
+		await _mist_frames(main, world, out)
+		quit()
+		return
 	elif scene.begins_with("tramp"):
 		press_x = INF  # 뛰지 않고 달려 들어감
 		dj_after = -1.0
@@ -69,7 +81,7 @@ func _init() -> void:
 			press_left -= 1
 		elif dj_after >= 0.0 and not dj_done and (jumped_at >= 0.0 if scene != "camera" else bounced_at >= 0.0) and since >= dj_after:
 			dj_done = true
-			press_left = 5
+			press_left = 11 if scene == "jump_double" else 5
 			pressed = true
 		elif tap_index < taps.size() and not tapped:
 			var touch := sim.line_touch_eta(0.6)
@@ -116,6 +128,25 @@ func _init() -> void:
 	quit()
 
 
+## 틈이 화면 가운데에 오는 자리까지 달린 뒤 같은 화면을 안개 설정별로 저장한다 (입력 없음)
+func _mist_frames(main: Control, world: Node2D, out: String) -> void:
+	var sim: RunnerSim = world.sim
+	sim.items.clear()
+	sim.x = sim.roofs[0].right - 280.0
+	sim.y = sim.roofs[0].top
+	world._process(1.0 / 60.0)
+	main._process(1.0 / 60.0)
+	world.set_process(false)
+	for preset in ["M1", "M2", "M3"]:
+		world.mist_preset = preset
+		world.queue_redraw()
+		world.get_node("FrontMist").queue_redraw()
+		main.get_node("TuningPanel").queue_redraw()
+		await process_frame
+		RenderingServer.force_draw(false)
+		root.get_texture().get_image().save_png(out + "/mist_%s.png" % preset)
+
+
 ## 장면에 쓸 옥상: 앞 옥상(넓게) + 특수 틈 + 끝없이 긴 다음 옥상 (속도 SPEED 고정)
 func _course(scene: String) -> RunnerSim:
 	var sim := RunnerSim.new(7, SPEED)
@@ -125,12 +156,12 @@ func _course(scene: String) -> RunnerSim:
 	sim.roofs.clear()
 	var prev := {"left": -3000.0, "right": 0.0, "top": 200.0}
 	sim.roofs.append(prev)
-	if scene == "jump":
+	if scene == "jump" or scene.begins_with("jump_"):
 		prev.right = 100000.0  # 틈 없이 달리다 뛰고 내려앉음
 	elif scene == "double":
 		sim.roofs.append({"left": 470.0, "right": 100000.0, "top": 220.0})
 	else:
-		var kind := "pole" if scene == "pole" else ("tramp" if scene.begins_with("tramp") else "line")
+		var kind := "pole" if scene == "pole" or scene == "mist" else ("tramp" if scene.begins_with("tramp") else "line")
 		for seed_value in range(1, 400):
 			var gen := RoofGenerator.new(seed_value)
 			var p := RoofGenerator.first_roof(0.0)

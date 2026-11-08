@@ -137,7 +137,7 @@ func _line_press(offset: float, dt: float = DT, hold_press: bool = false, start_
 	sim.set("_double_used", start_used)
 	sim.vy = 0.0
 	sim.y = line.top + DROP
-	var touch_time := sqrt(2.0 * DROP / Balance.GRAVITY)
+	var touch_time := sqrt(2.0 * DROP / JumpModel.gravity())
 	var press_step := roundi((touch_time + offset) / dt)
 	var out := {"result": "", "apex": 0.0, "doubled": false, "sim": sim}
 	var seen := false
@@ -372,7 +372,7 @@ func test_전봇대_틈은_더블점프까지_써도_판_없이_못_건너고_�
 					sim.y = plate.top
 					sim.set("_ground_roof", sim.roofs[1])
 					# 판에 서면 더블점프가 다시 생김: 첫 점프 꼭대기 무렵 더블점프
-					if _trial(sim, start + float(off), hold, false, hold + JumpModel.jump_speed() / Balance.GRAVITY).crossed:
+					if _trial(sim, start + float(off), hold, false, JumpModel.apex_time(hold)).crossed:
 						crossed_from_plate += 1
 			assert_true(crossed_from_plate > 0, "속도 %d: 판 %.0f에서 다시 뛰어 건너는 조합" % [speed, start])
 
@@ -403,7 +403,7 @@ func test_판에서_다음_옥상까지는_판_끝에서_늦게_뛰어도_코요
 			sim.y = plate.top
 			sim.set("_ground_roof", sim.roofs[1])
 			# 판 끝에서 발이 떨어진 뒤 코요테 시간 안에 누른다 (꼭대기 무렵 더블점프)
-			if _trial(sim, late_x + speed * Balance.COYOTE_TIME * 0.5, hold, false, hold + JumpModel.jump_speed() / Balance.GRAVITY).crossed:
+			if _trial(sim, late_x + speed * Balance.COYOTE_TIME * 0.5, hold, false, JumpModel.apex_time(hold)).crossed:
 				crossed += 1
 		assert_true(crossed > 0, "속도 %d: 코요테로 뛰어 건넘" % speed)
 
@@ -589,7 +589,7 @@ func test_트램펄린을_누르며_밟으면_달려_들어가도_뛰어서_떨�
 		# 가장 일찍 튕기는 자리(위에서 내려와 뒷발 끝만 걸침)에서 누름(퍼펙트 아님)으로 튕겨도 건넌다
 		var sim := _sim(found, speed)
 		var tramp: Dictionary = sim.structures[0]
-		var fall := sqrt(2.0 * 60.0 / Balance.GRAVITY)
+		var fall := sqrt(2.0 * 60.0 / JumpModel.gravity())
 		sim.on_ground = false
 		sim.set("_jumped", true)
 		sim.x = tramp.left - Balance.CAT_FOOT_HALF + 2.0 - speed * fall

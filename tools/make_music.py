@@ -2,6 +2,7 @@
 
 사용: python3 tools/make_music.py assets/audio/neighborhood.ogg   (ffmpeg 필요)
      python3 tools/make_music.py <출력.ogg> mochi | swing   (v0.5.0 2b 후보 곡: 아래 SONGS)
+     python3 tools/make_music.py assets/audio/mochi_walk.ogg mochi_game   (게임 곡: mochi를 57초로 늘린 것)
 - C-Am-F-G 진행, 96BPM, 16마디. 멜로디(펜타토닉 위 무작위 걷기)는 뜯는 소리, 코드는 부드러운 패드, 베이스는 마디의 1·3박.
 - 곡 끝을 넘어가는 소리를 처음에 겹쳐 더해(감기) 루프가 끊기지 않게 한다.
 개발용 도구 (numpy 필요). 게임은 결과 파일만 쓴다.
@@ -103,6 +104,22 @@ SONGS = {
 }
 
 
+# 게임 곡: A(후보 8마디) B(후보 8마디) C(새 8마디, 북을 줄여 쉬어 가는 구간) A 뒤 4마디(첫 마디로 돌아가는 G로 끝남)
+_M = SONGS["mochi"]
+_C_CHORDS = "Am F C G Am F Dm G"
+_C_MELODY = [
+    "A5 - C6 - B5 A5 E5 -", "F5 - A5 - C6 A5 F5 -", "G5 - C6 - E6 D6 C6 -", "B5 - D6 - G5 - - -",
+    "A5 - C6 - B5 A5 E5 -", "F5 - A5 - C6 D6 C6 -", "D6 - A5 F5 A5 D6 F6 -", "G5 B5 D6 - F6 - D6 -",
+]
+SONGS["mochi_game"] = {
+    "bpm": _M["bpm"], "swing": _M["swing"], "lead": _M["lead"],
+    "chords": " ".join(_M["chords"].split() + _C_CHORDS.split() + _M["chords"].split()[4:8]),
+    "melody": _M["melody"] + _C_MELODY + _M["melody"][4:8],
+    "light": range(16, 24),      # 쉬어 가는 구간: 북 줄임, 베이스는 2분음표, 멜로디는 피치카토 + 글로켄
+    "fill": (15, 23, 27),        # 다음 구간으로 넘어가기 전 마지막 박에 손뼉을 몰아침
+}
+
+
 def note_midi(name: str) -> int:
     return NOTE_NAMES[name[:-1]] + 12 * (int(name[-1]) + 1)
 
@@ -175,13 +192,19 @@ def build_song(name: str) -> np.ndarray:
         t0 = bar * 4 * beat
         # 8분음표로 걷는 베이스: 근음 → 3음 → 5음 → 6음 → 옥타브 → 6음 → 5음 → 3음
         third = tones[1]
+        light = bar in song.get("light", ())
         for slot, step in enumerate([0, third, 7, 9, 12, 9, 7, third]):
+            if light and slot % 4:
+                continue
             put(pluck(midi_hz(root + step), 0.45, 0.30 if slot % 4 == 0 else 0.22), t0 + eighth(slot))
         # 북 (1, 3박 + 4박 뒤 살짝), 손뼉 (2, 4박), 쉐이커 (8분마다, 뒷박이 조금 큼)
-        for b in [0.0, 2.0, 3.5]:
+        for b in [0.0] if light else [0.0, 2.0, 3.5]:
             put(kick(0.75 if b != 3.5 else 0.45), t0 + b * beat)
-        for b in [1.0, 3.0]:
+        for b in [3.0] if light else [1.0, 3.0]:
             put(clap(0.20, rng), t0 + b * beat)
+        if bar in song.get("fill", ()):
+            for b in [3.25, 3.5, 3.75]:
+                put(clap(0.16, rng), t0 + b * beat)
         for slot in range(8):
             put(shaker(0.09 if slot % 2 else 0.05, rng), t0 + eighth(slot))
         # 화음: 마림바 곡은 뒷박 피치카토, 스윙 곡은 우쿨렐레처럼 네 줄을 빠르게 긁기
@@ -197,8 +220,11 @@ def build_song(name: str) -> np.ndarray:
         # 멜로디 + 네 마디마다 글로켄 반짝임
         for slot, token in enumerate(song["melody"][bar].split()):
             if token != "-":
-                put(lead(midi_hz(note_midi(token)), 0.36), t0 + eighth(slot))
-                if bar % 8 >= 4 and slot % 2 == 0:
+                if light:
+                    put(pizzicato(midi_hz(note_midi(token)), 0.30), t0 + eighth(slot))
+                else:
+                    put(lead(midi_hz(note_midi(token)), 0.36), t0 + eighth(slot))
+                if (light or bar % 8 >= 4) and slot % 2 == 0:
                     put(glock(midi_hz(note_midi(token) + 12), 0.09), t0 + eighth(slot))
     track[:tail] += track[total:total + tail]  # 끝 소리 감기 (루프)
     track = track[:total]

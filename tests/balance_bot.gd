@@ -74,7 +74,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			# 계획대로 더블점프를 쓰거나, 실수한 점프가 다음 발판에 못 미치면 첫 점프 꼭대기 + timing 실수에 더블점프
 			dj_delay = INF
 			if plan.dj or _falls_short(sim, press_x, hold):
-				dj_delay = maxf(hold + 2.0 * DT, hold + JumpModel.jump_speed() / Balance.GRAVITY + rng.randfn(0.0, skill.timing))
+				dj_delay = maxf(hold + 2.0 * DT, JumpModel.apex_time(hold) + rng.randfn(0.0, skill.timing))
 			dj_hold = JumpModel.double_max_hold() * clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
 		if sim.x >= press_x:
 			press_x = INF
@@ -133,7 +133,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 static func _apex_double_time(rise: float) -> float:
 	var v := JumpModel.jump_speed()
 	var hold := JumpModel.max_hold_time()
-	return JumpModel.double_total_time(v, hold, hold + v / Balance.GRAVITY, rise)
+	return JumpModel.double_total_time(v, hold, JumpModel.apex_time(hold), rise)
 
 
 ## 다음 발판으로 뛸 계획 {"x": 누를 위치, "dj": 더블점프를 쓸지}
@@ -191,7 +191,7 @@ static func _plate_hold(sim: RunnerSim, press_x: float, with_double: bool) -> fl
 	var hi := JumpModel.max_hold_time()
 	for i in 24:
 		var mid := (lo + hi) * 0.5
-		var t := JumpModel.double_total_time(v, mid, mid + v / Balance.GRAVITY, rise) if with_double else JumpModel.air_time(mid, rise)
+		var t := JumpModel.double_total_time(v, mid, JumpModel.apex_time(mid), rise) if with_double else JumpModel.air_time(mid, rise)
 		if t >= 0.0 and sim.speed * t < target:
 			lo = mid
 		else:

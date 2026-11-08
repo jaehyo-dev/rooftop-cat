@@ -85,7 +85,8 @@ var _was_pressed := false
 var _jumped := false        # 마지막으로 옥상에 선 뒤 점프했는지
 var _holding := false       # 점프 중 아직 누르고 있어 속도를 유지하는 중
 var _hold_time := 0.0
-var _hold_max := JumpModel.max_hold_time()  # 이번 점프에서 속도를 유지할 수 있는 최대 시간 (첫 점프·더블점프가 다름)
+var _hold_max := JumpModel.max_hold_time()  # 이번 점프에서 누를 수 있는 최대 시간 (첫 점프·더블점프가 다름)
+var _press_y := 0.0         # 이번 점프를 누른 자리의 높이 (손을 뗄 때 얼마나 올라왔는지 봄)
 var _double_used := false   # 이번 공중에서 더블점프를 썼는지 (서거나 줄을 눌러 튕기면 다시 생김)
 var _floating := false      # 더블점프 궤적이라 꼭대기에서 중력이 줄어드는 중
 var _press_age := 99.0      # 마지막으로 새로 누른 뒤 지난 시간, 이번 step 시작 기준 (줄 누름 판정)
@@ -182,11 +183,13 @@ func step(dt: float, pressed: bool) -> void:
 	if _holding and pressed and _hold_time < _hold_max:
 		var hold_dt := minf(dt, _hold_max - _hold_time)
 		_hold_time += hold_dt
-		vy = JumpModel.jump_speed()
-		y += vy * hold_dt
+		var held := JumpModel.hold_state(vy, hold_dt)
+		y += held.x
+		vy = held.y
 		dt -= hold_dt
-	else:
+	elif _holding:
 		_holding = false
+		vy = JumpModel.release_speed(y - _press_y, vy)
 	if dt > 0.0:
 		# 등가속도 운동을 정확히 적분해 프레임 간격과 상관없이 같은 높이가 나오게 한다 (떠 있는 구간 경계에서 쪼갬)
 		var prev_y := y
@@ -372,10 +375,11 @@ func _start_jump(pressed: bool) -> void:
 	_coyote = 0.0
 	_buffer = 0.0
 	_held_top = NAN
-	vy = JumpModel.jump_speed()
+	# 눌렀다 이미 뗀 입력(버퍼)이면 최소 높이로 뛴다
+	vy = JumpModel.jump_speed() if pressed else JumpModel.release_speed(0.0, JumpModel.jump_speed())
+	_press_y = y
 	_jumped = true
 	_floating = false
-	# 눌렀다 이미 뗀 입력(버퍼)이면 최소 높이로 뛴다
 	_holding = pressed
 	_hold_time = 0.0
 	_hold_max = JumpModel.max_hold_time()
@@ -383,7 +387,7 @@ func _start_jump(pressed: bool) -> void:
 	jumped = true
 
 
-## 더블점프: 떨어지던 속도를 지우고 첫 점프와 같은 속도로 다시 올라간다 (누르는 동안 double_max_hold까지 유지)
+## 더블점프: 떨어지던 속도를 지우고 다시 올라간다 (누르는 동안 double_max_hold까지 첫 점프처럼)
 func _start_double(pressed: bool) -> void:
 	_double_used = true
 	_floating = true
@@ -391,7 +395,8 @@ func _start_double(pressed: bool) -> void:
 	_coyote = 0.0
 	_buffer = 0.0
 	_held_top = NAN
-	vy = JumpModel.jump_speed()
+	vy = JumpModel.double_speed() if pressed else JumpModel.release_speed(0.0, JumpModel.double_speed())
+	_press_y = y
 	_holding = pressed
 	_hold_time = 0.0
 	_hold_max = JumpModel.double_max_hold()

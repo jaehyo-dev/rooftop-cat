@@ -83,4 +83,6 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 - 검토 캡처 `review/v0.5.0/2b/*.gif`, `*.png`: 게임 화면을 캡처해 만듦 (영상 비교 이미지는 저장소에 넣지 않음)
 - 검토용 비교 그림 `review/v0.4.1/before_*.png`, `after_*.png`, `before_seed7_*.png`, `font_compare.png`, `pole_compare.png`, `compare_sheet.png`, `compare_after.png`, `play_30s.gif`: 2026-11-08, 게임 캡처와 기존 그림으로 직접 합성 (게임에 포함 안 됨). `font_compare.png`의 글꼴(Gaegu, Gamja Flower, Poor Story, 모두 SIL OFL 1.1, google/fonts 커밋 86aced9)은 비교 그림에만 쓰고 저장소에는 넣지 않음
 - 프로젝트 아이콘 `icon.svg`: 이 프로젝트에서 직접 만듦
-- 배경 음악 `assets/audio/neighborhood.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦
+- 안개 설정 M2·M3 판 `assets/sprites/backdrop/mist_far_m2.png`, `mist_mid_m2.png`, `mist_near_m2.png`, `mist_far_m3.png`, `mist_mid_m3.png`, `mist_near_m3.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 섞음 (M2 크림 75%, M3 채도 낮은 크림·옅은 하늘색 90%, 원본은 그대로 둠)
+- 배경 음악 `assets/audio/mochi_walk.ogg` "찹쌀떡 산책": 2026-11-08, `tools/make_music.py mochi_game`(numpy)으로 직접 작곡·합성한 곡 (118BPM, 마림바·손뼉·쉐이커, 57초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦
+- 이전 배경 음악 `assets/audio/neighborhood.ogg` (v0.4.x, 지금은 쓰지 않고 보관): 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦

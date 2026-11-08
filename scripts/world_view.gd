@@ -24,11 +24,21 @@ const CLOUD_TEXTURES := [
 	preload("res://assets/sprites/backdrop/cloud3.png"), preload("res://assets/sprites/backdrop/cloud4.png")]
 const TOWN_BOTTOM := 0.66       # 먼 동네 띠 아래 끝 (화면 높이 비율). 아랫부분은 먼 안개에 묻힘
 ## 안개 띠 그림 (Backdrop.MISTS 이름별)과 띠 아래를 이어 채우는 색 (그림 맨 아랫줄 색)
-const MIST_TEXTURES := {"far": preload("res://assets/sprites/backdrop/mist_far.png"),
-		"town": preload("res://assets/sprites/backdrop/mist_town.png"),
-		"mid": preload("res://assets/sprites/backdrop/mist_mid_cream.png"), "near": preload("res://assets/sprites/backdrop/mist_near_cream.png")}
-## 분홍 두 겹(mid, near)은 크림색(#fff6ec) 쪽으로 45% 섞음 (v0.5.0 2b, 투명도 그대로): 그림은 tools/tint_mist.py, 원래 채움 색 #fec4bd, #cebbdf
-const MIST_FILLS := {"far": Color("#fdd0a3"), "mid": Color("#fedad2"), "near": Color("#e4d6e5")}
+const MIST_TOWN_TEXTURE := preload("res://assets/sprites/backdrop/mist_town.png")
+## 안개 설정 (v0.5.0 2b 마무리, 사용자가 로컬 빌드에서 고름): 안개 세 겹(far, mid, near)의 그림·채움 색, 맨 앞 안개가 덮는 높이 배율·불투명도.
+## 그림은 tools/tint_mist.py: M1 mid·near만 크림(#fff6ec) 45%, M2 세 겹 크림 75%, M3 far·mid는 채도 낮은 크림(#f3efe7), near는 옅은 하늘색(#e2ebf0) 쪽으로 90%.
+## M2·M3에서 far도 옅게 한 이유: far가 살구색 그대로면 mid·near가 옅어진 뒤 틈 뒤의 모래 땅처럼 보임
+const MIST_LOOKS := {
+	"M1": {"far": preload("res://assets/sprites/backdrop/mist_far.png"), "far_fill": Color("#fdd0a3"),
+			"mid": preload("res://assets/sprites/backdrop/mist_mid_cream.png"), "near": preload("res://assets/sprites/backdrop/mist_near_cream.png"),
+			"mid_fill": Color("#fedad2"), "near_fill": Color("#e4d6e5"), "near_cover": 1.0, "near_alpha": 0.90},
+	"M2": {"far": preload("res://assets/sprites/backdrop/mist_far_m2.png"), "far_fill": Color("#feebd9"),
+			"mid": preload("res://assets/sprites/backdrop/mist_mid_m2.png"), "near": preload("res://assets/sprites/backdrop/mist_near_m2.png"),
+			"mid_fill": Color("#ffebe1"), "near_fill": Color("#f5e9e9"), "near_cover": 2.0 / 3.0, "near_alpha": 0.90},
+	"M3": {"far": preload("res://assets/sprites/backdrop/mist_far_m3.png"), "far_fill": Color("#f4ebe0"),
+			"mid": preload("res://assets/sprites/backdrop/mist_mid_m3.png"), "near": preload("res://assets/sprites/backdrop/mist_near_m3.png"),
+			"mid_fill": Color("#f4ebe3"), "near_fill": Color("#e1e7ee"), "near_cover": 0.5, "near_alpha": 0.70},
+}
 ## 건물 몸통이 안개에 묻히는 구간: 옥상 윗면에서 이만큼 아래부터 묻히기 시작해 BODY_MIST_TO에서 다 묻힘
 const BODY_MIST_FROM := 70.0
 const BODY_MIST_TO := 330.0
@@ -110,9 +120,15 @@ const BURST_STAR_COLOR := Color("#ffd166")
 const BURST_STAR_OUTLINE := Color("#a8693a")
 const BURST_STARS := 6
 const BURST_STAR_REACH := 90.0
-const SFX_VOLUME_DB := -6.0
+## 효과음이 음악(-26 LUFS 안팎)보다 5dB쯤 위에 오게 (v0.5.0 2b 마무리, ffmpeg ebur128로 잼). 착지는 원래 작아서 올린다
+const SFX_VOLUME_DB := -5.0
+const SFX_TRIM_DB := {"land": 4.0}
 const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
 
+## 안개 설정 (바꾸면 바로 적용)
+var mist_preset := "M1"
+## 점프 무게 설정: 다음 판부터 적용 (판 중간에 바꾸면 이미 만든 옥상 간격과 맞지 않음)
+var next_jump_preset := "A"
 var sim := RunnerSim.new(randi())
 var cat := CatView.new()
 var _touches := {}
@@ -156,7 +172,7 @@ func _ready() -> void:
 		var player := AudioStreamPlayer.new()
 		player.name = "Sfx_" + sound
 		player.stream = load("res://assets/audio/sfx/%s.wav" % sound)
-		player.volume_db = SFX_VOLUME_DB
+		player.volume_db = SFX_VOLUME_DB + SFX_TRIM_DB.get(sound, 0.0)
 		add_child(player)
 		_sfx[sound] = player
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 아이템 그림을 크게 줄여 그려도 거칠지 않게
@@ -240,6 +256,7 @@ func _place_cat(delta: float) -> void:
 
 ## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다
 func restart() -> void:
+	JumpModel.use_preset(next_jump_preset)
 	sim = RunnerSim.new(randi())
 	_accumulator = 0.0
 	_pops.clear()
@@ -358,13 +375,20 @@ func _draw_strip(canvas: CanvasItem, tex: Texture2D, top: float, parallax: float
 
 ## 안개 한 겹: 띠 그림 + 띠 아래는 같은 색으로 화면 바닥까지 채움 (틈 아래가 안개 속 낭떠러지로 보이게)
 func _draw_mist(canvas: CanvasItem, mist: Array, size: Vector2) -> void:
-	var tex: Texture2D = MIST_TEXTURES[mist[0]]
-	var top: float = size.y * mist[2] + _cam_lift * minf(1.0, mist[1])  # 세로 카메라도 시차만큼 (가까운 안개는 건물과 같이)
-	var tint := Color(1, 1, 1, mist[3])
-	_draw_strip(canvas, tex, top, mist[1], size.x, tint)
+	var look: Dictionary = MIST_LOOKS[mist_preset]
+	var layer: String = mist[0]
+	var tex: Texture2D = look.get(layer, MIST_TOWN_TEXTURE)
+	var band_top: float = mist[2]
+	var alpha: float = mist[3]
+	if layer == "near":
+		band_top = 1.0 - (1.0 - band_top) * look.near_cover
+		alpha = look.near_alpha
+	var top: float = size.y * band_top + _cam_lift * minf(1.0, mist[1])  # 세로 카메라도 시차만큼 (가까운 안개는 건물과 같이)
+	_draw_strip(canvas, tex, top, mist[1], size.x, Color(1, 1, 1, alpha))
 	var bottom := top + tex.get_height() - 1.0
-	if MIST_FILLS.has(mist[0]) and bottom < size.y:
-		canvas.draw_rect(Rect2(0.0, bottom, size.x, size.y - bottom), Color(MIST_FILLS[mist[0]], mist[3]))
+	var fill: Variant = look.get(layer + "_fill")
+	if fill != null and bottom < size.y:
+		canvas.draw_rect(Rect2(0.0, bottom, size.x, size.y - bottom), Color(fill, alpha))
 
 
 ## 건물·기둥 몸통을 아래로 갈수록 안개 색으로 덮는다 (옥상 윗면 기준이라 고양이가 서는 곳은 늘 또렷함)
@@ -373,7 +397,7 @@ func _draw_body_mist(left: float, right: float, top: float, ground: float) -> vo
 	if from >= ground:
 		return
 	var to := minf(top + BODY_MIST_TO, ground)
-	var mist: Color = MIST_FILLS.mid
+	var mist: Color = MIST_LOOKS[mist_preset].mid_fill
 	var end := Color(mist, BODY_MIST_MAX * (to - from) / (BODY_MIST_TO - BODY_MIST_FROM))
 	draw_polygon([Vector2(left, from), Vector2(right, from), Vector2(right, to), Vector2(left, to)],
 			[Color(mist, 0.0), Color(mist, 0.0), end, end])

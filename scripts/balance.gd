@@ -25,9 +25,17 @@ const PX_PER_METER := 100.0  # 거리 점수: 100픽셀 = 1미터
 const RESTART_DELAY := 0.8
 
 # --- 점프: 누르는 시간만큼 높이 ---
-## 누르고 있는 동안(최대 JUMP_MAX_HOLD) 같은 속도로 올라가고, 떼면 중력으로 떨어진다.
-## 그래서 높이 = 최소 높이 + 점프 속도 x 누른 시간 (누른 시간에 비례, 최대 높이에서 멈춤).
-const GRAVITY := 3200.0
+## 점프 무게 설정 (v0.5.0 2b 마무리, 사용자가 플레이로 고름). 높이(아래 MIN·MAX, 더블)는 어느 설정이든 같고 체공만 다르다. JumpModel이 계산에 쓴다.
+## A: 지금. 누르는 동안 같은 속도로 올라가 높이 = 최소 높이 + 점프 속도 x 누른 시간, 떼면 GRAVITY로 떨어짐.
+## B·C: 누르는 동안 포물선, 떨어질 때 중력 = 누르는 동안 중력 x fall_ratio, 최대 점프 체공 max_air초. float_gravity = 더블점프 꼭대기 중력 배율(1 = 떠 있음 없음)
+const JUMP_PRESETS := {
+	"A": {"float_gravity": 0.5},
+	"B": {"fall_ratio": 1.5, "max_air": 0.70, "float_gravity": 0.75},
+	"C": {"fall_ratio": 1.8, "max_air": 0.60, "float_gravity": 1.0},
+}
+const GRAVITY := 3200.0  # A의 중력. 게임 코드는 JumpModel.gravity()를 쓴다
+## B·C: 최소 높이보다 위에서 손을 떼면 이만큼만 더 오르고 꺾인다 (뚝 끊겨 보이지 않을 만큼만)
+const JUMP_CUT_RISE := 18.0
 const JUMP_MIN_HEIGHT := 70.0   # 짧게 톡 눌렀을 때
 const JUMP_MAX_HEIGHT := 250.0  # 길게 눌렀을 때 (최대)
 ## 땅에 닿기 직전에 누른 입력을 기억해 착지하자마자 뛰는 시간
@@ -36,10 +44,10 @@ const JUMP_BUFFER_TIME := 0.10
 const COYOTE_TIME := 0.08
 
 # --- 더블점프: 공중에서 새로 누르면 1회 (옥상·판에 서거나 줄을 눌러 튕기면 다시 생김) ---
-## 첫 점프와 같은 방식: 누르는 순간 JumpModel.jump_speed()로 다시 올라가고(떨어지던 속도는 지움), 누르는 동안 유지.
+## 첫 점프와 같은 방식: 누르는 순간 JumpModel.double_speed()로 다시 올라가고(떨어지던 속도는 지움), 누르는 동안 첫 점프처럼 움직인다.
 ## 높이(누른 자리에서 위로) = JUMP_MIN_HEIGHT ~ DOUBLE_JUMP_MAX_HEIGHT
 const DOUBLE_JUMP_MAX_HEIGHT := 130.0
-## 더블점프 뒤 꼭대기 근처(|세로 속도| < DOUBLE_FLOAT_SPEED)에서는 중력을 DOUBLE_FLOAT_GRAVITY배로 (잠깐 떠 있는 느낌)
+## 더블점프 뒤 꼭대기 근처(|세로 속도| < DOUBLE_FLOAT_SPEED)에서는 중력을 줄인다 (잠깐 떠 있는 느낌). DOUBLE_FLOAT_GRAVITY는 설정 A의 배율
 const DOUBLE_FLOAT_SPEED := 160.0
 const DOUBLE_FLOAT_GRAVITY := 0.5
 

@@ -5,9 +5,9 @@ extends Control
 ## 최고 기록·생선 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
 var record_path := BestRecord.DEFAULT_PATH
 
-## 주택가 배경 음악 (tools/make_music.py로 합성한 루프)
-const MUSIC := preload("res://assets/audio/neighborhood.ogg")
-const MUSIC_VOLUME_DB := -8.0
+## 배경 음악 "찹쌀떡 산책" (tools/make_music.py로 합성한 루프)
+const MUSIC := preload("res://assets/audio/mochi_walk.ogg")
+const MUSIC_VOLUME_DB := -5.0  # 곡 자체가 -21.4 LUFS라 -26.4 (효과음 world_view.gd SFX_VOLUME_DB와 맞춤)
 
 var _best := 0
 
@@ -30,6 +30,9 @@ func _ready() -> void:
 	player.volume_db = MUSIC_VOLUME_DB
 	add_child(player)
 	player.play()
+	# shortcut: 로컬 빌드 전용 설정 패널, 사용자가 점프·안개를 고르면 이 두 줄과 tuning_panel.gd를 지운다
+	if TuningPanel.allowed():
+		add_child(TuningPanel.new(_world))
 
 
 func _process(_delta: float) -> void:
