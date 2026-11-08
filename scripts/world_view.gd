@@ -218,7 +218,7 @@ func _process(delta: float) -> void:
 
 ## 이번 step에 일어난 일의 효과음과 발밑 터짐
 func _play_events() -> void:
-	var doomed := sim.is_doomed()
+	var doomed := sim.is_doomed() and not sim.has_box  # 상자가 받아 줄 떨어짐은 끝이 아니다
 	for sound in SfxEvents.sounds(sim, doomed and not _fall_sounded):
 		_sfx[sound].play()
 	if doomed:
@@ -227,7 +227,7 @@ func _play_events() -> void:
 		_fall_sounded = false
 	var bounced_good := sim.bounced and sim.bounce_result in ["good", "perfect"]
 	if sim.double_jumped or bounced_good:
-		_bursts.append({"x": sim.x, "y": sim.y, "t": 0.0, "stars": sim.double_jumped or sim.bounce_result == "perfect"})
+		_bursts.append({"x": sim.x, "y": sim.y + tramp_cat_lift(sim), "t": 0.0, "stars": sim.double_jumped or sim.bounce_result == "perfect"})
 
 
 ## 고양이를 로직 위치(발끝)에 놓고 자세를 맞춘다
@@ -536,17 +536,15 @@ func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
 	var top_h: float = TRAMP_SRC_LEG * k * look.sy
 	var leg_rows: float = tex.get_height() - TRAMP_SRC_LEG
 	var leg_h: float = leg_rows * k * TRAMP_LEG_STRETCH * look.sy
-	var top: float = feet - tramp_height(TRAMP_SRC_FEET, look.sy)
+	var top: float = feet - tramp_height(0.0, look.sy)
 	draw_texture_rect_region(tex, Rect2(x, top, w, top_h), Rect2(0, 0, tex.get_width(), TRAMP_SRC_LEG))
 	draw_texture_rect_region(tex, Rect2(x, top + top_h, w, leg_h), Rect2(0, TRAMP_SRC_LEG, tex.get_width(), leg_rows))
 
 
-## 그림의 row줄 위치가 다리 끝에서 몇 게임 픽셀 위인지 (row = TRAMP_SRC_FEET이면 전체 높이가 아니라 "맨 윗줄 ~ 다리 끝" 높이를 돌려줌)
+## 그림의 row줄이 다리 끝에서 몇 게임 픽셀 위인지 (0줄이면 트램펄린 전체 높이, 테 아래는 다리 늘임만큼 커짐)
 static func tramp_height(row: float, sy: float) -> float:
 	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
 	var legs := (TRAMP_SRC_FEET - TRAMP_SRC_LEG) * TRAMP_LEG_STRETCH
-	if row == TRAMP_SRC_FEET:
-		return (TRAMP_SRC_LEG + legs) * k * sy
 	var up := (TRAMP_SRC_FEET - row) * TRAMP_LEG_STRETCH if row >= TRAMP_SRC_LEG else legs + (TRAMP_SRC_LEG - row)
 	return up * k * sy
 
@@ -610,16 +608,18 @@ func _draw_overlay() -> void:
 	if not touch.is_empty() and not sim.game_over:
 		# 첫 점프를 누르고 있는 동안은 그리지 않는다 (누름이 끝난 뒤부터)
 		if _guided.has(touch.line.left) and not sim.is_holding():
-			var at := Vector2(touch.x + offset, ground - touch.line.top + FOOT_SINK)
+			# 트램펄린은 판정 높이가 아니라 눈에 보이는 그물 위를 가리킨다
+			var aim: float = touch.line.base + tramp_height(TRAMP_SRC_NET.rest, 1.0) if touch.line.kind == "tramp" else touch.line.top
+			var at := Vector2(touch.x + offset, ground - aim + FOOT_SINK)
 			var r := lerpf(GUIDE_PAW, GUIDE_START, touch.t / GUIDE_TIME)
 			_overlay.draw_arc(at, GUIDE_PAW, 0.0, TAU, 32, Color(HUD_BROWN, 0.45), 3.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
-			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
-		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
+		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 
 

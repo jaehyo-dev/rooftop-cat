@@ -716,7 +716,7 @@ func test_트램펄린_밟음_그림의_그물_바닥이_밟은_발_높이() -> 
 	var net: float = world_script.tramp_height(world_script.TRAMP_SRC_NET.pressed, 1.0)
 	var rest: float = world_script.tramp_height(world_script.TRAMP_SRC_NET.rest, 1.0)
 	assert_true(net > Balance.TRAMP_LIFT and net < rest * 0.5, "꺼진 그물 %.0f, 평소 그물 %.0f" % [net, rest])
-	assert_true(world_script.tramp_height(world_script.TRAMP_SRC_FEET, 1.0) > Balance.CAT_BODY_SIZE.y, "다리를 늘여 몸보다 큼")
+	assert_true(world_script.tramp_height(0.0, 1.0) > Balance.CAT_BODY_SIZE.y, "다리를 늘여 몸보다 큼")
 
 
 func test_트램펄린_고양이_그림은_폴짝_올라타_그물_깊이를_따라가고_튀어_나간다() -> void:
@@ -770,3 +770,8 @@ func test_효과음은_일어난_일에_맞게_난다() -> void:
 	assert_eq(SfxEvents.sounds(sim, false), ["fish"] as Array[String], "한 번만")
 	sim.picked.assign([{"kind": "box"}])
 	assert_eq(SfxEvents.sounds(sim, false), [] as Array[String], "상자는 소리 없음")
+
+
+func test_효과음_파일을_모두_불러온다() -> void:
+	for sound in SfxEvents.ALL:
+		assert_not_null(load("res://assets/audio/sfx/%s.wav" % sound), sound)

@@ -90,7 +90,9 @@ func _kick_events(sim: RunnerSim) -> void:
 		_spring.kick(Balance.KICK_LAND)
 	if sim.time_since_jump < _last.jump:
 		_spring.kick(Balance.KICK_CROUCH)
-	if _last.jump < Balance.CAT_CROUCH_TIME and sim.time_since_jump >= Balance.CAT_CROUCH_TIME and not sim.on_ground:
+	# 경계를 넘었거나, 느린 프레임이라 새로 뛴 프레임에 이미 경계를 지났을 때도 (아래 그물을 떠나는 순간도 같음)
+	if sim.time_since_jump >= Balance.CAT_CROUCH_TIME and not sim.on_ground \
+			and (_last.jump < Balance.CAT_CROUCH_TIME or sim.time_since_jump < _last.jump):
 		_spring.kick(Balance.KICK_TAKEOFF)
 	if sim.time_since_double_jump < _last.double:
 		_spring.kick(Balance.KICK_DOUBLE)
@@ -98,7 +100,7 @@ func _kick_events(sim: RunnerSim) -> void:
 	if (sim.is_riding() and not _last.riding) or (sim.time_since_bounce < _last.bounce and not _last.riding):
 		_spring.kick(Balance.KICK_TRAMP_RIDE)
 	# 그림이 그물을 떠나는 순간 세로로 늘어나며 발사
-	if _last.bounce < Balance.TRAMP_PUSH and sim.time_since_bounce >= Balance.TRAMP_PUSH:
+	if sim.time_since_bounce >= Balance.TRAMP_PUSH and (_last.bounce < Balance.TRAMP_PUSH or sim.time_since_bounce < _last.bounce):
 		_spring.kick(Balance.KICK_TRAMP_LAUNCH[sim.bounce_result])
 
 

@@ -64,9 +64,23 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/trampoline_sheet.png` | 2026-11-08 | Codex 내장 이미지 생성 (주택가 건물 시안·구조물 시트를 `--image`로 첨부해 그림체를 맞춤) | 트램펄린 3상태 시트 원본: 평소·밟음·튕김 (마젠타 배경, 게임에 포함 안 됨) | 없음 |
 | `assets/sprites/structures/trampoline_rest.png`, `trampoline_pressed.png`, `trampoline_launch.png` | 2026-11-08 | 위 원본 | 게임 속 트램펄린 (평소·밟음·튕김) | `tools/cut_parts.py`의 마젠타 지우기로 배경을 지우고 세 그림을 같은 캔버스(432x200)로 잘라 절반(216x100)으로 줄임 → `tools/clean_edges.py` |
 | `review/v0.4.1/mockup_A_extend.png`, `mockup_B_alley.png`, `mockup_C_mist.png` | 2026-11-08 | Codex 내장 이미지 생성 (v0.4.0 캡처와 주택가 시안을 `--image`로 첨부) | v0.4.1 화면 아래 시안 A·B·C (검토용, 게임에 포함 안 됨) | 없음 |
+| `assets/raw/cat_frames_flip.png` → `assets/sprites/cat_frames/flip_tuck.png`, `flip_curl.png`, `flip_ball.png`, `flip_open.png` | 2026-11-08 | Codex 내장 이미지 생성 (기준 그림·웅크림·도약 프레임을 `--image`로 첨부) | 앞구르기 공중제비 4자세 (v0.5.0 2b) | 마젠타 제거, 자르기, 크기·기준점 정렬 |
+
+## 검토용 음악 후보 (게임에 포함되지 않음, v0.5.0 2b)
+
+사용자가 듣고 고르기 위한 30초 발췌입니다. 고른 곡만 나중에 게임에 넣으며, 그때 "게임에 포함된 것"으로 옮깁니다. CC0 전문은 `review/v0.5.0/2b/music/CC0_LICENSE.txt`.
+
+| 이름 | 만든 사람 | 라이선스 | 출처 | 쓰는 곳 | 수정 |
+|---|---|---|---|---|---|
+| Happy Clappy Loop | OwlishMedia | CC0 (2026-11-08 공식 페이지에서 확인) | https://opengameart.org/content/happy-clappy-loop | `review/v0.5.0/2b/music/3_cc0_happy_clappy_loop.ogg` | 30초로 이어 붙임, 음량 맞춤, 끝 페이드, ogg 변환 |
+| Upbeat song | Ruhinre | CC0 (2026-11-08 공식 페이지에서 확인) | https://opengameart.org/content/upbeat-song | `review/v0.5.0/2b/music/4_cc0_upbeat_song.ogg` | 30초로 자름, 음량 맞춤, 끝 페이드, ogg 변환 |
 
 ## 직접 만든 것
 
+- 효과음 7종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 보잉, 퍼펙트, 떨어짐): 2026-11-08, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음
+- 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
+- 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)
+- 검토 캡처 `review/v0.5.0/2b/*.gif`, `*.png`: 게임 화면을 캡처해 만듦 (영상 비교 이미지는 저장소에 넣지 않음)
 - 검토용 비교 그림 `review/v0.4.1/before_*.png`, `after_*.png`, `before_seed7_*.png`, `font_compare.png`, `pole_compare.png`, `compare_sheet.png`, `compare_after.png`, `play_30s.gif`: 2026-11-08, 게임 캡처와 기존 그림으로 직접 합성 (게임에 포함 안 됨). `font_compare.png`의 글꼴(Gaegu, Gamja Flower, Poor Story, 모두 SIL OFL 1.1, google/fonts 커밋 86aced9)은 비교 그림에만 쓰고 저장소에는 넣지 않음
 - 프로젝트 아이콘 `icon.svg`: 이 프로젝트에서 직접 만듦
 - 배경 음악 `assets/audio/neighborhood.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦

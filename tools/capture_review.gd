@@ -3,7 +3,8 @@ extends SceneTree
 ## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_review.gd -- <장면> <출력 폴더>
 ## 장면: double(넓은 틈 더블점프·공중제비), line_good(누름→퍼펙트), line_early(너무 이른 누름), line_miss(안 누름),
 ##       pole(판까지 점프+더블점프, 판에서 다시), camera(퍼펙트 + 더블점프로 높이 → 세로 카메라),
-##       tramp_miss·tramp_good·tramp_perfect·tramp_early(트램펄린에 달려 들어가 안 누름·누름·퍼펙트·너무 이른 누름)
+##       tramp_miss·tramp_good·tramp_perfect·tramp_early(트램펄린에 달려 들어가 안 누름·누름·퍼펙트·너무 이른 누름),
+##       jump(달리기 → 최대 점프 → 착지 → 달리기, 전후 비교용)
 ## (line_*·camera 장면은 빨래줄 생성이 꺼져 있어 지금은 쓰지 않음)
 ## 저장: <출력 폴더>/f000.png ... (프레임마다), frames.csv(시간, 높이, 카메라, 판정)
 
@@ -16,6 +17,7 @@ func _init() -> void:
 	var scene: String = args[0]
 	var out: String = args[1]
 	DirAccess.make_dir_recursive_absolute(out)
+	AudioServer.set_bus_mute(0, true)  # 캡처 중에는 소리를 내지 않는다
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
@@ -30,7 +32,11 @@ func _init() -> void:
 	var press_x := edge - SPEED * JumpModel.max_air_time(Balance.LINE_HEIGHT) + 90.0 if scene.begins_with("line") or scene == "camera" else edge - 60.0
 	var jump_frames := 7          # 첫 점프 누름 (최대)
 	var dj_after := 0.30          # 점프(또는 줄 튕김) 뒤 더블점프까지 (초), 음수 = 안 씀
-	if scene.begins_with("tramp"):
+	if scene == "jump":
+		press_x = -400.0
+		jump_frames = 21  # 최대 점프 (0.35초 누름)
+		dj_after = -1.0
+	elif scene.begins_with("tramp"):
 		press_x = INF  # 뛰지 않고 달려 들어감
 		dj_after = -1.0
 	elif scene.begins_with("line"):
@@ -119,7 +125,9 @@ func _course(scene: String) -> RunnerSim:
 	sim.roofs.clear()
 	var prev := {"left": -3000.0, "right": 0.0, "top": 200.0}
 	sim.roofs.append(prev)
-	if scene == "double":
+	if scene == "jump":
+		prev.right = 100000.0  # 틈 없이 달리다 뛰고 내려앉음
+	elif scene == "double":
 		sim.roofs.append({"left": 470.0, "right": 100000.0, "top": 220.0})
 	else:
 		var kind := "pole" if scene == "pole" else ("tramp" if scene.begins_with("tramp") else "line")

@@ -115,3 +115,21 @@ func test_공중에서는_숨쉬고_꼭대기에서_부푼다() -> void:
 	sim.vy = -JumpModel.jump_speed()
 	var fast: Vector2 = CatPose.pose(sim).scale
 	assert_true(fast.y > 1.05 and fast.x < 1.0, "빨리 떨어지면 세로로 늘어남 %s" % str(fast))
+
+
+func test_느린_프레임에서도_뛰는_순간_늘어남_충격이_빠지지_않는다() -> void:
+	# 느린 프레임: 새로 뛴 것을 처음 보는 프레임에 웅크림 시간이 이미 지나 있어도 늘어나는 충격이 들어가야 한다
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames(1)
+	var sim := RunnerSim.new(1)
+	cat.show_state(sim, DT)  # 땅 위 (지난 프레임으로 기억)
+	sim.on_ground = false
+	sim.y = 500.0
+	sim.vy = 100.0
+	sim.time_since_jump = Balance.CAT_CROUCH_TIME + 0.002
+	cat.show_state(sim, 0.0001)
+	var spring: Spring = cat.get("_spring")
+	var expected: float = (Balance.KICK_CROUCH.y + Balance.KICK_TAKEOFF.y) * spring.kick_gain()
+	assert_true(spring.velocity.y > expected * 0.9, "세로 충격 %.2f (기대 %.2f)" % [spring.velocity.y, expected])
+	cat.queue_free()
