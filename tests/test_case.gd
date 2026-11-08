@@ -8,6 +8,15 @@ extends Node
 var failures: PackedStringArray = []
 
 
+## 속도 단계 표의 서로 다른 속도들 (옥상·구조물 테스트가 단계마다 확인한다)
+static func stage_speeds() -> Array:
+	var speeds := []
+	for stage in Balance.SPEED_STAGES:
+		if not speeds.has(stage[1]):
+			speeds.append(stage[1])
+	return speeds
+
+
 ## 조건이 참이어야 한다.
 func assert_true(condition: bool, message: String = "") -> void:
 	if not condition:

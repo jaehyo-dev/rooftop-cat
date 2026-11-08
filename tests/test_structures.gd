@@ -4,7 +4,7 @@ extends TestCase
 ## 트램펄린(옥상 끝 발사대): 판정 창·높이·발사·생성 수치는 맨 아래 "트램펄린" 부분.
 
 const DT := 1.0 / 120.0
-const SPEEDS := [430.0, 700.0, 950.0]
+var SPEEDS := stage_speeds()
 
 
 ## 시드를 돌려 kind("tramp"/"pole")인 특수 틈을 처음 찾는다. {"prev": 앞 옥상, "roofs": [다음 옥상] 또는 [판, 다음 옥상]}
@@ -346,35 +346,46 @@ func test_전봇대_틈은_더블점프까지_써도_판_없이_못_건너고_�
 		var width: float = plate.right - plate.left
 		assert_true(width >= Balance.POLE_WIDTH_MIN - 0.01 and width <= Balance.POLE_WIDTH_START + 0.01, "판 너비 범위")
 		assert_true(after.no_ghost, "다음 옥상은 투명화 구제 없음")
-		# 판 없이는 더블점프까지 어떤 조합으로도 못 건넌다 (투명화 구제도 없음)
-		var crossed_without := 0
-		for r in _sweep(found, speed, false, false, true):
-			if r.crossed:
-				crossed_without += 1
-		assert_eq(crossed_without, 0, "속도 %d: 판 없이 건너는 조합" % speed)
-		# 판이 있어도 판에 내려앉지 않고 건너는 조합은 없다 (한 번에 못 건넘). 점프 + 더블점프로 판에 닿는 조합은 있다
-		var crossed_skipping := 0
-		var reached_plate := 0
-		for r in _sweep(found, speed, true, false, true):
-			if r.plate:
-				reached_plate += 1
-			if r.crossed and not r.plate:
-				crossed_skipping += 1
-		assert_eq(crossed_skipping, 0, "속도 %d: 판을 거치지 않고 건넌 조합" % speed)
-		assert_true(reached_plate > 0, "속도 %d: 첫 점프로 판에 닿는 조합이 있음" % speed)
-		# 판 위 어느 자리에서 시작해도(판 왼쪽 끝~오른쪽 끝), 판에서 다시 뛰어 다음 옥상에 닿는 조합이 있다
-		for start in [plate.left, (plate.left + plate.right) * 0.5, plate.right]:
-			var crossed_from_plate := 0
-			for off in range(-30, int(Balance.CAT_FOOT_HALF + Balance.COYOTE_TIME * speed), 6):
-				for hold in [0.12, 0.18, 0.24, JumpModel.max_hold_time()]:
-					var sim := _sim(found, speed)
-					sim.x = start
-					sim.y = plate.top
-					sim.set("_ground_roof", sim.roofs[1])
-					# 판에 서면 더블점프가 다시 생김: 첫 점프 꼭대기 무렵 더블점프
-					if _trial(sim, start + float(off), hold, false, hold + JumpModel.jump_speed() / Balance.GRAVITY).crossed:
-						crossed_from_plate += 1
-			assert_true(crossed_from_plate > 0, "속도 %d: 판 %.0f에서 다시 뛰어 건너는 조합" % [speed, start])
+		_assert_pole_crossing(found, speed)
+
+
+func test_속도_단계가_오른_뒤_도착한_전봇대_틈도_판을_거쳐야만_건넌다() -> void:
+	for speed in SPEEDS:
+		_assert_pole_crossing(_find("pole", speed), RoofGenerator.arrival_speed(speed))
+
+
+## speed로 달릴 때: 판 없이는 못 건너고, 판을 거쳐야만 건너며, 판 어디서나 다시 뛰어 건널 수 있다
+func _assert_pole_crossing(found: Dictionary, speed: float) -> void:
+	var plate: Dictionary = found.roofs[0]
+	# 판 없이는 더블점프까지 어떤 조합으로도 못 건넌다 (투명화 구제도 없음)
+	var crossed_without := 0
+	for r in _sweep(found, speed, false, false, true):
+		if r.crossed:
+			crossed_without += 1
+	assert_eq(crossed_without, 0, "속도 %d: 판 없이 건너는 조합" % speed)
+	# 판이 있어도 판에 내려앉지 않고 건너는 조합은 없다 (한 번에 못 건넘). 점프 + 더블점프로 판에 닿는 조합은 있다
+	var crossed_skipping := 0
+	var reached_plate := 0
+	for r in _sweep(found, speed, true, false, true):
+		if r.plate:
+			reached_plate += 1
+		if r.crossed and not r.plate:
+			crossed_skipping += 1
+	assert_eq(crossed_skipping, 0, "속도 %d: 판을 거치지 않고 건넌 조합" % speed)
+	assert_true(reached_plate > 0, "속도 %d: 첫 점프로 판에 닿는 조합이 있음" % speed)
+	# 판 위 어느 자리에서 시작해도(판 왼쪽 끝~오른쪽 끝), 판에서 다시 뛰어 다음 옥상에 닿는 조합이 있다
+	for start in [plate.left, (plate.left + plate.right) * 0.5, plate.right]:
+		var crossed_from_plate := 0
+		for off in range(-30, int(Balance.CAT_FOOT_HALF + Balance.COYOTE_TIME * speed), 6):
+			for hold in [0.12, 0.18, 0.24, JumpModel.max_hold_time()]:
+				var sim := _sim(found, speed)
+				sim.x = start
+				sim.y = plate.top
+				sim.set("_ground_roof", sim.roofs[1])
+				# 판에 서면 더블점프가 다시 생김: 첫 점프 꼭대기 무렵 더블점프
+				if _trial(sim, start + float(off), hold, false, hold + JumpModel.jump_speed() / Balance.GRAVITY).crossed:
+					crossed_from_plate += 1
+		assert_true(crossed_from_plate > 0, "속도 %d: 판 %.0f에서 다시 뛰어 건너는 조합" % [speed, start])
 
 
 func test_판_앞뒤_틈은_화면에_보이는_거리_이하() -> void:
@@ -562,48 +573,65 @@ func test_트램펄린_틈은_트램펄린_없이_더블점프까지_다_써도_
 		assert_eq(roof.tramp.right, prev.right - Balance.TRAMP_INSET, "옥상 끝에 놓임")
 		assert_eq(roof.tramp.top, prev.top + Balance.TRAMP_LIFT, "그물 높이")
 		assert_true(roof.left - prev.right >= RoofGenerator.clear_gap(speed, 0.0), "속도 %d: 못 건너는 넓이" % speed)
-		var crossed_without := 0
-		for r in _sweep(found, speed, false, false, true):
-			crossed_without += 1 if r.crossed else 0
-		assert_eq(crossed_without, 0, "속도 %d: 트램펄린 없이 건너는 조합" % speed)
-		# 트램펄린이 있어도 밟지 않고(뛰어넘음) 건너는 조합은 없다
-		var skipped := 0
-		for r in _sweep(found, speed, true, false, true):
-			skipped += 1 if r.crossed and not r.bounced else 0
-		assert_eq(skipped, 0, "속도 %d: 트램펄린을 뛰어넘고 건넌 조합" % speed)
+		_assert_tramp_needed(found, speed)
+
+
+func test_속도_단계가_오른_뒤_도착한_트램펄린_틈도_트램펄린을_밟아야만_건넌다() -> void:
+	for speed in SPEEDS:
+		var found := _find("tramp", speed)
+		var v := RoofGenerator.arrival_speed(speed)
+		_assert_tramp_needed(found, v)
+		_assert_tramp_crossing(found, v)
+
+
+## speed로 달릴 때: 트램펄린 없이, 또는 뛰어넘어서는 못 건넌다
+func _assert_tramp_needed(found: Dictionary, speed: float) -> void:
+	var crossed_without := 0
+	for r in _sweep(found, speed, false, false, true):
+		crossed_without += 1 if r.crossed else 0
+	assert_eq(crossed_without, 0, "속도 %d: 트램펄린 없이 건너는 조합" % speed)
+	# 트램펄린이 있어도 밟지 않고(뛰어넘음) 건너는 조합은 없다
+	var skipped := 0
+	for r in _sweep(found, speed, true, false, true):
+		skipped += 1 if r.crossed and not r.bounced else 0
+	assert_eq(skipped, 0, "속도 %d: 트램펄린을 뛰어넘고 건넌 조합" % speed)
 
 
 func test_트램펄린을_누르며_밟으면_달려_들어가도_뛰어서_떨어져도_반드시_건넌다() -> void:
 	for speed in SPEEDS:
-		var found := _find("tramp", speed)
-		# 옥상 끝 근처 여러 자리에서 여러 높이로 뛰어 위에 떨어지거나 달려 들어가며, 닿기 바로 전에 누름
-		# (트램펄린 바로 앞에서 길게 누른 손이 닿을 때까지 이어지면 새 누름이 아니라 "early"라 뺀다)
-		var stepped := 0
-		var failed := 0
-		for r in _sweep(found, speed, true, true):
-			if r.get("result", "") in ["good", "perfect"]:
-				stepped += 1
-				failed += 0 if r.crossed else 1
-		assert_true(stepped > 20, "속도 %d: 밟은 조합 %d" % [speed, stepped])
-		assert_eq(failed, 0, "속도 %d: 누르며 밟고도 못 건넌 조합 (밟은 %d)" % [speed, failed])
-		# 가장 일찍 튕기는 자리(위에서 내려와 뒷발 끝만 걸침)에서 누름(퍼펙트 아님)으로 튕겨도 건넌다
-		var sim := _sim(found, speed)
-		var tramp: Dictionary = sim.structures[0]
-		var fall := sqrt(2.0 * 60.0 / Balance.GRAVITY)
-		sim.on_ground = false
-		sim.set("_jumped", true)
-		sim.x = tramp.left - Balance.CAT_FOOT_HALF + 2.0 - speed * fall
-		sim.y = tramp.top + 60.0
-		var press_step := roundi((fall - 0.1) / DT)
-		var result := ""
-		for i in int(4.0 / DT):
-			sim.step(DT, i == press_step)
-			if sim.bounced and result == "":
-				result = sim.bounce_result
-			if sim.on_ground or sim.game_over:
-				break
-		assert_eq(result, "good", "속도 %d: 누름" % speed)
-		assert_true(sim.on_ground and is_same(sim.get("_ground_roof"), sim.roofs[-1]), "속도 %d: 가장 일찍 튕겨도 건넘 (x %.0f)" % [speed, sim.x])
+		_assert_tramp_crossing(_find("tramp", speed), speed)
+
+
+## speed로 달릴 때: 누르며 밟으면 달려 들어가도 뛰어서 떨어져도, 가장 일찍 튕겨도 건넌다
+func _assert_tramp_crossing(found: Dictionary, speed: float) -> void:
+	# 옥상 끝 근처 여러 자리에서 여러 높이로 뛰어 위에 떨어지거나 달려 들어가며, 닿기 바로 전에 누름
+	# (트램펄린 바로 앞에서 길게 누른 손이 닿을 때까지 이어지면 새 누름이 아니라 "early"라 뺀다)
+	var stepped := 0
+	var failed := 0
+	for r in _sweep(found, speed, true, true):
+		if r.get("result", "") in ["good", "perfect"]:
+			stepped += 1
+			failed += 0 if r.crossed else 1
+	assert_true(stepped > 20, "속도 %d: 밟은 조합 %d" % [speed, stepped])
+	assert_eq(failed, 0, "속도 %d: 누르며 밟고도 못 건넌 조합 (밟은 %d)" % [speed, failed])
+	# 가장 일찍 튕기는 자리(위에서 내려와 뒷발 끝만 걸침)에서 누름(퍼펙트 아님)으로 튕겨도 건넌다
+	var sim := _sim(found, speed)
+	var tramp: Dictionary = sim.structures[0]
+	var fall := sqrt(2.0 * 60.0 / Balance.GRAVITY)
+	sim.on_ground = false
+	sim.set("_jumped", true)
+	sim.x = tramp.left - Balance.CAT_FOOT_HALF + 2.0 - speed * fall
+	sim.y = tramp.top + 60.0
+	var press_step := roundi((fall - 0.1) / DT)
+	var result := ""
+	for i in int(4.0 / DT):
+		sim.step(DT, i == press_step)
+		if sim.bounced and result == "":
+			result = sim.bounce_result
+		if sim.on_ground or sim.game_over:
+			break
+	assert_eq(result, "good", "속도 %d: 누름" % speed)
+	assert_true(sim.on_ground and is_same(sim.get("_ground_roof"), sim.roofs[-1]), "속도 %d: 가장 일찍 튕겨도 건넘 (x %.0f)" % [speed, sim.x])
 
 
 func test_트램펄린_다음_옥상은_가장_늦게_튕기고_더블점프를_가장_멀리_써도_안_지나친다() -> void:

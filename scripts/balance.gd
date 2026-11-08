@@ -15,9 +15,23 @@ const CAT_SCREEN_X := 340.0
 
 # --- 달리기 ---
 const RUN_SPEED := 430.0  # 처음 속도 (초당 픽셀)
-## 시간이 갈수록 빨라짐: 속도 = RUN_SPEED + SPEED_GAIN x 지난 시간(초), 최대 SPEED_MAX
-const SPEED_GAIN := 1.5
 const SPEED_MAX := 950.0
+## 속도 단계 표 (review/v0.6.0/PLAN.md 4번): [시작 시각(초), 속도, 구간 밀도]. 밀도는 구간 배치(2a-2)에서 쓴다.
+## 단계 11·12는 속도가 그대로라 신호를 내지 않고 밀도만 오른다.
+const SPEED_STAGES := [
+	[0.0, RUN_SPEED, 1.00], [15.0, 490.0, 0.97], [30.0, 550.0, 0.94], [50.0, 610.0, 0.91],
+	[75.0, 670.0, 0.88], [105.0, 730.0, 0.85], [140.0, 790.0, 0.82], [185.0, 850.0, 0.79],
+	[240.0, 900.0, 0.77], [300.0, SPEED_MAX, 0.75], [420.0, SPEED_MAX, 0.70], [540.0, SPEED_MAX, 0.65],
+]
+const SPEED_RAMP_TIME := 1.2  # 단계가 오를 때 다음 속도까지 부드럽게 빨라지는 시간 (초)
+## 단계마다 배경 음악 pitch_scale을 이만큼 올린다 (최대 MUSIC_PITCH_MAX)
+const MUSIC_PITCH_STEP := 0.013
+const MUSIC_PITCH_MAX := 1.12
+## 속도선 진하기: 단계가 오른 직후 1. 그 뒤 SPEED_LINE_STAGE 단계부터 단계에 비례해 옅게 남는다 (단계 10에서 SPEED_LINE_REST_MAX)
+const SPEED_LINE_STAGE := 3
+const SPEED_LINE_REST_MIN := 0.12
+const SPEED_LINE_REST_MAX := 0.3
+const SPEED_LINE_FADE := 0.3  # 진한 속도선이 끝에서 옅어지는 시간 (SPEED_RAMP_TIME 안, 초)
 
 # --- 점수 ---
 const PX_PER_METER := 100.0  # 거리 점수: 100픽셀 = 1미터

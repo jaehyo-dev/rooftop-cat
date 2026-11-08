@@ -2,7 +2,7 @@ extends TestCase
 ## 옥상 생성: 간격이 항상 넘을 수 있는 범위 안인지 (속도별), 시드 고정.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
-const SPEEDS := [250.0, Balance.RUN_SPEED, 700.0, 1000.0]
+var SPEEDS := stage_speeds()
 
 
 func test_같은_시드면_같은_옥상() -> void:
@@ -27,8 +27,8 @@ func test_간격과_높이와_너비가_범위_안() -> void:
 				assert_true(absf(rise) <= Balance.ROOF_TOP_STEP + 0.001, where + " 높이 차")
 				assert_true(roof.top >= Balance.ROOF_TOP_MIN and roof.top <= Balance.ROOF_TOP_MAX, where + " 높이")
 				var width: float = roof.right - roof.left
-				assert_true(width >= RoofGenerator.min_width(speed), where + " 짧은 점프로도 내려앉을 너비")
-				assert_true(width <= maxf(Balance.ROOF_WIDTH_MAX, RoofGenerator.min_width(speed) * 1.5), where + " 최대 너비")
+				assert_true(width >= RoofGenerator.min_width(RoofGenerator.arrival_speed(speed)), where + " 다음 단계 속도로 짧게 뛰어도 내려앉을 너비")
+				assert_true(width <= maxf(Balance.ROOF_WIDTH_MAX, RoofGenerator.min_width(RoofGenerator.arrival_speed(speed)) * 1.5), where + " 최대 너비")
 				if not failures.is_empty():
 					return
 

@@ -79,7 +79,13 @@ def fall() -> np.ndarray:
     return 0.7 * fade(sweep(760.0, 170.0, 0.55), 2.5)
 
 
-SOUNDS = {"jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall}
+def stage_up() -> np.ndarray:
+    """속도 단계 오름: 짧게 올라가는 세 음"""
+    notes = [(587.0, 0.0), (784.0, 0.09), (1175.0, 0.18)]
+    return sum(at(bell(freq, 0.26, 12.0), start, 0.46) for freq, start in notes)
+
+
+SOUNDS = {"jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

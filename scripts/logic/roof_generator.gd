@@ -57,7 +57,7 @@ func _plain_roof(prev: Dictionary, speed: float) -> Dictionary:
 			Balance.ROOF_TOP_MIN, Balance.ROOF_TOP_MAX)
 	var gap := _rng.randf_range(Balance.ROOF_GAP_MIN, max_gap(speed, top - prev.top))
 	var left: float = prev.right + gap
-	var width_min := min_width(speed)
+	var width_min := min_width(arrival_speed(speed))  # 다음 단계 속도로 톡 뛰어도 지나치지 않게
 	return {"left": left, "right": left + _rng.randf_range(width_min, maxf(Balance.ROOF_WIDTH_MAX, width_min * 1.5)), "top": top}
 
 
@@ -78,9 +78,9 @@ static func gap_safety(speed: float) -> float:
 	return lerpf(Balance.ROOF_GAP_SAFETY_START, Balance.ROOF_GAP_SAFETY, clampf(t, 0.0, 1.0))
 
 
-## 특수 틈을 건너는 데 쓰는 속도: 옥상은 2200픽셀 앞에서 만들어서 도착할 때는 더 빠르다 (못 건넘 기준은 빠른 쪽으로)
+## 옥상에 도착할 때의 속도 = 다음 단계 속도: 옥상은 ROOF_LOOKAHEAD 앞에서 만들고, 그 거리는 많아야 5.1초라 가장 짧은 단계(15초)보다 짧아 한 단계만 넘는다
 static func arrival_speed(speed: float) -> float:
-	return minf(Balance.SPEED_MAX, speed + Balance.SPEED_GAIN * Balance.ROOF_LOOKAHEAD / speed)
+	return SpeedCurve.next_speed(speed)
 
 
 ## 점프 + 더블점프(둘 다 최대, 가장 멀리 가는 때)로도 높이 차 rise의 옥상을 못 건너는 가장 좁은 틈. 옥상 끝에서 마지막으로

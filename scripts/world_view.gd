@@ -115,6 +115,14 @@ const BURST_STAR_REACH := 90.0
 const SFX_VOLUME_DB := -5.0
 const SFX_TRIM_DB := {"land": 4.0}
 const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
+## 속도 단계 신호: 위 가운데 "빨라진다!" 글자와 발바닥 도장 N개 (N = 단계)
+const STAGE_SIGNAL_TIME := 0.8
+const STAGE_TEXT_Y := 84.0
+const STAGE_PAW_Y := 132.0
+const STAGE_PAW_GAP := 40.0
+## 속도선: 오른쪽에서 왼쪽으로 지나가는 뾰족한 선. 진하기(SpeedCurve.line_strength)가 개수와 불투명도를 함께 정한다
+const SPEED_LINE_COUNT := 36
+const SPEED_LINE_COLOR := Color(1, 0.98, 0.93)
 
 var sim := RunnerSim.new(randi())
 var cat := CatView.new()
@@ -618,11 +626,49 @@ func _draw_overlay() -> void:
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
 			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+	if not sim.game_over:
+		_draw_speed_lines()
+		if sim.time_since_stage_rise < STAGE_SIGNAL_TIME:
+			_draw_stage_signal(sim.time_since_stage_rise / STAGE_SIGNAL_TIME)
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
 		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
+
+
+## 속도선: 선마다 높이·길이·빠르기를 번호로 고정해 깜빡이지 않고 흘러가게 한다
+func _draw_speed_lines() -> void:
+	var strength := SpeedCurve.line_strength(sim.stage, sim.time_since_stage_rise)
+	if strength <= 0.0:
+		return
+	var size := get_viewport_rect().size
+	var color := Color(SPEED_LINE_COLOR, 0.35 + 0.6 * strength)
+	for i in ceili(SPEED_LINE_COUNT * strength):
+		var length := 140.0 + 280.0 * fposmod(i * 0.37, 1.0)
+		var flow := (1800.0 + 900.0 * fposmod(i * 0.73, 1.0)) * sim.elapsed + i * 311.0
+		var x := size.x + length - fposmod(flow, size.x + 2.0 * length)
+		var y := size.y * fposmod(i * 0.618, 1.0)
+		var half := 2.0 + 3.0 * fposmod(i * 0.29, 1.0)
+		_overlay.draw_colored_polygon([Vector2(x - length, y), Vector2(x, y - half), Vector2(x, y + half)], color)
+
+
+## 위 가운데 "빨라진다!" + 발바닥 도장 (단계 수만큼). k = 0~1, 끝에서 옅어짐
+func _draw_stage_signal(k: float) -> void:
+	var alpha := 1.0 - smoothstep(0.7, 1.0, k)
+	var center := get_viewport_rect().size.x * 0.5
+	_draw_text(Vector2(center, STAGE_TEXT_Y), "빨라진다!", 52, alpha)
+	for i in sim.stage:
+		_draw_paw(Vector2(center + (i - (sim.stage - 1) * 0.5) * STAGE_PAW_GAP, STAGE_PAW_Y), alpha)
+
+
+## 발바닥 도장: 크림색 테두리 위에 갈색 발바닥 (큰 볼록살 + 발가락 3개)
+func _draw_paw(at: Vector2, alpha: float) -> void:
+	var dots := [[Vector2(0, 5), 10.0], [Vector2(-11, -5), 5.0], [Vector2(0, -10), 5.0], [Vector2(11, -5), 5.0]]
+	for dot in dots:
+		_overlay.draw_circle(at + dot[0], dot[1] + 3.0, Color(HUD_CREAM, alpha))
+	for dot in dots:
+		_overlay.draw_circle(at + dot[0], dot[1], Color(HUD_BROWN, alpha))
 
 
 ## 말풍선 (HUD와 같은 갈색 글자·밝은 테두리, 크림색 바탕)

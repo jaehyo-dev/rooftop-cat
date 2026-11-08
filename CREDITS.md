@@ -79,7 +79,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 
 ## 직접 만든 것
 
-- 효과음 7종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 보잉, 퍼펙트, 떨어짐): 2026-11-08, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음
+- 효과음 8종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름): 2026-11-08, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
 - 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)
 - 검토 캡처 `review/v0.5.0/2b/*.gif`, `*.png`: 게임 화면을 캡처해 만듦 (영상 비교 이미지는 저장소에 넣지 않음)

@@ -36,6 +36,7 @@ var ghosted := false  # 벽에 부딪혀 투명화가 시작됨
 var rescued := false  # 종이상자로 구제가 시작됨
 var bounced := false  # 빨래줄에서 튕김 (결과는 bounce_result)
 var double_jumped := false  # 더블점프를 씀
+var stage_rose := false  # 속도 단계가 올라 빨라지기 시작함
 ## 이번 step에 먹은 아이템들 (먹는 연출용)
 var picked: Array[Dictionary] = []
 
@@ -44,6 +45,10 @@ var y := 0.0
 var vy := 0.0
 var on_ground := true
 var speed := Balance.RUN_SPEED
+## 지금 속도 단계 (1부터, SpeedCurve)
+var stage := 1
+## 단계가 올라 빨라지기 시작한 뒤 지난 시간 (신호 연출용). 오르기 전이면 큰 값
+var time_since_stage_rise := 99.0
 ## false면 속도가 그대로 (속도별 테스트용)
 var accelerate := true
 ## 떨어져서 게임이 끝났는지. 끝나면 step은 아무것도 하지 않는다
@@ -77,7 +82,6 @@ var time_since_double_jump := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
-var _start_speed := Balance.RUN_SPEED
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
 var _ghost_roof := {}       # 투명화로 통과해 올라설 옥상 (부딪힌 벽의 옥상)
@@ -98,10 +102,9 @@ var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
 var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 남은 시간
 
 
-## start_speed: 처음 달리는 속도. 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
+## start_speed: 처음 달리는 속도 (accelerate = false로 속도를 고정하는 테스트용). 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
 func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
 	speed = start_speed
-	_start_speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
@@ -120,12 +123,19 @@ func step(dt: float, pressed: bool) -> void:
 	rescued = false
 	bounced = false
 	double_jumped = false
+	stage_rose = false
 	picked.clear()
 	if game_over:
 		return
 	elapsed += dt
+	time_since_stage_rise += dt
 	if accelerate:
-		speed = SpeedCurve.speed_at(elapsed, _start_speed)
+		speed = SpeedCurve.speed_at(elapsed)
+		var now := SpeedCurve.stage_at(elapsed)
+		if now != stage and SpeedCurve.rises(now):
+			stage_rose = true
+			time_since_stage_rise = 0.0
+		stage = now
 	ghost_time = maxf(0.0, ghost_time - dt)
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed

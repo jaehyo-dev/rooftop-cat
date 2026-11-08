@@ -26,6 +26,22 @@ func test_게임_화면이_달리고_터치하면_점프() -> void:
 	main.queue_free()
 
 
+func test_단계가_오르면_음악이_빨라지고_새_판에서_돌아온다() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	await wait_frames(2)
+	assert_eq(main.get_node("Music").pitch_scale, 1.0, "단계 1")
+	world.sim.elapsed = 31.0
+	await wait_frames(3)
+	assert_eq(world.sim.stage, 3)
+	assert_true(is_equal_approx(main.get_node("Music").pitch_scale, SpeedCurve.music_pitch(3)), "단계 3")
+	world.restart()
+	await wait_frames(2)
+	assert_eq(main.get_node("Music").pitch_scale, 1.0, "새 판은 원래 곡으로")
+	main.queue_free()
+
+
 func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시작() -> void:
 	const PATH := "user://test_main_best.cfg"
 	DirAccess.remove_absolute(PATH)

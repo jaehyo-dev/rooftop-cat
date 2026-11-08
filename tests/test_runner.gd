@@ -9,11 +9,51 @@ func test_누르지_않아도_달리고_시간이_갈수록_빨라진다() -> vo
 	var start := sim.x
 	for i in 120:
 		sim.step(DT, false)
-	# 첫 1초: 처음 속도에서 SPEED_GAIN만큼 빨라지며 달린 거리 (등가속도: 평균 속도 x 1초)
-	var expected := Balance.RUN_SPEED + Balance.SPEED_GAIN * 0.5
-	assert_true(absf(sim.x - start - expected) < 0.5, "1초에 %.1f만큼 (실제 %.1f)" % [expected, sim.x - start])
-	assert_true(absf(sim.speed - SpeedCurve.speed_at(1.0)) < 0.001, "지금 속도는 속도 곡선을 따름")
+	# 첫 1초: 단계 1은 처음 속도 그대로
+	assert_true(absf(sim.x - start - Balance.RUN_SPEED) < 0.5, "1초에 RUN_SPEED만큼 (실제 %.1f)" % (sim.x - start))
 	assert_true(sim.on_ground)
+	# 단계 2가 되면 부드럽게 빨라진다 (옥상을 벗어나지 않게 시간만 앞으로)
+	sim.elapsed = 16.0
+	sim.step(DT, false)
+	assert_true(sim.speed > Balance.RUN_SPEED, "빨라짐")
+	assert_true(absf(sim.speed - SpeedCurve.speed_at(sim.elapsed)) < 0.001, "지금 속도는 속도 곡선을 따름")
+
+
+func test_단계가_오르면_신호가_한_번_켜지고_효과음이_난다() -> void:
+	var sim := RunnerSim.new(1)
+	assert_eq(sim.stage, 1)
+	sim.elapsed = 15.0 - 3.5 * DT
+	var rises := 0
+	for i in 12:
+		sim.step(DT, false)
+		if sim.stage_rose:
+			rises += 1
+			assert_true(SfxEvents.sounds(sim, false).has("stage_up"), "상승 음")
+			assert_eq(sim.time_since_stage_rise, 0.0, "오른 순간")
+			assert_eq(sim.stage, 2)
+		else:
+			assert_false(SfxEvents.sounds(sim, false).has("stage_up"), "오르지 않으면 소리 없음")
+	assert_eq(rises, 1, "한 번만")
+	assert_true(sim.time_since_stage_rise > 0.0 and sim.time_since_stage_rise < 0.1, "그 뒤 지난 시간이 늘어남")
+
+
+func test_속도가_그대로인_단계는_신호가_없다() -> void:
+	var sim := RunnerSim.new(1)
+	sim.elapsed = 420.0 - 2.0 * DT
+	sim.stage = 10
+	for i in 6:
+		sim.step(DT, false)
+		assert_false(sim.stage_rose, "단계 11은 밀도만 오름")
+	assert_eq(sim.stage, 11)
+
+
+func test_속도_고정이면_단계도_그대로() -> void:
+	var sim := RunnerSim.new(1, 700.0)
+	sim.accelerate = false
+	sim.elapsed = 100.0
+	sim.step(DT, false)
+	assert_eq(sim.stage, 1)
+	assert_false(sim.stage_rose)
 
 
 func test_속도_고정이면_일정한_속도로_달린다() -> void:

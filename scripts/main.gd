@@ -10,6 +10,7 @@ const MUSIC := preload("res://assets/audio/mochi_walk.ogg")
 const MUSIC_VOLUME_DB := -5.0  # 곡 자체가 -21.4 LUFS라 -26.4 (효과음 world_view.gd SFX_VOLUME_DB와 맞춤)
 
 var _best := 0
+var _music := AudioStreamPlayer.new()
 
 @onready var _world: Node2D = $World
 
@@ -24,18 +25,21 @@ func _ready() -> void:
 	# 배경 음악: 끝나면 처음부터 반복. 웹에서는 첫 터치·클릭 뒤부터 소리가 난다 (브라우저 규칙)
 	var music_stream: AudioStreamOggVorbis = MUSIC.duplicate()
 	music_stream.loop = true
-	var player := AudioStreamPlayer.new()
-	player.name = "Music"
-	player.stream = music_stream
-	player.volume_db = MUSIC_VOLUME_DB
-	add_child(player)
-	player.play()
+	_music.name = "Music"
+	_music.stream = music_stream
+	_music.volume_db = MUSIC_VOLUME_DB
+	add_child(_music)
+	_music.play()
 
 
 func _process(_delta: float) -> void:
 	$DistanceLabel.text = "%d m" % _world.sim.distance()
 	$FishLabel.text = str(_world.sim.fish)
 	$BoxIcon.visible = _world.sim.has_box
+	# 단계마다 곡이 조금씩 빨라진다 (바뀔 때만 넘겨 웹 오디오를 매 프레임 건드리지 않음)
+	var pitch := SpeedCurve.music_pitch(_world.sim.stage)
+	if not is_equal_approx(_music.pitch_scale, pitch):
+		_music.pitch_scale = pitch
 
 
 func _on_game_over(meters: int) -> void:

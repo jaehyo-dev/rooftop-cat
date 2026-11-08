@@ -33,8 +33,9 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 
 ## play와 같지만 특수 틈 성적도 돌려준다: time, tramp_try/tramp_ok(트램펄린 틈 들어감/건넘), line_try/line_ok(줄 틈), pole_try/pole_ok(전봇대 틈),
 ## touch_try/touch_ok(줄·트램펄린에 닿은 횟수/누름·퍼펙트로 튕긴 횟수), doubles(더블점프 쓴 횟수), death(떨어진 곳: tramp/line/pole/plain).
+## inputs를 주면 step마다 누름 여부를 담는다 (캡처 도구가 같은 판을 다시 재생하는 데 씀).
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
-static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true) -> Dictionary:
+static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = []) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0}
 	var seen := {}         # 이미 센 특수 틈 (다음 옥상 왼쪽 x)
 	var gap_roof := {}     # 지금 건너는 중인 특수 틈의 다음 옥상
@@ -91,6 +92,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		var tap := not tapped and sim.elapsed >= tap_at
 		tapped = tapped or tap  # 이번 닿음에는 한 번만 누른다 (튕기면 다시)
 		sim.step(DT, hold_left > 0.0 or tap)
+		inputs.append(hold_left > 0.0 or tap)
 		hold_left -= DT
 		if sim.bounced:
 			tap_at = INF
@@ -155,7 +157,7 @@ static func _plan(sim: RunnerSim) -> Dictionary:
 		# 전봇대 판: 넓은 틈이라 항상 더블점프. 최대 점프 + 꼭대기 더블점프로 판 가운데에 내려앉는 위치 (너무 앞이면 마지막 순간)
 		var center: float = (next.left + next.right) * 0.5
 		return {"x": minf(center - sim.speed * _apex_double_time(rise), latest), "dj": true}
-	# 지금 속도로 계산 (점프하는 동안 빨라지는 건 아주 조금이라 무시)
+	# 지금 속도로 계산 (점프 중 단계가 오르면 조금 더 멀리 가지만 무시)
 	var reach := sim.speed * JumpModel.max_air_time(rise)
 	var earliest: float = next.left - Balance.CAT_FOOT_HALF - reach + 10.0  # 이보다 일찍 누르면 앞발이 못 걸침
 	if earliest <= latest - 20.0:

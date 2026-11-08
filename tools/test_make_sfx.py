@@ -16,8 +16,8 @@ def end_pitch(sound):
 
 
 class SfxTest(unittest.TestCase):
-    def test_일곱_종류이고_터지지_않으며_짧다(self):
-        self.assertEqual(len(make_sfx.SOUNDS), 7)
+    def test_여덟_종류이고_터지지_않으며_짧다(self):
+        self.assertEqual(len(make_sfx.SOUNDS), 8)
         for name, make in make_sfx.SOUNDS.items():
             sound = make()
             self.assertGreater(np.abs(sound).max(), 0.1, name)

@@ -1,7 +1,7 @@
 extends SceneTree
 ## 밸런스 비교표 출력 (자동 테스트가 아니라 보고용 도구).
 ## 실행: godot --headless --path . -s res://tests/balance_report.gd
-## 시드 1~30, 실력별로 한 판(최대 900초)을 돌려 한 판 길이 가운데값과 특수 틈 성공률을 찍는다.
+## 시드 1~30, 실력별로 한 판(최대 900초)을 돌려 한 판 길이 가운데값, 끝난 단계, 특수 틈 성공률을 찍는다.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
 const SEEDS := 30
@@ -9,8 +9,8 @@ const MAX_TIME := 900.0
 
 
 func _initialize() -> void:
-	print("| 실력 | 가운데값(초) | 하위25% | 상위25% | 트램펄린 틈 성공 | 판 틈 성공 | 트램펄린 닿음 누름·퍼펙트/전체 | 떨어진 곳 |")
-	print("|---|---|---|---|---|---|---|---|")
+	print("| 실력 | 가운데값(초) | 하위25% | 상위25% | 끝난 단계(가운데·하위25%·상위25%) | 트램펄린 틈 성공 | 판 틈 성공 | 트램펄린 닿음 누름·퍼펙트/전체 | 떨어진 곳 |")
+	print("|---|---|---|---|---|---|---|---|---|")
 	for skill_name in BalanceBot.SKILLS:
 		var times: Array[float] = []
 		var total := {}
@@ -24,7 +24,8 @@ func _initialize() -> void:
 			if s.has("death"):
 				deaths[s.death] = deaths.get(s.death, 0) + 1
 		times.sort()
-		print("| %s | %.0f | %.0f | %.0f | %s | %s | %s | %s |" % [skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4],
+		print("| %s | %.0f | %.0f | %.0f | %d·%d·%d | %s | %s | %s | %s |" % [skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4],
+				SpeedCurve.stage_at(times[SEEDS / 2]), SpeedCurve.stage_at(times[SEEDS / 4]), SpeedCurve.stage_at(times[SEEDS * 3 / 4]),
 				_rate(total.tramp_ok, total.tramp_try), _rate(total.pole_ok, total.pole_try),
 				_rate(total.get("touch_ok", 0), total.get("touch_try", 0)), str(deaths)])
 	quit(0)
