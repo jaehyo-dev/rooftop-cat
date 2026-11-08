@@ -65,6 +65,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/structures/trampoline_rest.png`, `trampoline_pressed.png`, `trampoline_launch.png` | 2026-11-08 | 위 원본 | 게임 속 트램펄린 (평소·밟음·튕김) | `tools/cut_parts.py`의 마젠타 지우기로 배경을 지우고 세 그림을 같은 캔버스(432x200)로 잘라 절반(216x100)으로 줄임 → `tools/clean_edges.py` |
 | `review/v0.4.1/mockup_A_extend.png`, `mockup_B_alley.png`, `mockup_C_mist.png` | 2026-11-08 | Codex 내장 이미지 생성 (v0.4.0 캡처와 주택가 시안을 `--image`로 첨부) | v0.4.1 화면 아래 시안 A·B·C (검토용, 게임에 포함 안 됨) | 없음 |
 | `assets/raw/cat_frames_flip.png` → `assets/sprites/cat_frames/flip_tuck.png`, `flip_curl.png`, `flip_ball.png`, `flip_open.png` | 2026-11-08 | Codex 내장 이미지 생성 (기준 그림·웅크림·도약 프레임을 `--image`로 첨부) | 앞구르기 공중제비 4자세 (v0.5.0 2b) | 마젠타 제거, 자르기, 크기·기준점 정렬 |
+| `review/v0.6.0/sheets/obstacles*.png`, `items_hearts.png`, `review/v0.6.0/cut/` | 2026-11-08 | Codex 내장 이미지 생성 (요청문: ASSET_PROMPTS.md) | v0.6.0 장애물·아이템·하트 시안 (게임에 포함 안 됨) | `cut/`은 마젠타 배경을 지우고 잘라 냄 (`tools/cut_parts.py`) |
+| `review/v0.6.0/mockup_*.png` | 2026-11-08 | v0.5.0 게임 캡처 + 위 시안 + 기존 고양이·생선 그림 | 30초 장면 시안 (게임에 포함 안 됨) | `make_mockups.py`로 합성, 글자는 Gaegu Bold |
 
 ## 검토용 음악 후보 (게임에 포함되지 않음, v0.5.0 2b)
 
