@@ -2,13 +2,16 @@ import sys
 import unittest
 from pathlib import Path
 
-import numpy as np
-from PIL import Image
-
 sys.path.insert(0, str(Path(__file__).parent))
-from make_obstacle_art import soften
+try:
+    import numpy as np
+    from PIL import Image
+    from make_obstacle_art import soften
+except ImportError:
+    np = None  # 개발용 도구라 CI에는 numpy·Pillow·scipy가 없다
 
 
+@unittest.skipIf(np is None, "numpy, Pillow, scipy가 없으면 건너뜀")
 class SoftenTest(unittest.TestCase):
     def test_채도만_55퍼센트로_줄고_알파는_그대로(self):
         image = Image.new("RGBA", (4, 4), (200, 100, 50, 77))
