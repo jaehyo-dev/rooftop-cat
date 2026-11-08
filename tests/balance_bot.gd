@@ -8,6 +8,8 @@ extends RefCounted
 ## 특수 틈: 트램펄린 틈은 뛰지 않고 달려 들어가, 닿는 순간 + timing 실수에 톡 누른다 (판정 창 밖이면 실패해 떨어짐.
 ##   실패 뒤 남은 더블점프로 살리려 하지는 않음). 빨래줄 틈(은퇴, 켜면)은 옥상 끝에서 마지막에 최대로 뛰어 줄 위에 내리고 같은 방식으로 누른다.
 ##   전봇대 틈은 판 가운데로 뛰어 올라선 뒤 판에서 다음 옥상으로 뛴다. 착지할 때마다 다시 계획한다.
+## 장애물(v0.6.0): 서 있는 옥상의 다음 장애물을 보고 그 종류에 가장 넓은 창이 나오는 동작(톡·중간·길게, 물탱크는 더블)을 골라 창 가운데에서 누른다.
+##   비둘기가 함께 있으면 낮게(톡). 비둘기만 있으면 그대로 달린다. 맞아도 계속 달린다.
 ## 실력(skill)은 두 가지 실수로 나타낸다 (시드로 고정된 무작위 값):
 ## - timing: 누르는 순간이 어긋나는 정도 (초, 표준편차). 빠를수록 같은 시간 실수가 더 먼 거리가 된다
 ## - short_hold: 손을 일찍 떼는 정도 (최대로 누를 시간에 대한 비율, 표준편차)
@@ -16,6 +18,8 @@ extends RefCounted
 const DT := 1.0 / 120.0
 ## 줄·트램펄린에 닿는 때를 이만큼 앞에서 보고 누를 때를 정한다 (초)
 const LINE_LOOK := 0.6
+
+static var _jump_cache := {}
 
 ## 실력별 실수 크기. 초보 = 처음 해 보는 사람, 익숙함 = 몇 판 해 본 사람, 숙련 = 많이 해 본 사람
 const SKILLS := {
@@ -36,7 +40,11 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 ## inputs를 주면 step마다 누름 여부를 담는다 (캡처 도구가 같은 판을 다시 재생하는 데 씀).
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
 static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = []) -> Dictionary:
-	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0}
+	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
+			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {}}
+	var seg_roof := {}     # 지금 지나는 구간 옥상 (단계별 통과율)
+	var seg_stage := 0
+	var seg_hearts := 0
 	var seen := {}         # 이미 센 특수 틈 (다음 옥상 왼쪽 x)
 	var gap_roof := {}     # 지금 건너는 중인 특수 틈의 다음 옥상
 	var gap_kind := ""
@@ -62,19 +70,23 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			tapped = false
 		# 트램펄린 뒤 긴 옥상은 내려설 때 다음 옥상이 아직 안 만들어졌을 수 있다: 생길 때까지 계획을 미룬다
 		var next_known := sim.roofs.find(ground) + 1 < sim.roofs.size()
-		if sim.on_ground and not next_known:
+		var unplanned: bool = sim.on_ground and not is_same(ground, planned_roof)
+		var hop := _obstacle_plan(sim, ground) if unplanned else {}
+		if unplanned and not next_known and hop.is_empty():
 			press_x = INF
-		if sim.on_ground and next_known and not is_same(ground, planned_roof):
+		if unplanned and (next_known or not hop.is_empty()):
 			planned_roof = ground
-			var plan := _plan(sim)
+			var plan: Dictionary = hop if not hop.is_empty() else _plan(sim)
 			press_x = plan.x + rng.randfn(0.0, skill.timing) * sim.speed
-			hold = JumpModel.max_hold_time() * clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
-			var needed := _plate_hold(sim, press_x, plan.dj)
-			if needed >= 0.0:
-				hold = minf(hold, needed)  # 판으로 뛸 자리를 이미 지났으면 눌러서 뛰는 시간을 줄여 판 가운데에 맞춘다
+			var keep := clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
+			hold = plan.get("hold", JumpModel.max_hold_time()) * keep
+			if hop.is_empty():
+				var needed := _plate_hold(sim, press_x, plan.dj)
+				if needed >= 0.0:
+					hold = minf(hold, needed)  # 판으로 뛸 자리를 이미 지났으면 눌러서 뛰는 시간을 줄여 판 가운데에 맞춘다
 			# 계획대로 더블점프를 쓰거나, 실수한 점프가 다음 발판에 못 미치면 첫 점프 꼭대기 + timing 실수에 더블점프
 			dj_delay = INF
-			if plan.dj or _falls_short(sim, press_x, hold):
+			if plan.dj or (hop.is_empty() and _falls_short(sim, press_x, hold)):
 				dj_delay = maxf(hold + 2.0 * DT, hold + JumpModel.jump_speed() / Balance.GRAVITY + rng.randfn(0.0, skill.timing))
 			dj_hold = JumpModel.double_max_hold() * clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
 		if sim.x >= press_x:
@@ -102,6 +114,20 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 				stats.touch_ok += 1
 		if sim.double_jumped:
 			stats.doubles += 1
+		if not sim.hit_obstacle.is_empty():
+			stats.hits[sim.hit_obstacle.kind] = stats.hits.get(sim.hit_obstacle.kind, 0) + 1
+		# 구간 옥상 통과율: 옥상 끝까지 하트를 잃지 않고 살아서 지나면 통과
+		if seg_roof.is_empty():
+			var here := sim.roof_at(sim.x)
+			if here.has("segment"):
+				seg_roof = here
+				seg_stage = sim.stage
+				seg_hearts = sim.hearts
+				stats.segment_try[seg_stage] = stats.segment_try.get(seg_stage, 0) + 1
+		elif sim.game_over or sim.x > seg_roof.right:
+			if not sim.game_over and sim.hearts == seg_hearts:
+				stats.segment_ok[seg_stage] = stats.segment_ok.get(seg_stage, 0) + 1
+			seg_roof = {}
 		# 특수 틈 성적
 		if gap_roof.is_empty():
 			for i in sim.roofs.size():
@@ -120,6 +146,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		elif sim.rescued or sim.game_over or sim.x > gap_roof.right:
 			gap_roof = {}
 	stats.time = minf(sim.elapsed, max_time)
+	stats.end = sim.end_reason
 	if sim.game_over:
 		# 어디서 떨어졌는지 (보고용): tramp / line / pole / plain
 		var here := {}
@@ -129,6 +156,72 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 				break
 		stats.death = "tramp" if here.has("tramp") else "line" if here.has("line") else ("pole" if here.get("no_ghost", false) or here.get("platform", false) else "plain")
 	return stats
+
+
+## 서 있는 옥상의 다음 장애물(비둘기 제외)을 넘는 계획 {"x", "hold", "dj"}. 없으면 빈 Dictionary
+static func _obstacle_plan(sim: RunnerSim, ground: Dictionary) -> Dictionary:
+	var next := {}
+	for o in sim.obstacles:
+		if not o.has("k") and o.x >= ground.left and o.x <= ground.right and o.x + o.w > sim.x and (next.is_empty() or o.x < next.x):
+			next = o
+	if next.is_empty():
+		return {}
+	var low := false
+	for o in sim.obstacles:
+		low = low or (o.has("k") and absf(o.x - next.x) < 300.0)
+	var best := _best_jump(next.kind, sim.speed, low)
+	return {"x": next.x - best.lead * sim.speed, "hold": best.hold, "dj": best.dj}
+
+
+## 종류·속도별 가장 넓은 창의 동작 {"lead": 장애물 왼쪽 끝 얼마나 앞에서(초) 누를지, "hold", "dj"} (같은 계산을 되풀이하지 않게 기억)
+static func _best_jump(kind: String, speed: float, low: bool) -> Dictionary:
+	var key := "%s %d %s" % [kind, int(speed / 10.0), low]
+	if _jump_cache.has(key):
+		return _jump_cache[key]
+	var max_hold := JumpModel.max_hold_time()
+	var options: Array = [[max_hold, true]] if kind == "tank" else ([[0.075, false]] if low else [[0.075, false], [0.15, false], [max_hold, false]])
+	var info: Dictionary = Balance.OBSTACLES[kind]
+	var o := {"x": 0.0, "w": info.w, "y0": info.y0, "y1": info.y1}
+	var best := {"lead": 0.0, "hold": max_hold, "dj": kind == "tank", "size": -1}
+	for option: Array in options:
+		var path := _jump_path(option[0], option[1])
+		var run := 0
+		for i in 120:
+			var lead := i / 60.0
+			var safe := true
+			for p: Vector2 in path:
+				safe = safe and not RunnerSim.body_hits(o, (p.x - lead) * speed, p.y)
+			# 내려선 자리가 장애물을 넘어야 한다
+			safe = safe and (path[-1].x - lead) * speed > info.w + Balance.CAT_BODY_SIZE.x * 0.4
+			run = run + 1 if safe else 0
+			if run > best.size:
+				best = {"lead": (i - (run - 1) * 0.5) / 60.0, "hold": option[0], "dj": option[1], "size": run}
+	_jump_cache[key] = best
+	return best
+
+
+## 바닥에서 뛰어 내려올 때까지의 경로 [Vector2(시각, 높이), ...]. dj면 첫 점프 꼭대기에서 더블점프(최대)
+static func _jump_path(hold: float, dj: bool) -> Array:
+	var v := JumpModel.jump_speed()
+	var apex := hold + v / Balance.GRAVITY
+	var double_end := apex + JumpModel.double_max_hold()
+	var path: Array = []
+	var y := 0.0
+	var vy := v
+	var t := 0.0
+	var step := 1.0 / 60.0
+	while y >= 0.0:
+		var used := dj and t >= apex
+		if t < hold or (dj and t >= apex and t < double_end):
+			vy = v
+			y += v * step
+		else:
+			var moved := JumpModel.integrate(y, vy, step, used)
+			y = moved.x
+			vy = moved.y
+		t += step
+		path.append(Vector2(t, y))
+	return path
 
 
 ## 최대 점프 + 첫 점프 꼭대기에서 더블점프(최대)의 체공 시간 (높이 차 rise)

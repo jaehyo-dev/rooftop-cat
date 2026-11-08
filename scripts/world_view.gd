@@ -87,6 +87,36 @@ const TRAMP_SETTLE := 0.5
 ## 세로 배율 (다리 끝 기준): 밟음 = 눌림(1보다 작음), 튕김·출렁임 = 늘어남 폭. [안 누름·이른 누름, 누름, 퍼펙트]
 const TRAMP_PRESS_SY := {"miss": 0.95, "early": 0.95, "good": 0.92, "perfect": 0.84}
 const TRAMP_POP_SY := {"miss": 0.05, "early": 0.05, "good": 0.14, "perfect": 0.28}
+## 장애물 그림 (assets/sprites/obstacles/, 화면 크기는 Balance.OBSTACLES의 art 너비)
+const OBSTACLE_TEXTURES := {"pot": preload("res://assets/sprites/obstacles/pot.png"), "ac": preload("res://assets/sprites/obstacles/ac.png"),
+		"tank": preload("res://assets/sprites/obstacles/tank.png"), "flock": preload("res://assets/sprites/obstacles/flock.png")}
+const OBSTACLE_SHADOW_ALPHA := 0.6
+const OBSTACLE_SHADOW_FLAT := 0.2
+const FLOCK_SHADOW_ALPHA := 0.25  # 비둘기가 옥상에 드리우는 옅은 그림자
+const PROP_CLEAR := 170.0         # 장애물 둘레 이 거리 안의 소품은 그리지 않는다 (겹치면 헷갈림)
+## 장애물이 화면에 들어올 때 위에 떴다 사라지는 "!"
+const ALERT_COLOR := Color("#e0402f")
+const ALERT_TIME := 0.55
+const ALERT_POP := 0.12
+const ALERT_RISE := 24.0
+## 매 판 처음 만나는 종류마다 고양이 위에 띄우는 안내
+const OBSTACLE_HINTS := {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!"}
+const HINT_TIME := 1.1
+## 비둘기가 화면에 들어오기 이만큼 전부터 소리와 오른쪽 끝 깃털 표시 (초)
+const FLOCK_WARN_TIME := 1.0
+## 부딪힌 장애물이 튕겨 나가 사라지는 시간과 움직임
+const KNOCK_TIME := 0.45
+const KNOCK_VX := 260.0
+const KNOCK_VY := 420.0
+const KNOCK_SPIN := 3.5
+## 하트 HUD: 위 가운데 (게임 크기). 오른쪽부터 잃는다. 1개 남으면 두근거림
+const HEART_TEXTURES := {"full": preload("res://assets/sprites/hud/heart_full.png"), "crack": preload("res://assets/sprites/hud/heart_crack.png"),
+		"empty": preload("res://assets/sprites/hud/heart_empty.png")}
+const HEART_SIZE := Vector2(54.0, 46.0)
+const HEART_GAP := 8.0
+const HEART_Y := 12.0
+const HEART_CRACK_TIME := 0.35
+const HEART_PULSE := 0.08
 const FISH_WIDTH := 56.0
 const BOX_WIDTH := 60.0
 const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
@@ -145,6 +175,11 @@ var _overlay := Node2D.new()     # 맨 앞: 빨래줄 안내·결과 글자
 var _cat_lift := 0.0             # 고양이 그림만 올려 그리는 픽셀 (트램펄린, tramp_cat_lift를 부드럽게 따라감)
 var _cam_lift := 0.0             # 세로 카메라: 화면을 아래로 내려 그리는 픽셀 (CameraFollow)
 var _guided: Array[float] = []   # 이번 판에 안내를 보여 준 줄 (왼쪽 x)
+var _alerts := {}                # 장애물 번호 → 화면에 들어온 뒤 지난 시간
+var _cooed := {}                 # 소리를 낸 비둘기 번호
+var _hinted := {}                # 이번 판에 안내를 보여 준 장애물 종류
+var _hint := {}                  # 지금 안내 {"text", "t"}
+var _knocked: Array[Dictionary] = []  # 튕겨 나가는 장애물 {"kind", "x", "y", "t"} (x = 가운데, y = 아래 끝)
 
 
 ## 가운데가 진하고 가장자리로 사라지는 원 (흰색, 그릴 때 색을 입힘)
@@ -203,6 +238,9 @@ func _process(delta: float) -> void:
 			# 구제 끝: 받쳐 준 상자가 고양이 발밑에서 사라진다
 			_pops.append({"kind": "box", "x": sim.x, "y": sim.y, "t": 0.0})
 		_was_rescuing = sim.rescuing
+		if not sim.hit_obstacle.is_empty():
+			var o := sim.hit_obstacle
+			_knocked.append({"kind": o.kind, "x": RunnerSim.obstacle_left(o, sim.x) + o.w * 0.5, "y": o.y0, "t": 0.0})
 		_tap_pending = false
 		pressed = is_pressed()
 		_accumulator -= STEP
@@ -216,6 +254,7 @@ func _process(delta: float) -> void:
 	for burst in _bursts:
 		burst.t += delta
 	_bursts = _bursts.filter(func(burst: Dictionary) -> bool: return burst.t < BURST_TIME)
+	_update_obstacle_signs(delta)
 	# 이번 판 처음 GUIDE_LINES개 줄 틈에만 안내 (닿을 것으로 보이는 순간 그 줄을 셈)
 	var touch := sim.line_touch_eta(GUIDE_TIME)
 	if not touch.is_empty() and not _guided.has(touch.line.left) and _guided.size() < GUIDE_LINES:
@@ -225,6 +264,29 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	_front_mist.queue_redraw()
 	_overlay.queue_redraw()
+
+
+## 화면에 들어오는 장애물의 "!"와 처음 만남 안내, 비둘기 소리, 튕겨 나간 장애물 시간
+func _update_obstacle_signs(delta: float) -> void:
+	var ahead := get_viewport_rect().size.x - Balance.CAT_SCREEN_X
+	for id in _alerts:
+		_alerts[id] += delta
+	for o in sim.obstacles:
+		if not _alerts.has(o.id) and RunnerSim.obstacle_left(o, sim.x) - sim.x <= ahead:
+			_alerts[o.id] = 0.0
+			if not _hinted.has(o.kind):
+				_hinted[o.kind] = true
+				_hint = {"text": OBSTACLE_HINTS[o.kind], "t": 0.0}
+		if o.kind == "flock" and not _cooed.has(o.id) and RunnerSim.flock_eta(o, sim.x, sim.vx(), ahead) <= FLOCK_WARN_TIME:
+			_cooed[o.id] = true
+			_sfx.coo.play()
+	if not _hint.is_empty():
+		_hint.t += delta
+		if _hint.t >= HINT_TIME:
+			_hint = {}
+	for knocked in _knocked:
+		knocked.t += delta
+	_knocked = _knocked.filter(func(k: Dictionary) -> bool: return k.t < KNOCK_TIME)
 
 
 ## 이번 step에 일어난 일의 효과음과 발밑 터짐
@@ -260,6 +322,11 @@ func restart() -> void:
 	_wait_release = true
 	_cam_lift = 0.0
 	_guided.clear()
+	_alerts.clear()
+	_cooed.clear()
+	_hinted.clear()
+	_hint = {}
+	_knocked.clear()
 	_place_cat(0.0)
 	restarted.emit()
 	queue_redraw()
@@ -319,6 +386,11 @@ func _draw() -> void:
 			_draw_tramp(structure, offset, ground)
 		else:
 			_draw_line(structure, offset, ground)
+
+	for o in sim.obstacles:
+		_draw_obstacle(o, offset, ground)
+	for knocked in _knocked:
+		_draw_knocked(knocked, offset, ground)
 
 	# 트램펄린을 밟고 있으면 그림자도 꺼진 그물 위에 (고양이 그림 높이 보정만큼 같이 올림)
 	var riding := sim.is_riding()
@@ -460,9 +532,20 @@ func _draw_building(roof: Dictionary, offset: float, ground: float) -> void:
 		x = next_x
 	draw_texture(style.right, Vector2(roundf(x), top))
 	for prop in look.props:
+		if _near_obstacle(prop.x):
+			continue
 		var tex := BuildingArt.prop_texture(prop.kind)
-		draw_texture(tex, Vector2(prop.x + offset - tex.get_width() * 0.5, top + BuildingArt.PROP_SINK - tex.get_height()))
+		var prop_size: Vector2 = tex.get_size() * BuildingArt.PROP_SCALE
+		draw_texture_rect(tex, Rect2(prop.x + offset - prop_size.x * 0.5, top + BuildingArt.PROP_SINK - prop_size.y, prop_size.x, prop_size.y), false, Color(1, 1, 1, BuildingArt.PROP_ALPHA))
 	_draw_body_mist(left, right, top, ground)  # 벽 너비만 (지붕 턱은 BODY_MIST_FROM보다 위라 상관없음)
+
+
+## 옥상 위 장애물(비둘기 제외) 둘레에 있는 자리인지
+func _near_obstacle(at_x: float) -> bool:
+	for o in sim.obstacles:
+		if not o.has("k") and at_x > o.x - PROP_CLEAR and at_x < o.x + o.w + PROP_CLEAR:
+			return true
+	return false
 
 
 func _look_of(roof: Dictionary) -> Dictionary:
@@ -472,6 +555,49 @@ func _look_of(roof: Dictionary) -> Dictionary:
 		_roof_looks[roof.left] = {"plan": BuildingLayout.plan(roof.left, roof.right, BuildingArt.widths()),
 				"props": BuildingLayout.props(roof.left, roof.right)}
 	return _roof_looks[roof.left]
+
+
+## 장애물 그림 크기 (너비는 Balance, 높이는 그림 비율대로)
+static func _obstacle_size(kind: String) -> Vector2:
+	var tex: Texture2D = OBSTACLE_TEXTURES[kind]
+	var w: float = Balance.OBSTACLES[kind].art.x
+	return Vector2(w, w * tex.get_height() / tex.get_width())
+
+
+## 장애물: 발밑에 진한 접지 그림자, 판정 상자 가운데에 그림. 비둘기는 판정 높이 가운데에 떠 있고 옥상에 옅은 그림자
+func _draw_obstacle(o: Dictionary, offset: float, ground: float) -> void:
+	var center: float = RunnerSim.obstacle_left(o, sim.x) + o.w * 0.5
+	var at := center + offset
+	var art_size := _obstacle_size(o.kind)
+	if at < -art_size.x or at > get_viewport_rect().size.x + art_size.x:
+		return
+	if o.kind == "flock":
+		var below := sim.roof_at(center)
+		if not below.is_empty():
+			_draw_flat_shadow(Vector2(at, ground - below.top + FOOT_SINK), art_size.x, FLOCK_SHADOW_ALPHA)
+		var fly_y: float = ground - (o.y0 + o.y1) * 0.5 + 4.0 * sin(sim.elapsed * 7.0 + o.x)
+		draw_texture_rect(OBSTACLE_TEXTURES.flock, Rect2(at - art_size.x * 0.5, fly_y - art_size.y * 0.5, art_size.x, art_size.y), false)
+		return
+	var feet: float = ground - o.base + FOOT_SINK
+	_draw_flat_shadow(Vector2(at, feet), art_size.x, OBSTACLE_SHADOW_ALPHA)
+	draw_texture_rect(OBSTACLE_TEXTURES[o.kind], Rect2(at - art_size.x * 0.5, feet - art_size.y, art_size.x, art_size.y), false)
+
+
+## 납작한 그림자 (너비 width)
+func _draw_flat_shadow(pos: Vector2, width: float, alpha: float) -> void:
+	draw_set_transform(pos, 0.0, Vector2(1.0, OBSTACLE_SHADOW_FLAT))
+	draw_texture_rect(_shadow_texture, Rect2(-width * 0.6, -width * 0.6, width * 1.2, width * 1.2), false, Color(SHADOW_COLOR, alpha))
+	draw_set_transform(Vector2.ZERO)
+
+
+## 맞은 장애물: 앞·위로 튕기며 돌다 사라진다
+func _draw_knocked(k: Dictionary, offset: float, ground: float) -> void:
+	var u: float = k.t / KNOCK_TIME
+	var art_size := _obstacle_size(k.kind)
+	var pos := Vector2(k.x + offset + KNOCK_VX * k.t, ground - k.y + FOOT_SINK - art_size.y * 0.5 - KNOCK_VY * k.t + 0.5 * Balance.GRAVITY * k.t * k.t)
+	draw_set_transform(pos, KNOCK_SPIN * k.t)
+	draw_texture_rect(OBSTACLE_TEXTURES[k.kind], Rect2(-art_size * 0.5, art_size), false, Color(1, 1, 1, 1.0 - u * u))
+	draw_set_transform(Vector2.ZERO)
 
 
 ## 전봇대: 판 옥상(platform) 위에 판이 오게 그리고 기둥은 화면 아래까지 늘린다 (기둥은 그림일 뿐 판정 없음)
@@ -626,6 +752,8 @@ func _draw_overlay() -> void:
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
 			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+	_draw_obstacle_signs(ground, offset)
+	_draw_hearts()
 	if not sim.game_over:
 		_draw_speed_lines()
 		if sim.time_since_stage_rise < STAGE_SIGNAL_TIME:
@@ -635,6 +763,55 @@ func _draw_overlay() -> void:
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
 		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
+
+
+## 장애물 위 "!", 처음 만남 안내 말풍선, 비둘기가 오기 전 오른쪽 끝 깃털 표시
+func _draw_obstacle_signs(ground: float, offset: float) -> void:
+	var view_w := get_viewport_rect().size.x
+	for o in sim.obstacles:
+		var left: float = RunnerSim.obstacle_left(o, sim.x)
+		if o.kind == "flock" and not sim.game_over:
+			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - Balance.CAT_SCREEN_X)
+			if eta > 0.0 and eta <= FLOCK_WARN_TIME:
+				_draw_feather(Vector2(view_w - 34.0, ground - (o.y0 + o.y1) * 0.5))
+		var t: float = _alerts.get(o.id, ALERT_TIME)
+		if t < ALERT_TIME:
+			var height: float = _obstacle_size(o.kind).y + (o.y0 - o.base)
+			var at := Vector2(minf(left + o.w * 0.5 + offset, view_w - 40.0), maxf(44.0, ground - o.base + FOOT_SINK - height - ALERT_RISE))
+			# 통 떴다가 끝에서 옅어진다
+			var pop := minf(1.0, t / ALERT_POP)
+			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0 - smoothstep(ALERT_TIME * 0.7, ALERT_TIME, t), ALERT_COLOR)
+	if not _hint.is_empty() and not sim.game_over:
+		_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
+
+
+## 깃털 표시: 크림색 테두리 위에 비스듬한 깃털 (코드 도형)
+func _draw_feather(at: Vector2) -> void:
+	var points := PackedVector2Array()
+	for i in 12:
+		var a := TAU * i / 12.0
+		points.append(at + Vector2(cos(a) * 24.0, sin(a) * 10.0).rotated(-0.5))
+	_overlay.draw_colored_polygon(points, HUD_CREAM)
+	_overlay.draw_polyline(points + PackedVector2Array([points[0]]), HUD_BROWN, 3.0, true)
+	_overlay.draw_line(at + Vector2(-30.0, 16.0), at + Vector2(20.0, -10.0), HUD_BROWN, 3.0, true)
+
+
+## 이 자리(왼쪽부터 index, 0부터)의 하트 그림: 오른쪽부터 잃고, 잃은 직후에는 금 간 하트
+static func heart_frame(index: int, hearts: int, since_hit: float) -> String:
+	if index < hearts:
+		return "full"
+	return "crack" if index == hearts and since_hit < HEART_CRACK_TIME else "empty"
+
+
+## 하트 HUD. 1개 남으면 천천히 두근거림 (1초에 1번)
+func _draw_hearts() -> void:
+	var total := Balance.HEARTS_MAX * HEART_SIZE.x + (Balance.HEARTS_MAX - 1) * HEART_GAP
+	var x := (get_viewport_rect().size.x - total) * 0.5
+	for i in Balance.HEARTS_MAX:
+		var k := 1.0 + HEART_PULSE * absf(sin(PI * sim.elapsed)) if sim.hearts == 1 and i == 0 else 1.0
+		var box: Vector2 = HEART_SIZE * k
+		var at := Vector2(x + i * (HEART_SIZE.x + HEART_GAP), HEART_Y) - (box - HEART_SIZE) * 0.5
+		_overlay.draw_texture_rect(HEART_TEXTURES[heart_frame(i, sim.hearts, sim.time_since_hit)], Rect2(at, box), false)
 
 
 ## 속도선: 선마다 높이·길이·빠르기를 번호로 고정해 깜빡이지 않고 흘러가게 한다
@@ -678,15 +855,15 @@ func _draw_bubble(center: Vector2, text: String) -> void:
 	box.border_color = HUD_BROWN
 	box.set_border_width_all(3)
 	box.set_corner_radius_all(16)
-	var w := 118.0
+	var w := maxf(118.0, HUD_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 34).x + 36.0)
 	var h := 50.0
 	_overlay.draw_style_box(box, Rect2(center - Vector2(w, h) * 0.5, Vector2(w, h)))
 	_draw_text(center + Vector2(0.0, 2.0), text, 34, 1.0)
 
 
 ## 가운데 정렬 글자 (center = 글자 가운데)
-func _draw_text(center: Vector2, text: String, size: int, alpha: float) -> void:
+func _draw_text(center: Vector2, text: String, size: int, alpha: float, color: Color = HUD_BROWN) -> void:
 	var width := HUD_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var pos := center + Vector2(-width * 0.5, size * 0.35)
 	_overlay.draw_string_outline(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 8, Color(HUD_CREAM, alpha))
-	_overlay.draw_string(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(HUD_BROWN, alpha))
+	_overlay.draw_string(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(color, alpha))

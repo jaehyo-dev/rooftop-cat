@@ -11,6 +11,10 @@ const FADE := 28.0
 ## 소품이 지붕 턱에 살짝 박히는 깊이 (떠 보이지 않게)
 const PROP_SINK := 3.0
 
+## 소품은 장애물보다 물러나 보이게 작고 옅게 그린다 (채도 55%는 그림에 구워 둠: tools/make_obstacle_art.py, PLAN 1번)
+const PROP_SCALE := 0.8
+const PROP_ALPHA := 0.6
+
 static var _styles: Array = []   # [{"left": Texture, "right": Texture, "mids": [Texture...]}]
 static var _props: Dictionary = {}  # 이름 → Texture
 
@@ -27,7 +31,7 @@ static func _load() -> void:
 			mids.append(load("%s%s_m%d.png" % [dir, name, m]))
 		_styles.append({"left": load("%s%s_l.png" % [dir, name]), "right": load("%s%s_r.png" % [dir, name]), "mids": mids})
 	for kind in BuildingLayout.PROP_WEIGHTS:
-		_props[kind] = load("%sprop_%s.png" % [dir, kind])
+		_props[kind] = load("%sprop_soft_%s.png" % [dir, kind])
 
 
 ## BuildingLayout.plan에 넘길 조각 폭 목록

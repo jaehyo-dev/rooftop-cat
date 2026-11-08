@@ -14,6 +14,11 @@ const BASE_BODY_WIDTH := 711.0
 const FRAME_SCALE := 0.5
 ## 기울기가 목표로 다가가는 빠르기 (클수록 빨리 바뀜)
 const TILT_SMOOTH := 22.0
+## 부딪힌 뒤 비틀거림 (그림만, 속도·판정은 그대로): 최대 각도, 시간(초), 빠르기
+const STAGGER_DEG := 14.0
+const STAGGER_TIME := 0.6
+const STAGGER_RATE := 20.0
+const INVULN_BLINK := 0.08  # 무적 깜빡임 간격 (초)
 
 var frame_name := "run_0"
 var _textures := {}
@@ -73,13 +78,22 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	_remember(sim)
 	# 발끝(원점)을 기준으로 늘이고 줄이고 기울여서 옥상에 붙어 있게 한다 (스프링이 넘쳐도 뒤집히지 않게 하한)
 	scale = _spring.value.max(Vector2(0.5, 0.5)) * art_scale()
-	rotation_degrees = _tilt
+	rotation_degrees = _tilt + stagger(sim.time_since_hit)
 	_sprite.rotation = pose.spin
 	position.y -= pose.bob
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
 	modulate.a = 1.0
 	if sim.ghost_time > 0.0:
 		modulate.a = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
+	elif sim.invuln_time > 0.0:
+		modulate.a = 0.3 if int(sim.invuln_time / INVULN_BLINK) % 2 == 0 else 0.9
+
+
+## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다
+static func stagger(since: float) -> float:
+	if since >= STAGGER_TIME:
+		return 0.0
+	return STAGGER_DEG * sin(since * STAGGER_RATE) * (1.0 - since / STAGGER_TIME)
 
 
 ## 지난 프레임 뒤에 새로 일어난 일(착지, 점프, 웅크림 끝, 더블점프, 그물 실림, 튕김)마다 스프링에 충격을 넣는다

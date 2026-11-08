@@ -1,7 +1,7 @@
 class_name SfxEvents
 ## RunnerSim의 이번 step 결과 → 낼 효과음 이름 (화면·소리와 분리된 순수 계산).
 
-const ALL := ["jump", "double_jump", "land", "fish", "boing", "perfect", "fall", "stage_up"]
+const ALL := ["jump", "double_jump", "land", "fish", "boing", "perfect", "fall", "stage_up", "coo"]
 
 
 ## fall_start: 끝날 떨어짐이 이번에 처음 확정됐는지 (부르는 쪽이 한 번만 true로)

@@ -13,6 +13,11 @@ func _init(seed_value: int) -> void:
 	_roofs_until_box = _rng.randi_range(Balance.BOX_EVERY_MIN, Balance.BOX_EVERY_MAX)
 
 
+## 손으로 짠 구간 옥상도 상자 간격에 센다 (상자는 다음 쉼 옥상에 놓인다)
+func skip_roofs(count: int) -> void:
+	_roofs_until_box -= count
+
+
 ## prev 다음에 roof가 생겼을 때 놓을 아이템들 (가로 위치 순서)
 func items_for(prev: Dictionary, roof: Dictionary) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []

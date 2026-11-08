@@ -24,7 +24,7 @@ func test_같은_시드면_같은_아이템() -> void:
 
 
 func test_아이템이_생겨도_같은_시드의_옥상은_그대로() -> void:
-	var sim := RunnerSim.new(3)
+	var sim := RunnerSim.new(3, Balance.RUN_SPEED, false)
 	var gen := RoofGenerator.new(3)
 	assert_true(sim.items.size() > 0, "아이템이 있음")
 	for i in range(1, sim.roofs.size()):

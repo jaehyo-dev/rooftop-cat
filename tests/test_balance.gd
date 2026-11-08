@@ -1,5 +1,5 @@
 extends TestCase
-## 밸런스 봇으로 실력별 한 판 길이를 잰다 (목표는 review/v0.6.0/PLAN.md 8번, 장애물이 들어오는 2a-2에서 다시 맞춘다).
+## 밸런스 봇으로 실력별 한 판 길이를 잰다 (목표는 review/v0.6.0/PLAN.md 8번, 봇은 참고이고 사람이 최종). 익숙함 상한(300초)은 지금 넘고 있어 보고만 한다.
 ## 봇과 실력 수치는 tests/balance_bot.gd. 시드를 고정해 결과가 항상 같다.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
@@ -7,19 +7,29 @@ const SEEDS := 30
 const MAX_TIME := 900.0  # 15분 버티면 그만 잰다
 
 
-func test_실력별_한_판_길이() -> void:
+func test_실력별_한_판_길이와_끝난_이유() -> void:
 	var medians := {}
 	for skill_name in BalanceBot.SKILLS:
 		var times: Array[float] = []
+		var falls := 0
+		var hearts := 0
+		var early := 0
 		for seed_value in SEEDS:
-			times.append(BalanceBot.play(BalanceBot.SKILLS[skill_name], seed_value + 1, MAX_TIME))
+			var s: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS[skill_name], seed_value + 1, MAX_TIME)
+			times.append(s.time)
+			falls += 1 if s.end == "fall" else 0
+			hearts += 1 if s.end == "hearts" else 0
+			early += 1 if s.time < 30.0 else 0
 		times.sort()
 		medians[skill_name] = times[SEEDS / 2]
-		print("    밸런스 봇 %s: 가운데값 %.0f초 (하위 25%% %.0f초, 상위 25%% %.0f초)" % [
-			skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4]])
-	assert_true(medians["초보"] >= 40.0 and medians["초보"] <= 150.0, "초보는 1분 안팎 (%.0f초)" % medians["초보"])
+		print("    밸런스 봇 %s: 가운데값 %.0f초 (하위 25%% %.0f초, 상위 25%% %.0f초), 떨어짐 %d, 하트 0 %d" % [
+			skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4], falls, hearts])
+		if skill_name == "초보":
+			assert_true(early * 10 <= SEEDS, "초보도 첫 30초 안에 끝나는 판은 10%% 이하 (%d판)" % early)
+			assert_true(falls >= SEEDS * 0.5 and falls <= SEEDS * 0.7, "초보: 떨어짐 50~70%% (%d/%d, 나머지는 하트 0)" % [falls, SEEDS])
+	assert_true(medians["초보"] >= 60.0 and medians["초보"] <= 90.0, "초보 목표 60~90초 (%.0f초)" % medians["초보"])
 	assert_true(medians["익숙함"] >= 180.0, "익숙해지면 3분 이상 (%.0f초)" % medians["익숙함"])
-	assert_true(medians["숙련"] >= medians["익숙함"], "잘할수록 오래 버팀")
+	assert_true(medians["숙련"] >= 600.0, "숙련 목표 600초 이상 (%.0f초)" % medians["숙련"])
 
 
 func test_같은_시드면_같은_결과() -> void:

@@ -1,4 +1,4 @@
-"""효과음 7종을 직접 합성해 WAV로 저장한다. 난수를 쓰지 않아 항상 같은 소리가 나온다.
+"""효과음을 직접 합성해 WAV로 저장한다. 난수를 쓰지 않아 항상 같은 소리가 나온다.
 
 사용: python3 tools/make_sfx.py assets/audio/sfx
 개발용 도구 (numpy 필요). 게임은 결과 파일만 쓴다.
@@ -85,7 +85,13 @@ def stage_up() -> np.ndarray:
     return sum(at(bell(freq, 0.26, 12.0), start, 0.46) for freq, start in notes)
 
 
-SOUNDS = {"jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
+def coo() -> np.ndarray:
+    """비둘기 "구구": 낮고 둥근 음 두 번"""
+    one = fade(sweep(330.0, 260.0, 0.16), 6.0)
+    return np.concatenate([one, np.zeros(int(0.05 * RATE)), one]) * 0.6
+
+
+SOUNDS = {"coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

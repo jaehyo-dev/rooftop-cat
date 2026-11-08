@@ -16,6 +16,8 @@ var _rng := RandomNumberGenerator.new()
 var _special_rng := RandomNumberGenerator.new()
 var _pending: Array[Dictionary] = []  # 전봇대 틈에서 판 뒤에 이어질 옥상
 var _made := 0  # 지금까지 만든 일반 옥상 수
+## 새 옥상이 특수 틈이 될 확률 (CoursePlacer가 단계에 맞춰 바꾼다)
+var special_chance := Balance.SPECIAL_GAP_CHANCE
 
 
 func _init(seed_value: int) -> void:
@@ -33,7 +35,7 @@ func next_roof(prev: Dictionary, speed: float) -> Dictionary:
 	if not _pending.is_empty():
 		return _pending.pop_front()
 	var roof := _plain_roof(prev, speed)
-	var wants_special := _special_rng.randf() < Balance.SPECIAL_GAP_CHANCE
+	var wants_special := _special_rng.randf() < special_chance
 	var is_line := _special_rng.randf() < Balance.LINE_SHARE
 	var t := _special_rng.randf()
 	_made += 1
@@ -49,6 +51,11 @@ func next_roof(prev: Dictionary, speed: float) -> Dictionary:
 		if not special.is_empty():
 			return special
 	return roof
+
+
+## 전봇대 틈에서 판 뒤에 이어질 옥상이 남아 있는지
+func has_pending() -> bool:
+	return not _pending.is_empty()
 
 
 ## 일반 옥상 (특수 틈이 아닐 때)

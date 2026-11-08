@@ -25,6 +25,8 @@ extends RefCounted
 ##   달려 들어가 몸 가운데가 run_in_x를 지나거나 위에서 내려와 발이 걸치면 닿음. 닿기 LINE_BLOCK_EARLY 안의 땅 위 누름은 점프가 아니라
 ##   트램펄린 누름으로 남긴다. 누름·퍼펙트는 앞으로 발사(가로 속도 tramp.good_vx·perfect_vx, 내려설 때까지), 안 누름·이른 누름은
 ##   제자리에서 낮게 튀고(가로 속도 그대로) 다시 받아 주지 않는다.
+## 장애물(obstacles, CoursePlacer): 몸 타원의 Balance.OBSTACLE_HIT_SCALE배로 판정. 부딪히면 하트 -1 + 무적(invuln_time), 속도는 그대로.
+##   하트 0이면 게임 끝. 투명화·무적·구제 중에는 맞지 않는다. 비둘기 위치는 시간이 아니라 고양이 x의 함수다 (obstacle_left).
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
 ## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
 
@@ -37,6 +39,8 @@ var rescued := false  # 종이상자로 구제가 시작됨
 var bounced := false  # 빨래줄에서 튕김 (결과는 bounce_result)
 var double_jumped := false  # 더블점프를 씀
 var stage_rose := false  # 속도 단계가 올라 빨라지기 시작함
+## 이번 step에 부딪힌 장애물 (튕겨 나가는 연출용). 없으면 빈 Dictionary
+var hit_obstacle := {}
 ## 이번 step에 먹은 아이템들 (먹는 연출용)
 var picked: Array[Dictionary] = []
 
@@ -53,6 +57,8 @@ var time_since_stage_rise := 99.0
 var accelerate := true
 ## 떨어져서 게임이 끝났는지. 끝나면 step은 아무것도 하지 않는다
 var game_over := false
+## 끝난 이유: "fall"(떨어짐), "hearts"(하트 0). 끝나기 전에는 빈 글자
+var end_reason := ""
 ## 달린 시간 (초)
 var elapsed := 0.0
 var roofs: Array[Dictionary] = []
@@ -60,6 +66,14 @@ var roofs: Array[Dictionary] = []
 var structures: Array[Dictionary] = []
 ## 아직 먹지 않은 아이템 (ItemPlacer 형식). 먹거나 지나간 아이템은 지운다
 var items: Array[Dictionary] = []
+## 아직 지나가지 않은 장애물 (CoursePlacer 형식). 부딪히거나 지나간 것은 지운다
+var obstacles: Array[Dictionary] = []
+## 남은 하트 (저장하지 않음, 판마다 Balance.HEARTS_MAX)
+var hearts := Balance.HEARTS_MAX
+## 부딪힌 뒤 무적 남은 시간
+var invuln_time := 0.0
+## 마지막으로 부딪힌 뒤 지난 시간 (비틀거림·금 간 하트 연출용). 부딪히기 전이면 큰 값
+var time_since_hit := 99.0
 ## 이번 판에 먹은 생선 수
 var fish := 0
 ## 종이상자를 가지고 있는지 (한 번에 1개만)
@@ -82,6 +96,7 @@ var time_since_double_jump := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
+var _course: CoursePlacer  # 손으로 짠 구간 배치. null이면 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
 var _ghost_roof := {}       # 투명화로 통과해 올라설 옥상 (부딪힌 벽의 옥상)
@@ -103,10 +118,13 @@ var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 �
 
 
 ## start_speed: 처음 달리는 속도 (accelerate = false로 속도를 고정하는 테스트용). 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
-func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED) -> void:
+## use_course: false면 구간 없이 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
+func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: bool = true) -> void:
 	speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
+	if use_course:
+		_course = CoursePlacer.new(_generator, seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
 	_ground_roof = roofs[0]
 	y = roofs[0].top
@@ -124,6 +142,7 @@ func step(dt: float, pressed: bool) -> void:
 	bounced = false
 	double_jumped = false
 	stage_rose = false
+	hit_obstacle = {}
 	picked.clear()
 	if game_over:
 		return
@@ -137,6 +156,8 @@ func step(dt: float, pressed: bool) -> void:
 			time_since_stage_rise = 0.0
 		stage = now
 	ghost_time = maxf(0.0, ghost_time - dt)
+	invuln_time = maxf(0.0, invuln_time - dt)
+	time_since_hit += dt
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
 	time_since_land += dt
@@ -148,6 +169,9 @@ func step(dt: float, pressed: bool) -> void:
 	_move_forward(vx() * dt)
 	_fill_roofs()
 	_pick_items()
+	_hit_obstacles()
+	if game_over:
+		return
 
 	if rescuing:
 		_rescue_rise(dt)
@@ -225,6 +249,7 @@ func step(dt: float, pressed: bool) -> void:
 	elif y < Balance.FALL_LIMIT:
 		fell = true
 		game_over = true
+		end_reason = "fall"
 
 
 ## 가로 위치 at_x 아래에 있는 옥상. 없으면 빈 Dictionary
@@ -370,6 +395,44 @@ func _pick_items() -> void:
 			has_box = true
 		picked.append(item)
 		items.remove_at(i)
+
+
+## 부딪힌 장애물의 하트를 깎는다 (땅 위·탑승·떠오름에서 step이 일찍 끝나므로 아이템 판정 옆에서 본다)
+func _hit_obstacles() -> void:
+	var safe := rescuing or ghost_time > 0.0 or invuln_time > 0.0
+	for i in range(obstacles.size() - 1, -1, -1):
+		var o := obstacles[i]
+		if obstacle_left(o, x) + o.w < x - 1000.0:
+			obstacles.remove_at(i)  # 지나간 장애물
+		elif not safe and body_hits(o, x, y):
+			safe = true  # 한 step에 하트 하나만
+			hit_obstacle = o
+			obstacles.remove_at(i)
+			hearts -= 1
+			invuln_time = Balance.INVULN_TIME
+			time_since_hit = 0.0
+			if hearts <= 0:
+				game_over = true
+				end_reason = "hearts"
+
+
+## 장애물 판정 왼쪽 끝. 비둘기는 고양이 x의 함수라 시간·속도가 달라도 고양이 가운데가 o.x에 올 때 항상 그 자리에서 만난다
+static func obstacle_left(o: Dictionary, cat_x: float) -> float:
+	return o.x - o.get("k", 0.0) * (cat_x - o.x)
+
+
+## 비둘기가 앞으로 ahead픽셀 안(화면 오른쪽 끝)에 들어올 때까지 남은 시간 (달리는 속도 run_vx)
+static func flock_eta(o: Dictionary, cat_x: float, run_vx: float, ahead: float) -> float:
+	return (obstacle_left(o, cat_x) - cat_x - ahead) / (run_vx * (1.0 + o.k))
+
+
+## 고양이(가운데 cat_x, 발끝 feet)의 작은 타원이 장애물 상자에 닿는지
+static func body_hits(o: Dictionary, cat_x: float, feet: float) -> bool:
+	var left := obstacle_left(o, cat_x)
+	var center_y := feet + Balance.CAT_BODY_SIZE.y * 0.5
+	var near := Vector2(clampf(cat_x, left, left + o.w), clampf(center_y, o.y0, o.y1))
+	var radius := Balance.CAT_BODY_SIZE * 0.5 * Balance.OBSTACLE_HIT_SCALE
+	return ((near - Vector2(cat_x, center_y)) / radius).length_squared() < 1.0
 
 
 ## 발 범위가 옥상에 걸쳐 있는지
@@ -590,8 +653,13 @@ func _land_on(roof: Dictionary) -> void:
 ## 고양이 앞쪽까지 옥상을 만들고, 지나간 옥상은 지운다
 func _fill_roofs() -> void:
 	while roofs[-1].right < x + Balance.ROOF_LOOKAHEAD:
-		var roof := _generator.next_roof(roofs[-1], speed)
-		items.append_array(_placer.items_for(roofs[-1], roof))
+		var roof: Dictionary = _course.next_roof(roofs[-1], speed, stage) if _course else _generator.next_roof(roofs[-1], speed)
+		if roof.has("segment"):
+			items.append_array(roof.seg_items)
+			obstacles.append_array(roof.obs)
+			_placer.skip_roofs(ceili((roof.right - roof.left) / speed / Balance.BOX_ROOF_SECONDS))
+		else:
+			items.append_array(_placer.items_for(roofs[-1], roof))
 		roofs.append(roof)
 		if roof.has("line"):
 			structures.append(roof.line)

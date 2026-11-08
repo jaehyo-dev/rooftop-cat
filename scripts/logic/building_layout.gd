@@ -13,8 +13,8 @@ const TRIES := 16
 ## 소품을 놓을 때 옥상 양 끝에서 비워 두는 거리 (빨래줄 기둥과 겹치지 않게), 소품 사이 최소 거리
 const PROP_EDGE := 110.0
 const PROP_GAP := 190.0
-## 소품 종류와 나올 비중 (난간·화분은 장애물로 보이지 않게 드물게)
-const PROP_WEIGHTS := {"chimney": 3, "tank": 2, "antenna": 3, "plants": 2, "railing": 1, "aircon": 2}
+## 소품 종류와 나올 비중. 장애물과 모양이 겹치는 화분·실외기·물탱크는 뺐다 (PLAN 1번)
+const PROP_WEIGHTS := {"chimney": 3, "antenna": 3, "railing": 1}
 
 
 ## 옥상 [left, right]의 건물 계획. styles = [{"left": 폭, "right": 폭, "mids": [폭...]}, ...] (그림 픽셀)
