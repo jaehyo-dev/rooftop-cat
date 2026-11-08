@@ -75,7 +75,7 @@ def build() -> np.ndarray:
 NOTE_NAMES = {"C": 0, "Db": 1, "D": 2, "Eb": 3, "E": 4, "F": 5, "Gb": 6, "G": 7, "Ab": 8, "A": 9, "Bb": 10, "B": 11}
 # 코드 이름 → (근음 MIDI, 3화음)
 MAJOR, MINOR = (0, 4, 7), (0, 3, 7)
-CHORD_TABLE = {"C": (48, MAJOR), "F": (41, MAJOR), "G": (43, MAJOR), "Am": (45, MINOR), "Dm": (38, MINOR), "Bb": (46 - 12, MAJOR), "Gm": (43, MINOR)}
+CHORD_TABLE = {"C": (48, MAJOR), "F": (41, MAJOR), "G": (43, MAJOR), "Am": (45, MINOR), "Dm": (38, MINOR), "Bb": (34, MAJOR), "Gm": (43, MINOR)}
 # 멜로디: 한 마디 8칸(8분음표), "-"는 쉼 또는 앞 음이 울리는 칸. 무작위 없이 악보 그대로 = 따라 흥얼거릴 수 있게
 SONGS = {
     # 찹쌀떡 산책: 또각또각 걷는 마림바와 손뼉

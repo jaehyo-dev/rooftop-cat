@@ -55,16 +55,16 @@ static func flip_time(sim: RunnerSim) -> float:
 
 
 static func _pose(sim: RunnerSim) -> Dictionary:
-	if sim.is_doomed() or _tramp_flop(sim):
-		# 떨어져서 끝나는 중·트램펄린에서 안 눌러 맥없이 튐: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
-		var wobble := sin(sim.elapsed * TAU * 5.0)
-		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
 	if sim.rescuing:
 		# 종이상자에 실려 올라가는 중: 올라가는 자세로 코를 살짝 든다
 		return {"frame": "rise", "scale": Vector2.ONE, "tilt": -6.0}
 	if sim.is_riding():
 		# 트램펄린·줄을 밟아 눌러 내려가는 중: 웅크려 힘을 모은 모습
 		return {"frame": "crouch", "scale": Vector2(1.08, 0.88), "tilt": 0.0}
+	if sim.is_doomed() or _tramp_flop(sim):
+		# 떨어져서 끝나는 중·트램펄린에서 안 눌러 맥없이 튐: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
+		var wobble := sin(sim.elapsed * TAU * 5.0)
+		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
 	if sim.on_ground:
 		if sim.time_since_land < Balance.CAT_LAND_TIME:
 			# 착지: 앞발부터 닿는 그림 (눌림은 스프링 충격 KICK_LAND)

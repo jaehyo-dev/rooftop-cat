@@ -259,6 +259,9 @@ func test_트램펄린_결과별_자세() -> void:
 	assert_eq(CatPose.pose(sim).frame, "takeoff", "누름도 도약 그림으로 발사")
 	sim.bounce_result = "miss"
 	assert_eq(CatPose.pose(sim).frame, "flail", "안 누르면 허우적")
+	sim.rescuing = true
+	assert_eq(CatPose.pose(sim).frame, "rise", "떨어지다 상자에 구제되면 허우적이 아니라 올라가는 자세")
+	sim.rescuing = false
 	sim.time_since_land = 0.0
 	sim.on_ground = true
 	assert_true(CatPose.pose(sim).frame != "flail", "내려서면 끝")
