@@ -87,7 +87,7 @@ const TRAMP_SETTLE := 0.5
 ## 세로 배율 (다리 끝 기준): 밟음 = 눌림(1보다 작음), 튕김·출렁임 = 늘어남 폭. [안 누름·이른 누름, 누름, 퍼펙트]
 const TRAMP_PRESS_SY := {"miss": 0.95, "early": 0.95, "good": 0.92, "perfect": 0.84}
 const TRAMP_POP_SY := {"miss": 0.05, "early": 0.05, "good": 0.14, "perfect": 0.28}
-## 장애물 그림 (assets/sprites/obstacles/, 화면 크기는 Balance.OBSTACLES의 art 너비)
+## 장애물 그림 (assets/sprites/obstacles/, 화면 너비는 Balance.OBSTACLES의 art_w)
 const OBSTACLE_TEXTURES := {"pot": preload("res://assets/sprites/obstacles/pot.png"), "ac": preload("res://assets/sprites/obstacles/ac.png"),
 		"tank": preload("res://assets/sprites/obstacles/tank.png"), "flock": preload("res://assets/sprites/obstacles/flock.png")}
 const OBSTACLE_SHADOW_ALPHA := 0.6
@@ -560,7 +560,7 @@ func _look_of(roof: Dictionary) -> Dictionary:
 ## 장애물 그림 크기 (너비는 Balance, 높이는 그림 비율대로)
 static func _obstacle_size(kind: String) -> Vector2:
 	var tex: Texture2D = OBSTACLE_TEXTURES[kind]
-	var w: float = Balance.OBSTACLES[kind].art.x
+	var w: float = Balance.OBSTACLES[kind].art_w
 	return Vector2(w, w * tex.get_height() / tex.get_width())
 
 

@@ -111,7 +111,6 @@ func _scene(main: Control, world: Node2D, path: String) -> void:
 	sim.roofs.append({"left": left + 1500.0, "right": left + 3000.0, "top": TOP})
 	sim.obstacles[3].k = 0.0  # 사진에 잘 보이는 자리에 멈춰 둔다
 	sim.x = left + 240.0
-	sim.stage = 3
 	for i in 3:
 		sim.time_since_land = 9.0
 		world.set("_touches", {})

@@ -2,9 +2,10 @@ extends TestCase
 ## 구간 배치(CoursePlacer)와 장애물·하트 판정, 사람 기준 통과 검사 (PLAN 1·2·4·5번).
 
 const Human := preload("res://tests/human_check.gd")
+const BalanceBot := preload("res://tests/balance_bot.gd")
 
 
-## 시드 하나로 옥상을 count개 만든다. stage_of(i)로 단계를 준다 (없으면 단계 stage 고정)
+## 시드 하나로 옥상을 count개 만든다 (단계 stage 고정)
 func _course(seed_value: int, stage: int, count: int) -> Array[Dictionary]:
 	var placer := CoursePlacer.new(RoofGenerator.new(seed_value), seed_value)
 	var roofs: Array[Dictionary] = [RoofGenerator.first_roof(-400.0)]
@@ -73,6 +74,21 @@ func test_섞임_표대로_어려운_구간이_늘고_특수_틈이_쉼_자리�
 	assert_eq(hard_low, 0, "단계 3에는 어려움 없음")
 	assert_true(hard_high > 100, "단계 10은 어려움이 많음 (%d)" % hard_high)
 	assert_true(special > 20, "쉼 자리에 특수 틈이 나옴 (%d)" % special)
+
+
+func test_구간이_있어도_상자가_드물어지지_않는다() -> void:
+	# 실수 없는 봇으로 3분 달리며 나온 상자를 센다 (긴 구간 옥상도 상자 간격에 세는지: ItemPlacer.skip_roofs)
+	for seed_value in 3:
+		var inputs: Array = []
+		BalanceBot.play_stats({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, 180.0, Balance.RUN_SPEED, true, inputs)
+		var sim := RunnerSim.new(seed_value + 1)
+		var boxes := {}
+		for pressed in inputs:
+			sim.step(1.0 / 120.0, pressed)
+			for item in sim.items:
+				if item.kind == "box":
+					boxes[item.x] = true
+		assert_true(boxes.size() >= 2, "시드 %d: 3분에 상자 2개 이상 (%d개)" % [seed_value + 1, boxes.size()])
 
 
 func test_밀도는_입구_여유를_줄이지_않고_뒤만_줄인다() -> void:
