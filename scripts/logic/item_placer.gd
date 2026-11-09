@@ -1,25 +1,20 @@
 class_name ItemPlacer
 extends RefCounted
 ## 새 옥상이 생길 때마다 그 옥상과 앞 틈에 생선·종이상자를 놓는다 (화면과 분리된 로직).
-## 아이템 하나 = {"kind": "fish" 또는 "box", "x": 가로 위치, "y": 아이템 가운데 높이(아래에서 위로)}
+## 아이템 하나 = {"kind": "fish", "box", 또는 ItemSlots의 종류, "x": 가로 위치, "y": 아이템 가운데 높이(아래에서 위로)}
 ## 옥상과 다른 난수를 써서, 아이템이 생겨도 같은 시드의 옥상 모양은 그대로다. 같은 시드면 항상 같은 아이템이 나온다.
 
 var _rng := RandomNumberGenerator.new()
-var _roofs_until_box := 0  # 이만큼 옥상을 더 지나면 종이상자를 놓는다
+var _next_box := 0.0  # 이 시각(초) 뒤 첫 일반 옥상에 종이상자를 놓는다
 
 
 func _init(seed_value: int) -> void:
 	_rng.seed = hash(seed_value) ^ 0x5f3759df
-	_roofs_until_box = _rng.randi_range(Balance.BOX_EVERY_MIN, Balance.BOX_EVERY_MAX)
+	_next_box = _rng.randf_range(Balance.BOX_EVERY_MIN, Balance.BOX_EVERY_MAX)
 
 
-## 손으로 짠 구간 옥상도 상자 간격에 센다 (상자는 다음 쉼 옥상에 놓인다)
-func skip_roofs(count: int) -> void:
-	_roofs_until_box -= count
-
-
-## prev 다음에 roof가 생겼을 때 놓을 아이템들 (가로 위치 순서)
-func items_for(prev: Dictionary, roof: Dictionary) -> Array[Dictionary]:
+## prev 다음에 roof가 생겼을 때 놓을 아이템들 (가로 위치 순서). now = 지금 시각 (상자 간격)
+func items_for(prev: Dictionary, roof: Dictionary, now: float) -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	if _rng.randf() < Balance.FISH_ARC_CHANCE and not roof.has("line") and not roof.has("tramp"):
 		items.append_array(_fish_arc(prev, roof))
@@ -30,9 +25,8 @@ func items_for(prev: Dictionary, roof: Dictionary) -> Array[Dictionary]:
 		items.append_array(tramp_fish(roof.tramp))
 	if roof.get("platform", false):
 		return items  # 전봇대 판: 작아서 생선 줄·상자는 놓지 않음
-	_roofs_until_box -= 1
-	if _roofs_until_box <= 0:
-		_roofs_until_box = _rng.randi_range(Balance.BOX_EVERY_MIN, Balance.BOX_EVERY_MAX)
+	if now >= _next_box:
+		_next_box = now + _rng.randf_range(Balance.BOX_EVERY_MIN, Balance.BOX_EVERY_MAX)
 		# 상자는 옥상 가운데, 달리다 몸에 닿는 높이 (상자가 있는 옥상에는 생선 줄을 놓지 않아 겹치지 않음)
 		items.append({"kind": "box", "x": (roof.left + roof.right) * 0.5, "y": roof.top + Balance.ITEM_LIFT})
 	elif _rng.randf() < Balance.FISH_ROW_CHANCE:

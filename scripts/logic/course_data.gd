@@ -2,7 +2,7 @@ class_name CourseData
 ## 손으로 짠 구간 (설계 10개 + 밸런스로 더한 2개, 설계: review/v0.6.0/PLAN.md 5번, 그림: review/v0.6.0/segments.png).
 ## 길이는 픽셀이 아니라 초: t = 옥상 길이, obs = [종류, 옥상 왼쪽에서 몇 초 뒤], items = [종류, 초, 옥상 위 높이, 개수].
 ## gap = 최대 점프 거리의 비율, rise = 앞 옥상과의 높이 차. min_stage = 나오기 시작하는 속도 단계.
-## "slot"(아이템 자리)과 "gold"(황금 생선)는 2a-3에서 쓴다. 지금은 "fish"만 놓는다.
+## "slot" = 아이템 자리 (무엇이 놓일지는 ItemSlots), "gold" = 황금 생선 (물탱크를 더블로 넘으면 닿음).
 
 const SEGMENTS := {
 	"E1": {"level": 0, "min_stage": 1, "roofs": [

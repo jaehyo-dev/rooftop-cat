@@ -13,7 +13,7 @@ func _make(seed_value: int, count: int) -> Dictionary:
 	var per_roof: Array = [[]]
 	for i in count:
 		var roof := gen.next_roof(roofs[-1], Balance.RUN_SPEED)
-		per_roof.append(placer.items_for(roofs[-1], roof))
+		per_roof.append(placer.items_for(roofs[-1], roof, i * 1.5))
 		roofs.append(roof)
 	return {"roofs": roofs, "items": per_roof}
 
@@ -34,7 +34,7 @@ func test_아이템이_생겨도_같은_시드의_옥상은_그대로() -> void:
 func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있다() -> void:
 	var made := _make(11, 300)
 	var fish := 0
-	var box_roofs: Array[int] = []
+	var box_times: Array[float] = []
 	for i in range(1, made.roofs.size()):
 		var prev: Dictionary = made.roofs[i - 1]
 		var roof: Dictionary = made.roofs[i]
@@ -59,17 +59,14 @@ func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있
 			if item.kind == "fish":
 				fish += 1
 			else:
-				box_roofs.append(i)
+				box_times.append(i * 1.5)
 				assert_true(item.x > roof.left and item.x < roof.right, "상자는 옥상 위")
 	assert_true(fish > 300, "생선이 넉넉함 (%d)" % fish)
-	assert_true(box_roofs.size() >= 300 / Balance.BOX_EVERY_MAX, "상자 %d개" % box_roofs.size())
-	for k in range(1, box_roofs.size()):
-		# 전봇대 판은 상자 간격(옥상 수)에 세지 않는다
-		var gap := 0
-		for j in range(box_roofs[k - 1] + 1, box_roofs[k] + 1):
-			if not made.roofs[j].get("platform", false):
-				gap += 1
-		assert_true(gap >= Balance.BOX_EVERY_MIN and gap <= Balance.BOX_EVERY_MAX, "상자 간격 %d" % gap)
+	assert_true(box_times.size() >= 450.0 / Balance.BOX_EVERY_MAX - 1.0, "상자 %d개" % box_times.size())
+	for k in range(1, box_times.size()):
+		# 시간 기준: 옥상 하나(1.5초)와 전봇대 판 때문에 조금 늦어질 수 있다
+		var gap: float = box_times[k] - box_times[k - 1]
+		assert_true(gap >= Balance.BOX_EVERY_MIN and gap <= Balance.BOX_EVERY_MAX + 6.0, "상자 간격 %.1f초" % gap)
 
 
 ## 시작 옥상 위 앞쪽에 아이템 하나만 둔 sim

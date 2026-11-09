@@ -796,6 +796,8 @@ func test_효과음은_일어난_일에_맞게_난다() -> void:
 	sim.bounced = false
 	sim.picked.assign([{"kind": "fish"}, {"kind": "fish"}])
 	assert_eq(SfxEvents.sounds(sim, false), ["fish"] as Array[String], "한 번만")
+	sim.picked.assign([{"kind": "bell"}])
+	assert_true(SfxEvents.sounds(sim, false).has("bell"), "방울을 먹으면 딸랑")
 	sim.picked.assign([{"kind": "box"}])
 	assert_eq(SfxEvents.sounds(sim, false), [] as Array[String], "상자는 소리 없음")
 

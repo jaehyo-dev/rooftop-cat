@@ -91,7 +91,19 @@ def coo() -> np.ndarray:
     return np.concatenate([one, np.zeros(int(0.05 * RATE)), one]) * 0.6
 
 
-SOUNDS = {"coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
+def pang() -> np.ndarray:
+    """팡: 짧고 빠르게 내려가는 터짐"""
+    t = times(0.2)
+    crack = np.sin(2 * np.pi * 2300.0 * t + 8.0 * np.sin(2 * np.pi * 730.0 * t)) * np.exp(-t * 45.0)
+    return 0.8 * (at(fade(sweep(780.0, 130.0, 0.18), 12.0), 0.0, 0.2) + 0.6 * crack)
+
+
+def jingle() -> np.ndarray:
+    """딸랑: 방울이 두 번 울림"""
+    return 0.7 * sum(at(bell(f, 0.3, 11.0), s, 0.45) for f, s in [(2093.0, 0.0), (2637.0, 0.1)])
+
+
+SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

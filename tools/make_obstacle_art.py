@@ -3,6 +3,7 @@
 사용: python3 tools/make_obstacle_art.py
 - assets/raw/obstacles_noribbon.png (마젠타 시트) → assets/sprites/obstacles/{flock,pot,ac,tank}.png
 - review/v0.6.0/cut/heart_*.png → assets/sprites/hud/heart_{full,crack,empty}.png
+- review/v0.6.0/cut/{churu,gold,yarn,heart_item,can,bell}.png → assets/sprites/items/{snack,gold,yarn,cookie,can,bell}.png (게임 너비의 2배)
 - assets/sprites/buildings/prop_{chimney,antenna,railing}.png → prop_soft_*.png (채도 55%. 크기·불투명도는 게임이 그릴 때 정함, PLAN 1번)
 게임 그림 크기(balance.gd OBSTACLES)의 2배로 저장해 고해상도 휴대폰에서도 흐리지 않게 한다.
 개발용 도구 (numpy, scipy, Pillow 필요).
@@ -13,11 +14,14 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
+from clean_edges import clean
 from cut_parts import remove_magenta
 
 ROOT = Path(__file__).resolve().parent.parent
-OBSTACLE_WIDTH = {"flock": 218, "pot": 84, "ac": 140, "tank": 148}
+OBSTACLE_WIDTH = {"flock": 218, "pot": 84, "ac": 140, "tank": 135}
 HEART_SIZE = (108, 92)
+# 시트 이름 → (게임 파일 이름, 게임 안 너비: world_view.gd ITEM_WIDTHS). 제품 이름을 피해 질주 간식은 snack
+ITEMS = {"churu": ("snack", 62), "gold": ("gold", 96), "yarn": ("yarn", 76), "heart_item": ("cookie", 72), "can": ("can", 76), "bell": ("bell", 70)}
 SOFT_PROPS = ("chimney", "antenna", "railing")
 PROP_SATURATION = 0.55
 
@@ -59,6 +63,10 @@ def main() -> None:
     hud.mkdir(parents=True, exist_ok=True)
     for name in ("full", "crack", "empty"):
         Image.open(ROOT / f"review/v0.6.0/cut/heart_{name}.png").convert("RGBA").resize(HEART_SIZE, Image.LANCZOS).save(hud / f"heart_{name}.png")
+    for cut, (name, width) in ITEMS.items():
+        image = Image.open(ROOT / f"review/v0.6.0/cut/{cut}.png").convert("RGBA")
+        small = image.resize((width * 2, round(image.height * width * 2 / image.width)), Image.LANCZOS)
+        Image.fromarray(clean(np.asarray(small))).save(ROOT / f"assets/sprites/items/{name}.png")  # 줄일 때 생긴 분홍 테두리를 지움
     buildings = ROOT / "assets/sprites/buildings"
     for name in SOFT_PROPS:
         soften(Image.open(buildings / f"prop_{name}.png").convert("RGBA")).save(buildings / f"prop_soft_{name}.png")

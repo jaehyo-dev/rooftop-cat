@@ -28,7 +28,11 @@ extends RefCounted
 ## 장애물(obstacles, CoursePlacer): 몸 타원의 Balance.OBSTACLE_HIT_SCALE배로 판정. 부딪히면 하트 -1 + 무적(invuln_time), 속도는 그대로.
 ##   하트 0이면 게임 끝. 투명화·무적·구제 중에는 맞지 않는다. 비둘기 위치는 시간이 아니라 고양이 x의 함수다 (obstacle_left).
 ## 아이템: 몸에 닿은 생선은 fish에 더하고, 종이상자는 하나만 가진다(has_box). 상자를 가진 채 화면 맨 아래까지
-## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않는다.
+## 떨어지면 상자를 쓰고 가까운 앞 옥상 위로 올라간다(구제). 구제 중에는 벽을 통과하고 입력을 받지 않으며 아이템도 먹지 않는다.
+## 질주(dashing, PLAN 3번): 전용 분기 _dash_step. 입력·벽·트램펄린·전봇대 판을 보지 않고 보이지 않는 발판 위를 달리며 장애물을 부순다.
+##   남은 질주 거리가 앞 생성 범위보다 짧아지면 장애물 없는 착지 옥상을 끼워 넣고, 그 옥상 위에서 끝나 빈 곳에 내려놓는 일이 구조적으로 없다.
+## 털실(magnet_time): 반경 안 생선이 날아옴. 황금 생선: 생선 +GOLD_FISH. 쿠키: 하트 +1. 통조림: 화면 안 장애물이 생선으로 바뀜.
+## 방울(has_bell): 다음 한 번의 부딪힘을 막는다 (하트보다 먼저 쓰임, 하나만 가짐).
 
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
 var jumped := false
@@ -43,6 +47,12 @@ var stage_rose := false  # 속도 단계가 올라 빨라지기 시작함
 var hit_obstacle := {}
 ## 이번 step에 먹은 아이템들 (먹는 연출용)
 var picked: Array[Dictionary] = []
+var dash_started := false
+var dash_ended := false
+var bell_blocked := false  # 방울이 부딪힘을 막음 (막힌 장애물은 hit_obstacle)
+## 이번 step에 질주로 부순 장애물들, 통조림으로 바뀐 장애물들 (x는 그 순간 판정 왼쪽 끝)
+var smashed: Array[Dictionary] = []
+var canned: Array[Dictionary] = []
 
 var x := 0.0
 var y := 0.0
@@ -80,6 +90,15 @@ var fish := 0
 var has_box := false
 ## 종이상자로 구제되어 올라가는 중인지
 var rescuing := false
+## 질주 중인지, 질주 남은 시간 (0이어도 착지 옥상에 닿을 때까지 질주 중)
+var dashing := false
+var dash_time := 0.0
+## 털실 자석 남은 시간
+var magnet_time := 0.0
+## 금빛 방울을 가지고 있는지 (한 번에 1개만)
+var has_bell := false
+## 고양이 앞으로 화면 끝까지 거리 (통조림 범위). 화면 너비에 따라 world_view가 넘겨준다
+var view_ahead := 940.0
 ## 투명화 남은 시간 (0이면 보통 상태)
 var ghost_time := 0.0
 ## 착지한 뒤 지난 시간 (납작해짐 연출용). 착지 전이면 큰 값
@@ -96,6 +115,7 @@ var time_since_double_jump := 99.0
 
 var _generator: RoofGenerator
 var _placer: ItemPlacer
+var slots: ItemSlots  # 아이템 자리에 놓을 것 고르기
 var _course: CoursePlacer  # 손으로 짠 구간 배치. null이면 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
@@ -115,6 +135,11 @@ var _slack_line := {}       # 실패 튕김으로 느슨해진 줄 (이 줄은 �
 var _launch_vx := 0.0       # 트램펄린 발사 가로 속도 (내려설 때까지, 0이면 달리는 속도)
 var _buffer := 0.0          # 공중에서 누른 입력을 남겨 둔 시간
 var _coyote := 0.0          # 옥상 끝을 지난 뒤 점프를 받아 주는 남은 시간
+var _dash_landing := {}     # 질주가 끝날 착지 옥상
+var _dash_land_time := 0.0  # 착지 옥상 위에 들어온 뒤 지난 시간
+var _dash_ease := 0.0       # 질주가 끝난 뒤 속도가 돌아오는 남은 시간
+var _next_target_x := 0.0   # 질주 중 다음 부술 것을 놓을 수 있는 위치
+var _targets_made := 0      # 지금까지 놓은 부술 것 수 (음수 번호, 종류 차례)
 
 
 ## start_speed: 처음 달리는 속도 (accelerate = false로 속도를 고정하는 테스트용). 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
@@ -123,6 +148,7 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: 
 	speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
+	slots = ItemSlots.new(seed_value)
 	if use_course:
 		_course = CoursePlacer.new(_generator, seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
@@ -144,6 +170,11 @@ func step(dt: float, pressed: bool) -> void:
 	stage_rose = false
 	hit_obstacle = {}
 	picked.clear()
+	dash_started = false
+	dash_ended = false
+	bell_blocked = false
+	smashed.clear()
+	canned.clear()
 	if game_over:
 		return
 	elapsed += dt
@@ -157,6 +188,8 @@ func step(dt: float, pressed: bool) -> void:
 		stage = now
 	ghost_time = maxf(0.0, ghost_time - dt)
 	invuln_time = maxf(0.0, invuln_time - dt)
+	magnet_time = maxf(0.0, magnet_time - dt)
+	_dash_ease = maxf(0.0, _dash_ease - dt)
 	time_since_hit += dt
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
@@ -168,9 +201,13 @@ func step(dt: float, pressed: bool) -> void:
 
 	_move_forward(vx() * dt)
 	_fill_roofs()
-	_pick_items()
+	_pick_items(dt)
 	_hit_obstacles()
 	if game_over:
+		return
+
+	if dashing:
+		_dash_step(dt)
 		return
 
 	if rescuing:
@@ -302,9 +339,12 @@ func landing_top() -> float:
 	return 0.0
 
 
-## 지금 앞으로 가는 속도 (트램펄린 발사 중이면 발사 속도)
+## 지금 앞으로 가는 속도 (트램펄린 발사 중이면 발사 속도, 질주 중이면 질주 속도, 질주 직후에는 서서히 돌아옴)
 func vx() -> float:
-	return maxf(speed, _launch_vx)
+	var dash_v := minf(speed * Balance.DASH_MULT, Balance.DASH_MAX_SPEED)
+	if dashing:
+		return dash_v
+	return maxf(maxf(speed, _launch_vx), lerpf(speed, dash_v, _dash_ease / Balance.DASH_EASE))
 
 
 ## 달려 들어갈 때 닿는 자리 (몸 가운데): 그물 가운데쯤
@@ -314,6 +354,8 @@ static func run_in_x(tramp: Dictionary) -> float:
 
 ## 서 있는 옥상 위, 아직 닿지 않은(몸 가운데가 오른쪽 끝 전) 받아 주는 트램펄린. 없으면 빈 Dictionary
 func _tramp_ahead() -> Dictionary:
+	if dashing:
+		return {}
 	for s in structures:
 		if s.kind == "tramp" and not is_same(s, _slack_line) and x <= s.right \
 				and s.left >= _ground_roof.left and s.right <= _ground_roof.right and s.base == _ground_roof.top:
@@ -330,8 +372,8 @@ func front() -> float:
 func _move_forward(distance: float) -> void:
 	var old_front := front()
 	x += distance
-	if rescuing:
-		return  # 구제 중에는 벽을 통과한다
+	if rescuing or dashing:
+		return  # 구제·질주 중에는 벽을 통과한다
 	for roof in roofs:
 		if roof.top > y and roof.left >= old_front - 0.001 and roof.left < front() and not roof.get("platform", false):
 			var near_miss: bool = _jumped and roof.top - y <= Balance.CAT_BODY_SIZE.y
@@ -377,24 +419,144 @@ func _rescue_rise(dt: float) -> void:
 		return
 
 
-## 몸(타원)에 닿은 아이템을 먹는다. 상자를 이미 가지고 있으면 상자는 그대로 둔다
-func _pick_items() -> void:
+## 몸(타원)에 닿은 아이템을 먹는다. 구제 중에는 먹지 않는다. 털실 중에는 반경 안 생선을 끌어당긴다
+func _pick_items(dt: float) -> void:
 	var center_y := y + Balance.CAT_BODY_SIZE.y * 0.5
 	var radius := Balance.CAT_BODY_SIZE * 0.5 + Vector2.ONE * Balance.ITEM_RADIUS
+	var open_can := false
 	for i in range(items.size() - 1, -1, -1):
 		var item := items[i]
 		if item.x < x - 1000.0:
 			items.remove_at(i)  # 지나간 아이템
 			continue
-		var d := Vector2((item.x - x) / radius.x, (item.y - center_y) / radius.y)
-		if d.length_squared() > 1.0 or (item.kind == "box" and has_box):
+		if rescuing:
 			continue
-		if item.kind == "fish":
-			fish += 1
-		else:
-			has_box = true
+		if magnet_time > 0.0 and (item.kind == "fish" or item.kind == "gold"):
+			var at := Vector2(item.x, item.y)
+			if at.distance_to(Vector2(x, center_y)) <= Balance.MAGNET_RADIUS:
+				at = at.move_toward(Vector2(x, center_y), maxf(Balance.MAGNET_SPEED, vx() + 400.0) * dt)  # 질주 중 뒤에 남은 생선도 따라오게
+				item.x = at.x
+				item.y = at.y
+		var d := Vector2((item.x - x) / radius.x, (item.y - center_y) / radius.y)
+		if d.length_squared() > 1.0 or not _can_take(item.kind):
+			continue
+		match item.kind:
+			"fish":
+				fish += 1
+			"gold":
+				fish += Balance.GOLD_FISH
+			"box":
+				has_box = true
+			"bell":
+				has_bell = true
+			"yarn":
+				magnet_time = Balance.MAGNET_TIME
+			"cookie":
+				hearts += 1
+			"can":
+				open_can = true
+			"dash":
+				_start_dash()
 		picked.append(item)
 		items.remove_at(i)
+	if open_can:
+		_open_can()
+
+
+## 이미 가지고 있거나 소용없으면 그대로 둔다
+func _can_take(kind: String) -> bool:
+	match kind:
+		"box":
+			return not has_box
+		"bell":
+			return not has_bell
+		"cookie":
+			return hearts < Balance.HEARTS_MAX
+		"dash":
+			return not dashing
+	return true
+
+
+## 통조림: 화면 안 장애물이 전부 생선으로 바뀐다 (화면 밖은 그대로)
+func _open_can() -> void:
+	for i in range(obstacles.size() - 1, -1, -1):
+		var o := obstacles[i]
+		var left := obstacle_left(o, x)
+		if left > x + view_ahead or left + o.w < x - Balance.CAT_SCREEN_X:
+			continue
+		var was := o.duplicate()
+		was.x = left
+		canned.append(was)
+		obstacles.remove_at(i)
+		for n in Balance.CAN_FISH:
+			items.append({"kind": "fish", "x": left + o.w * 0.5 + (n - 1) * Balance.FISH_SPACING, "y": o.base + Balance.ITEM_LIFT})
+
+
+## 질주 시작: 다른 상태를 전부 지우고 전용 분기로 들어간다
+func _start_dash() -> void:
+	dashing = true
+	dash_started = true
+	dash_time = Balance.DASH_TIME
+	_dash_landing = {}
+	_dash_land_time = 0.0
+	_next_target_x = 0.0
+	on_ground = true  # 그림은 달리기, 일반 착지·떨어짐 코드는 타지 않음
+	vy = 0.0
+	ghost_time = 0.0
+	invuln_time = 0.0
+	_ghost_roof = {}
+	_launch_vx = 0.0
+	_ride_line = {}
+	_held_top = NAN
+	_buffer = 0.0
+	_coyote = 0.0
+	_holding = false
+	_floating = false
+	_jumped = false
+	_double_used = false
+
+
+## 질주 중: 보이지 않는 발판을 따라 달리고, 착지 옥상 위에서 끝낸다 (입력은 보지 않음)
+func _dash_step(dt: float) -> void:
+	_add_dash_target()
+	y = move_toward(y, _dash_floor(), Balance.DASH_RISE_SPEED * dt)
+	dash_time = maxf(0.0, dash_time - dt)
+	if _dash_landing.is_empty() or x - Balance.CAT_FOOT_HALF < _dash_landing.left:
+		return
+	_dash_land_time += dt
+	if dash_time == 0.0 and _dash_land_time >= Balance.DASH_LAND_WAIT:
+		dashing = false
+		dash_ended = true
+		invuln_time = Balance.DASH_END_INVULN
+		_dash_ease = Balance.DASH_EASE
+		_land_on(_dash_landing)
+
+
+## 화면 밖 옥상 위에 부술 것을 하나 놓는다 (질주가 끝나기 전에 닿는 자리만, 착지 옥상은 비워 둠)
+func _add_dash_target() -> void:
+	var at := x + view_ahead + Balance.DASH_TARGET_AHEAD
+	if at < _next_target_x or at > x + dash_time * vx():
+		return
+	var roof := roof_at(at)
+	var kind: String = Balance.DASH_TARGETS[_targets_made % Balance.DASH_TARGETS.size()]
+	var info: Dictionary = Balance.OBSTACLES[kind]
+	if roof.is_empty() or roof.get("platform", false) or is_same(roof, _dash_landing) or at + info.w > roof.right:
+		return
+	_targets_made += 1
+	obstacles.append({"id": -_targets_made, "kind": kind, "x": at, "w": info.w, "y0": roof.top + info.y0, "y1": roof.top + info.y1, "base": roof.top})
+	_next_target_x = at + Balance.DASH_TARGET_GAP * vx()
+
+
+## 보이지 않는 발판 높이: 발밑과 곧 닿을 옥상(판 제외) 중 가장 높은 곳. 틈 위에서 앞 옥상이 아직 멀면 지금 높이 그대로
+func _dash_floor() -> float:
+	var horizon := x + vx() * Balance.DASH_LOOK
+	var top := -INF
+	for roof in roofs:
+		if roof.left > horizon:
+			break
+		if roof.right >= x - Balance.CAT_FOOT_HALF and not roof.get("platform", false):
+			top = maxf(top, roof.top)
+	return top if top > -INF else y
 
 
 ## 부딪힌 장애물의 하트를 깎는다 (땅 위·탑승·떠오름에서 step이 일찍 끝나므로 아이템 판정 옆에서 본다)
@@ -402,14 +564,26 @@ func _hit_obstacles() -> void:
 	var safe := rescuing or ghost_time > 0.0 or invuln_time > 0.0
 	for i in range(obstacles.size() - 1, -1, -1):
 		var o := obstacles[i]
-		if obstacle_left(o, x) + o.w < x - 1000.0:
+		var left := obstacle_left(o, x)
+		if left + o.w < x - 1000.0:
 			obstacles.remove_at(i)  # 지나간 장애물
+		elif dashing:
+			# 높이와 상관없이 몸 앞이 닿으면 부순다 (이미 지나친 것은 그대로)
+			if left <= front() and left + o.w >= x:
+				var was := o.duplicate()
+				was.x = left
+				smashed.append(was)
+				obstacles.remove_at(i)
 		elif not safe and body_hits(o, x, y):
-			safe = true  # 한 step에 하트 하나만
+			safe = true  # 한 step에 하나만
 			hit_obstacle = o
 			obstacles.remove_at(i)
-			hearts -= 1
 			invuln_time = Balance.INVULN_TIME
+			if has_bell:
+				has_bell = false  # 방울이 대신 막는다 (하트 그대로)
+				bell_blocked = true
+				continue
+			hearts -= 1
 			time_since_hit = 0.0
 			if hearts <= 0:
 				game_over = true
@@ -526,6 +700,8 @@ func _surface_eta(within: float, lines_only: bool) -> Dictionary:
 func line_touch_eta(within: float) -> Dictionary:
 	if not _ride_line.is_empty():
 		return {"line": _ride_line, "t": 0.0, "x": x}
+	if dashing:
+		return {}
 	if on_ground:
 		# 달려 들어가는 트램펄린: 몸 가운데가 닿는 자리에 오는 때
 		var tramp := _tramp_ahead()
@@ -650,16 +826,30 @@ func _land_on(roof: Dictionary) -> void:
 	time_since_land = 0.0
 
 
+## 남은 질주 거리가 생성 범위보다 짧아지면 다음 옥상은 장애물 없는 넓은 착지 옥상. 아니면 빈 Dictionary
+func _landing_roof() -> Dictionary:
+	if not dashing or not _dash_landing.is_empty() or _generator.has_pending() or dash_time * vx() >= Balance.ROOF_LOOKAHEAD + Balance.DASH_LAND_EARLY:
+		return {}
+	if _course:
+		_course.drop_queue()
+	var left: float = roofs[-1].right + Balance.ROOF_GAP_MIN
+	_dash_landing = {"left": left, "right": left + vx() * Balance.DASH_LAND_SECONDS, "top": roofs[-1].top}
+	return _dash_landing
+
+
 ## 고양이 앞쪽까지 옥상을 만들고, 지나간 옥상은 지운다
 func _fill_roofs() -> void:
 	while roofs[-1].right < x + Balance.ROOF_LOOKAHEAD:
-		var roof: Dictionary = _course.next_roof(roofs[-1], speed, stage) if _course else _generator.next_roof(roofs[-1], speed)
+		var roof := _landing_roof()
+		if roof.is_empty():
+			roof = _course.next_roof(roofs[-1], speed, stage) if _course else _generator.next_roof(roofs[-1], speed)
 		if roof.has("segment"):
 			items.append_array(roof.seg_items)
 			obstacles.append_array(roof.obs)
-			_placer.skip_roofs(ceili((roof.right - roof.left) / speed / Balance.BOX_ROOF_SECONDS))
+			for slot: Dictionary in roof.slots:
+				items.append_array(slots.fill(slot, elapsed, hearts, has_bell))
 		else:
-			items.append_array(_placer.items_for(roofs[-1], roof))
+			items.append_array(_placer.items_for(roofs[-1], roof, elapsed))
 		roofs.append(roof)
 		if roof.has("line"):
 			structures.append(roof.line)

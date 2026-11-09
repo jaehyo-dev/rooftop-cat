@@ -92,9 +92,10 @@ const FISH_ROW_MAX := 6
 const FISH_ARC_CHANCE := 0.35   # 틈 위에 생선 무지개를 놓을 확률
 ## 생선 무지개 가운데가 양 끝보다 높은 정도. 중간쯤 눌러 뛰어야 닿는다 (최대 점프 높이 JUMP_MAX_HEIGHT보다 낮게)
 const FISH_ARC_HEIGHT := 120.0
-## 종이상자는 옥상 BOX_EVERY_MIN~MAX개마다 하나 (한 번에 1개만 가질 수 있음)
-const BOX_EVERY_MIN := 40
-const BOX_EVERY_MAX := 60
+## 종이상자는 이 시간(초)마다 다음 일반 옥상에 하나 (한 번에 1개만 가질 수 있음).
+## 예전 "옥상 40~60개"를 v0.5.0 평균 옥상 시간 약 1.5초로 어림한 값 (구간이 들어와도 드물어지지 않게 시간으로 셈)
+const BOX_EVERY_MIN := 60.0
+const BOX_EVERY_MAX := 90.0
 ## 종이상자 구제: 발이 이 높이(화면 맨 아래)까지 떨어지면 상자가 받쳐서 가까운 앞 옥상 위로 올려 준다
 const RESCUE_HEIGHT := 0.0
 const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
@@ -173,7 +174,7 @@ const POLE_GAP_SPAN := 100.0
 const OBSTACLES := {
 	"pot": {"w": 48.0, "y0": 0.0, "y1": 38.0, "art_w": 84.0},
 	"ac": {"w": 110.0, "y0": 0.0, "y1": 88.0, "art_w": 140.0},
-	"tank": {"w": 84.0, "y0": 0.0, "y1": 285.0, "art_w": 148.0},
+	"tank": {"w": 84.0, "y0": 0.0, "y1": 260.0, "art_w": 135.0},
 	"flock": {"w": 150.0, "y0": 240.0, "y1": 310.0, "art_w": 218.0},
 }
 ## 장애물에 대해서만 고양이 타원을 이만큼 작게 본다 (그림이 살짝 스쳐도 맞지 않게)
@@ -195,8 +196,40 @@ const SEGMENT_MIX := [
 ]
 ## 물탱크가 있는 구간의 옥상 높이 상한 (탱크 꼭대기까지 세로 카메라 안에)
 const SEGMENT_TANK_TOP_MAX := 240.0
-## 상자 규칙은 옥상 수로 세므로, 긴 구간 옥상은 이 시간(초)마다 옥상 하나로 쳐서 지금 간격을 유지한다 (일반 옥상 하나를 지나는 시간 어림)
-const BOX_ROOF_SECONDS := 1.5
+
+# --- 아이템 (PLAN 3번·12번) ---
+## 질주: 전용 분기 (RunnerSim._dash_step). 지금 속도 x DASH_MULT (상한 DASH_MAX_SPEED)
+const DASH_TIME := 4.0
+const DASH_MULT := 1.5
+const DASH_MAX_SPEED := 1250.0
+## 보이지 않는 발판 높이가 바뀌는 속도와, 앞 옥상을 미리 보는 시간 (높이 차 110을 벽 닿기 전에 오름)
+const DASH_RISE_SPEED := 1200.0
+const DASH_LOOK := 0.2
+## 착지 옥상을 요청하는 때: 남은 질주 거리 < 생성 범위 + 이 값 (옥상 폭만큼 늦어지는 것을 평균으로 맞춤)
+const DASH_LAND_EARLY := 300.0
+## 부술 것: 질주 중 화면 밖 이 거리에 이 시간(초) 간격으로 장애물을 더 놓는다 (구간 장애물만으로는 질주당 2개뿐, 목표 3~8개)
+const DASH_TARGET_AHEAD := 150.0
+const DASH_TARGET_GAP := 0.6
+const DASH_TARGETS := ["pot", "ac", "pot", "tank"]
+## 착지 옥상: 질주 속도로 이 시간 길이, 장애물 없음. 들어온 지 DASH_LAND_WAIT초 뒤 끝나고 DASH_END_INVULN초 무적, 속도는 DASH_EASE초에 걸쳐 원래대로
+const DASH_LAND_SECONDS := 1.5
+const DASH_LAND_WAIT := 0.3
+const DASH_END_INVULN := 1.0
+const DASH_EASE := 0.6
+## 부순 순간 게임 진행을 멈추는 시간과, 그 뒤 다시 멈추지 않는 시간 (질주 중 무적이라 공정성 문제 없음)
+const HITSTOP_TIME := 0.035
+const HITSTOP_GAP := 0.25
+## 털실 자석: 이 시간 동안 반경 안 생선이 날아옴
+const MAGNET_TIME := 8.0
+const MAGNET_RADIUS := 260.0
+const MAGNET_SPEED := 1400.0
+const GOLD_FISH := 20  # 황금 생선 하나 = 생선 수 (거리 점수에는 안 더함)
+const CAN_FISH := 3    # 통조림으로 바뀐 장애물 하나 = 생선 수
+const SLOT_FISH := 3   # 시간이 된 아이템이 없는 자리 = 생선 줄
+## 아이템 자리 우선순위 (앞일수록 먼저): [종류, 처음 나올 수 있는 시각(초), 다음까지 간격 최소, 최대].
+## 쿠키는 하트 2개 이하, 방울은 안 가지고 있을 때만. 첫 질주는 대본(CoursePlacer)이 정한다
+## 통조림·방울·첫 쿠키 시각은 밸런스 봇으로 정함 (하트 회복이 너무 흔하면 하트로 끝나는 판이 사라짐)
+const SLOT_ITEMS := [["cookie", 40.0, 40.0, 40.0], ["dash", INF, 50.0, 70.0], ["can", 60.0, 80.0, 110.0], ["bell", 45.0, 90.0, 120.0], ["yarn", 8.0, 25.0, 35.0]]
 
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)

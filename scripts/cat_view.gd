@@ -19,6 +19,7 @@ const STAGGER_DEG := 14.0
 const STAGGER_TIME := 0.6
 const STAGGER_RATE := 20.0
 const INVULN_BLINK := 0.08  # 무적 깜빡임 간격 (초)
+const DASH_TINT := Color(1.0, 0.86, 0.5)
 
 var frame_name := "run_0"
 var _textures := {}
@@ -40,6 +41,11 @@ func _ready() -> void:
 	_sprite.texture = _textures[frame_name]
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
+
+
+## 이름의 프레임 그림 (질주 잔상용)
+func frame_texture(frame: String) -> Texture2D:
+	return _textures[frame]
 
 
 ## 공중제비 회전축: 발끝(원점)에서 몸 높이의 절반 위 (프레임 픽셀)
@@ -82,8 +88,10 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	_sprite.rotation = pose.spin
 	position.y -= pose.bob
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
-	modulate.a = 1.0
-	if sim.ghost_time > 0.0:
+	modulate = Color.WHITE
+	if sim.dashing:
+		modulate = DASH_TINT.lerp(Color.WHITE, 0.5 + 0.5 * sin(sim.elapsed * 18.0))  # 금빛으로 번쩍임
+	elif sim.ghost_time > 0.0:
 		modulate.a = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
 	elif sim.invuln_time > 0.0:
 		modulate.a = 0.3 if int(sim.invuln_time / INVULN_BLINK) % 2 == 0 else 0.9

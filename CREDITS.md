@@ -67,6 +67,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/cat_frames_flip.png` → `assets/sprites/cat_frames/flip_tuck.png`, `flip_curl.png`, `flip_ball.png`, `flip_open.png` | 2026-11-08 | Codex 내장 이미지 생성 (기준 그림·웅크림·도약 프레임을 `--image`로 첨부) | 앞구르기 공중제비 4자세 (v0.5.0 2b) | 마젠타 제거, 자르기, 크기·기준점 정렬 |
 | `review/v0.6.0/sheets/obstacles*.png`, `items_hearts.png`, `review/v0.6.0/cut/` | 2026-11-08 | Codex 내장 이미지 생성 (요청문: ASSET_PROMPTS.md) | v0.6.0 장애물·아이템·하트 시안 (게임에 포함 안 됨) | `cut/`은 마젠타 배경을 지우고 잘라 냄 (`tools/cut_parts.py`) |
 | `assets/raw/obstacles_noribbon.png` → `assets/sprites/obstacles/*.png` | 2026-11-08 | Codex 내장 이미지 생성 (기존 시안과 소품을 `--image`로 첨부, 요청문: ASSET_PROMPTS.md) | 장애물 4종: 화분 무리, 낡은 실외기, 물탱크 탑, 비둘기 떼 | `tools/make_obstacle_art.py`로 마젠타 배경을 지우고 잘라 게임 크기의 2배로 줄임 |
+| `assets/sprites/items/snack.png`, `gold.png`, `yarn.png`, `cookie.png`, `can.png`, `bell.png` | 2026-11-09 | `review/v0.6.0/sheets/items_hearts.png`에서 잘라 냄 (요청문: ASSET_PROMPTS.md) | v0.6.0 아이템: 짜먹는 간식(질주), 황금 생선, 털실, 하트 쿠키, 통조림, 금빛 방울 | `tools/make_obstacle_art.py`로 게임 크기의 2배로 줄이고 가장자리 분홍 정리 |
 | `assets/sprites/hud/heart_*.png` | 2026-11-08 | `review/v0.6.0/sheets/items_hearts.png`에서 잘라 냄 | 하트 HUD (가득, 금 간, 빈 하트) | 108x92로 줄임 |
 | `assets/sprites/buildings/prop_soft_*.png` | 2026-11-08 | 위 건물 소품 원본 | 물러나 보이는 옥상 소품 (굴뚝, 안테나, 난간) | `tools/make_obstacle_art.py`로 채도 55% |
 | `review/v0.6.0/mockup_*.png` | 2026-11-08 | v0.5.0 게임 캡처 + 위 시안 + 기존 고양이·생선 그림 | 30초 장면 시안 (게임에 포함 안 됨) | `make_mockups.py`로 합성, 글자는 Gaegu Bold |
@@ -82,7 +83,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 
 ## 직접 만든 것
 
-- 효과음 9종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구): 2026-11-08, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음
+- 효과음 11종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑): 2026-11-09, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
 - 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)
 - 검토 캡처 `review/v0.5.0/2b/*.gif`, `*.png`: 게임 화면을 캡처해 만듦 (영상 비교 이미지는 저장소에 넣지 않음)
