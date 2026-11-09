@@ -119,7 +119,7 @@ func test_생선_소리만_작고_겹치지_않으며_황금과_아이템은_그
 	add_child(view)
 	await wait_frames(1)
 	var sfx: Dictionary = view.get("_sfx")
-	assert_eq(sfx.fish.volume_db, sfx.pickup.volume_db - 8.0, "생선만 8dB 작게")
+	assert_eq(sfx.fish.volume_db, sfx.pickup.volume_db - 12.0, "생선만 12dB 작게 (2b: 음이 오르면 더 크게 들려서)")
 	assert_eq(sfx.pickup.volume_db, sfx.bell.volume_db, "아이템은 다른 효과음과 같은 크기")
 	assert_eq(sfx.fish.max_polyphony, 2, "동시에 2개까지")
 	view.queue_free()

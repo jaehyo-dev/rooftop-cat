@@ -82,11 +82,8 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	var meters: int = world.sim.distance()
 	assert_true(meters >= 42, "거리 점수 %d m" % meters)
 	assert_true(main.get_node("GameOver").visible, "게임 끝 화면")
-	assert_true(main.get_node("GameOver/Label").text.contains("%d m" % meters), "이번 거리")
 	var score: int = world.sim.score()
-	var result: String = main.get_node("GameOver/Label").text
-	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보") and result.contains("점수  %d" % score), result)
-	assert_true(result.contains("새 기록"), "첫 기록은 새 기록")
+	assert_false(main.get_node("GameOver/Label").text.contains("점수  %d" % score) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
 	assert_eq(BestRecord.load_best(PATH), meters, "최고 거리 저장")
 	assert_eq(BestRecord.load_best_score(PATH), score, "최고 점수 저장")
 	assert_eq(main.get_node("BestLabel").text, "BEST %d" % score)
@@ -99,8 +96,15 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	await wait_frames(2)
 	assert_true(world.sim.game_over, "기다리는 시간 전에는 다시 시작 안 함")
 
+	# 숫자가 다 차오르면 실제 값과 새 기록
+	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout
+	var result: String = main.get_node("GameOver/Label").text
+	assert_true(result.contains("%d m" % meters), "이번 거리")
+	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보") and result.contains("점수  %d" % score), result)
+	assert_true(result.contains("새 기록"), "첫 기록은 새 기록")
+	assert_true(main.get_node("GameOver/Celebrate") != null, "새 기록 축하 별")
+
 	# 기다린 뒤 누르면 새 판, 누른 손가락으로 점프하지 않음
-	await get_tree().create_timer(Balance.RESTART_DELAY + 0.1).timeout
 	_touch(true)
 	await wait_frames(3)
 	assert_false(world.sim.game_over, "새 판 시작")
@@ -182,6 +186,7 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	await wait_frames(3)
 	assert_true(sim.game_over)
 	assert_false(main.get_node("BoxIcon").visible, "상자 표시 꺼짐")
+	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout  # 결과 숫자가 다 차오를 때까지
 	assert_true(main.get_node("GameOver/Label").text.contains("먹은 생선  %d  (모은 생선 %d)" % [sim.fish, 10 + sim.fish]), main.get_node("GameOver/Label").text)
 	assert_true(main.get_node("ScoreLabel").text == str(sim.score()), "오른쪽 위 점수")
 	assert_eq(BestRecord.load_fish(PATH), 10 + sim.fish, "모은 생선 저장")

@@ -92,10 +92,12 @@ func _run() -> void:
 
 
 ## tests/ 폴더에서 test_*.gd 파일 목록 (이름순)
+## TEST_FILTER 환경 변수가 있으면 파일 이름에 그 글자가 든 파일만 (예: TEST_FILTER=juice bash tests/run_tests.sh)
 func _test_files() -> PackedStringArray:
 	var result: PackedStringArray = []
+	var only := OS.get_environment("TEST_FILTER")  # Godot에서 "".contains는 거짓이라 비었으면 따로 확인
 	for file in DirAccess.get_files_at(TEST_DIR):
-		if file.begins_with("test_") and file.ends_with(".gd") and file != "test_case.gd":
+		if file.begins_with("test_") and file.ends_with(".gd") and file != "test_case.gd" and (only.is_empty() or file.contains(only)):
 			result.append(TEST_DIR.path_join(file))
 	result.sort()
 	return result

@@ -119,8 +119,15 @@ const HEART_TEXTURES := {"full": preload("res://assets/sprites/hud/heart_full.pn
 const HEART_SIZE := Vector2(54.0, 46.0)
 const HEART_GAP := 8.0
 const HEART_Y := 12.0
-const HEART_CRACK_TIME := 0.35
+const HEART_CRACK_TIME := 0.2   # 금 간 하트로 떨리는 시간. 그 뒤 HEART_BREAK_TIME까지 두 쪽으로 깨져 튀어 나감
+const HEART_BREAK_TIME := 0.65
+const HEART_SHAKE := 4.0
 const HEART_PULSE := 0.08
+## 하트 1개: 화면 가장자리가 은은하게 붉어지며 두근거림과 같은 박자로 진해짐
+const DANGER_COLOR := Color("#d8553f")
+const DANGER_WIDTH := 140.0
+const DANGER_ALPHA := 0.2
+const DANGER_PULSE := 0.16
 const RESCUE_BOX_WIDTH := 120.0  # 구제할 때 고양이를 받치는 상자
 const POP_TIME := 0.3            # 먹은 아이템이 떠오르며 사라지는 시간
 ## 빨래줄 "눌러!" 안내: 닿기 GUIDE_TIME초 전부터 줄어드는 동그라미가 닿는 순간 발 크기(GUIDE_PAW)에 딱 맞음
@@ -145,19 +152,29 @@ const BURST_STARS := 6
 const BURST_STAR_REACH := 90.0
 ## 효과음이 음악(-26 LUFS 안팎)보다 5dB쯤 위에 오게 (v0.5.0 2b 마무리, ffmpeg ebur128로 잼). 착지는 원래 작아서 올린다
 const SFX_VOLUME_DB := -5.0
-const SFX_TRIM_DB := {"land": 4.0, "fish": -8.0}
+## 생선은 촘촘하고 음이 오르면 더 크게 들려서 많이 낮춤 (2b: -8 → -12, 전체 -17dB)
+const SFX_TRIM_DB := {"land": 4.0, "fish": -12.0, "combo_up": -7.0, "combo_break": -9.0, "heartbeat": -11.0}
 const FISH_POLYPHONY := 2  # 동시에 나는 생선 소리 수
 const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
 ## 질주 그림: 화면이 멀어지는 배율과 시간, 빛남, 잔상 간격과 개수
 const DASH_ZOOM := 0.92
-const DASH_ZOOM_TIME := 0.3
+const DASH_ZOOM_RATE := 10.0  # 화면 배율이 목표로 다가가는 빠르기 (약 0.3초, 끝에서 부드럽게 멈춤)
 const DASH_GLOW := Color("#ffd166")
-const DASH_GLOW_RADIUS := 130.0
-const TRAIL_GAP := 0.04
-const TRAIL_COUNT := 3
+const DASH_GLOW_RADIUS := 95.0
+const DASH_GLOW_ALPHA := 0.35
+## 잔상: 시간이 아니라 달린 거리마다 남긴다 (시간 간격이면 화면에서 겹쳐 얼룩이 됨). 뒤로 갈수록 옅게, 따뜻한 색
+const TRAIL_SPACING := 70.0
+const TRAIL_ALPHAS := [0.46, 0.32, 0.2, 0.1]
+const TRAIL_TINT := Color(1.0, 0.86, 0.66)
+## 질주 시작 때 속도선이 고양이 높이로 몰리며 길어지는 시간
+const DASH_RUSH_TIME := 0.45
 ## 부순·바뀐 장애물 조각 (동시 상한은 휴대폰 웹 성능, PLAN 7번)
 const SHARD_MAX := 60
 const SHARD_LIFE := 0.5
+## 먹을 때 반짝임: 생선은 작은 별 2개, 황금은 큰 별 8개 + 점수 글자 + 금빛 번쩍임
+const SPARKLE_LIFE := 0.3
+const GOLD_FLASH_TIME := 0.3
+const GOLD_COLOR := Color("#e8a21a")
 const SHARD_COLORS := {"pot": Color("#c9764f"), "ac": Color("#b9c3c6"), "tank": Color("#9db3c2"), "flock": Color("#d9d4cc")}
 ## 떠오르는 효과 글자 ("팡!", "펑!", "딸랑!")
 const POP_TEXT_TIME := 0.5
@@ -168,13 +185,17 @@ const STATUS_Y := 64.0
 const STATUS_ICON := 30.0
 const STATUS_BAR := Vector2(90.0, 10.0)
 ## 속도 단계 신호: 위 가운데 "빨라진다!" 글자와 발바닥 도장 N개 (N = 단계)
-const STAGE_SIGNAL_TIME := 0.8
-const STAGE_TEXT_Y := 84.0
-const STAGE_PAW_Y := 132.0
+const STAGE_SIGNAL_TIME := 1.0  # 2b: 0.8 → 1.0, 글자 52 → 62 (하트 옆에서 작고 빨리 지나가 약했음)
+const STAGE_TEXT_Y := 88.0
+const STAGE_PAW_Y := 142.0
 const STAGE_PAW_GAP := 40.0
 ## 속도선: 오른쪽에서 왼쪽으로 지나가는 뾰족한 선. 진하기(SpeedCurve.line_strength)가 개수와 불투명도를 함께 정한다
 const SPEED_LINE_COUNT := 36
 const SPEED_LINE_COLOR := Color(1, 0.98, 0.93)
+const SPEED_LINE_FISH_GAP := 26.0   # 생선과 이 높이 안에서 겹치는 속도선은 옅게 (휴대폰에서 생선이 가려지지 않게)
+const SPEED_LINE_FISH_DIM := 0.25
+const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어드는 시간
+const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
 var sim := RunnerSim.new(randi())
 var cat := CatView.new()
@@ -207,10 +228,19 @@ var _zoom := 1.0                 # 화면 배율 (질주 중 멀어짐). 왼쪽 
 var _hitstop := 0.0              # 게임 진행을 멈추는 남은 시간
 var _hitstop_gap := 0.0          # 다시 멈추지 않는 남은 시간
 var _trail: Array[Dictionary] = []  # 잔상 {"x", "y", "frame"} (앞이 최신)
-var _trail_wait := 0.0
 var _shards: Array[Dictionary] = []  # 조각·별 {"x", "y", "vx", "vy", "t", "spin", "color", "star"} (로직 좌표)
 var _pop_texts: Array[Dictionary] = []  # 효과 글자 {"text", "x", "y", "t"}
 var _bell_break := 99.0          # 방울이 깨진 뒤 지난 시간
+## 부딪힘 손맛 (Balance.HIT_FEELS 이름). 로컬 플레이 빌드의 버튼(main.gd)이 바꾼다
+var hit_feel: String = Balance.HIT_FEEL_DEFAULT
+## 이 사각형(화면 좌표) 안의 터치는 점프로 치지 않는다 (로컬 손맛 버튼 자리)
+var input_block := Rect2()
+var _shake_since := 99.0         # 화면 흔들림: 시작 뒤 지난 시간, 길이, 세기
+var _shake_time := 0.0
+var _shake_amp := 0.0
+var _rush := 99.0                # 질주 시작 뒤 지난 시간 (속도선 몰림)
+var _gold_flash := 99.0          # 황금 생선 먹은 뒤 지난 시간
+var _beat_at := 0.0              # 심장 박동 박자를 본 마지막 시각 (sim.elapsed)
 
 
 ## 가운데가 진하고 가장자리로 사라지는 원 (흰색, 그릴 때 색을 입힘)
@@ -268,8 +298,9 @@ func _process(delta: float) -> void:
 	# 멈춤 중에는 게임 진행 루프를 건너뛴다 (눌린 입력은 _tap_pending에 남아 멈춤 뒤에 처리됨)
 	_accumulator = 0.0 if _hitstop > 0.0 else minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
+		var combo_before := [sim.combo.count, sim.combo.multiplier()]
 		sim.step(STEP, pressed and not _wait_release)
-		_play_events()
+		_play_events(combo_before)
 		for item in sim.picked:
 			_pops.append({"kind": item.kind, "x": item.x, "y": item.y, "t": 0.0})
 		if _was_rescuing and not sim.rescuing:
@@ -283,12 +314,13 @@ func _process(delta: float) -> void:
 		_tap_pending = false
 		pressed = is_pressed()
 		_accumulator -= STEP
-		if _hitstop > 0.0:
-			_accumulator = 0.0
-			break
+		# 게임 끝을 먼저 알린다: 마지막 하트를 잃은 부딪힘도 멈춤을 걸어 아래 break에 걸리기 때문
 		if sim.game_over:
 			_over_time = 0.0
 			game_over.emit(sim.distance())
+			break
+		if _hitstop > 0.0:
+			_accumulator = 0.0
 			break
 	for pop in _pops:
 		pop.t += delta
@@ -298,6 +330,10 @@ func _process(delta: float) -> void:
 	_bursts = _bursts.filter(func(burst: Dictionary) -> bool: return burst.t < BURST_TIME)
 	_update_obstacle_signs(delta)
 	_update_item_effects(delta)
+	# 하트 1개: 두근거림과 같은 박자로 작은 심장 소리
+	if sim.hearts == 1 and not sim.game_over and Juice.beat_crossed(_beat_at, sim.elapsed):
+		_sfx.heartbeat.play()
+	_beat_at = sim.elapsed
 	# 이번 판 처음 GUIDE_LINES개 줄 틈에만 안내 (닿을 것으로 보이는 순간 그 줄을 셈)
 	var touch := sim.line_touch_eta(GUIDE_TIME)
 	if not touch.is_empty() and not _guided.has(touch.line.left) and _guided.size() < GUIDE_LINES:
@@ -307,6 +343,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	_front_mist.queue_redraw()
 	_overlay.queue_redraw()
+
+
+## 효과음 하나 틀기 (결과 화면 새 기록 등 화면 밖에서 부를 때)
+func play_sfx(sound: String) -> void:
+	_sfx[sound].play()
 
 
 ## 게임이 끝나고 다시 시작할 수 있는 때인지
@@ -342,9 +383,25 @@ func _update_obstacle_signs(delta: float) -> void:
 func _item_effects() -> void:
 	if sim.dash_started:
 		_hint = {}  # 피할 안내는 질주 중에 맞지 않는다
+		_rush = 0.0
+	if not sim.hit_obstacle.is_empty() and not sim.bell_blocked:
+		# 부딪힘: 잠깐 멈칫 + 화면 흔들림 (세기는 고른 손맛)
+		var feel: Array = Balance.HIT_FEELS[hit_feel]
+		_hitstop = feel[0]
+		_hitstop_gap = Balance.HITSTOP_GAP
+		_shake(feel[1], Balance.HIT_SHAKE_TIME)
+	for item in sim.picked:
+		var center := Vector2(item.x, item.y)
+		if item.kind == "fish":
+			_sparkle(center, 2, 10.0, 180.0)
+		elif item.kind == "gold":
+			_sparkle(center, 8, 16.0, 320.0)
+			_gold_flash = 0.0
+			_pop_texts.append({"text": "+%d" % (Balance.GOLD_POINTS * sim.combo.multiplier()), "x": item.x, "y": item.y + 50.0, "t": 0.0, "color": GOLD_COLOR})
 	for o in sim.smashed:
 		_knocked.append({"kind": o.kind, "x": o.x + o.w * 0.5, "y": o.y0, "t": 0.0})
 		_shatter(o, "팡!")
+		_shake(Balance.SMASH_SHAKE, Balance.SMASH_SHAKE_TIME)
 		if _hitstop_gap <= 0.0:
 			_hitstop = Balance.HITSTOP_TIME
 			_hitstop_gap = Balance.HITSTOP_GAP
@@ -353,6 +410,24 @@ func _item_effects() -> void:
 	if sim.bell_blocked:
 		_bell_break = 0.0
 		_pop_texts.append({"text": "딸랑!", "x": sim.x, "y": sim.y + Balance.CAT_BODY_SIZE.y + 40.0, "t": 0.0})
+
+
+## 화면 흔들기 (이미 흔들리는 중이면 남은 세기가 더 센 쪽)
+func _shake(amp: float, time: float) -> void:
+	if Juice.shake_offset(_shake_since, _shake_time, _shake_amp).length() <= amp:
+		_shake_since = 0.0
+		_shake_time = time
+		_shake_amp = amp
+
+
+## 먹은 자리에서 바깥으로 튀는 반짝임 별 (고양이와 같이 앞으로 흘러감). 조각과 같은 상한 SHARD_MAX 안에서만
+func _sparkle(at: Vector2, count: int, size: float, reach: float) -> void:
+	for i in count:
+		if _shards.size() >= SHARD_MAX:
+			return
+		var a := TAU * (i + 0.25) / count - PI * 0.5
+		_shards.append({"x": at.x, "y": at.y, "vx": cos(a) * reach + sim.vx(), "vy": -sin(a) * reach, "t": 0.0, "spin": 5.0,
+				"color": Color.WHITE, "star": true, "size": size, "life": SPARKLE_LIFE})
 
 
 ## 장애물 자리에서 조각 5~8개 + 별 + 글자 (번호로 정해 무작위 없이 항상 같은 모양)
@@ -376,26 +451,29 @@ func _update_item_effects(delta: float) -> void:
 		shard.x += shard.vx * delta
 		shard.y += shard.vy * delta
 		shard.vy -= Balance.GRAVITY * 0.5 * delta
-	_shards = _shards.filter(func(s: Dictionary) -> bool: return s.t < SHARD_LIFE)
+	_shards = _shards.filter(func(s: Dictionary) -> bool: return s.t < s.get("life", SHARD_LIFE))
 	for pop in _pop_texts:
 		pop.t += delta
 	_pop_texts = _pop_texts.filter(func(p: Dictionary) -> bool: return p.t < POP_TEXT_TIME)
 	_bell_break += delta
-	_trail_wait -= delta
+	_shake_since += delta
+	_rush += delta
+	_gold_flash += delta
 	if not sim.dashing:
 		_trail.clear()
-	elif _trail_wait <= 0.0:
-		_trail_wait = TRAIL_GAP
+	elif _trail.is_empty() or sim.x - _trail[0].x >= TRAIL_SPACING:
 		_trail.push_front({"x": sim.x, "y": sim.y, "frame": cat.frame_name})
-		_trail.resize(mini(_trail.size(), TRAIL_COUNT + 1))
-	_zoom = move_toward(_zoom, DASH_ZOOM if sim.dashing else 1.0, (1.0 - DASH_ZOOM) / DASH_ZOOM_TIME * delta)
+		_trail.resize(mini(_trail.size(), TRAIL_ALPHAS.size() + 1))
+	_zoom = lerpf(_zoom, DASH_ZOOM if sim.dashing else 1.0, 1.0 - exp(-DASH_ZOOM_RATE * delta))
+	if absf(_zoom - 1.0) < 0.0005:
+		_zoom = 1.0  # 원래 크기에 딱 맞춰 글자·그림이 흐려지지 않게
 	_apply_zoom()
 
 
 ## 왼쪽 아래를 기준으로 세계 전체를 줄인다 (HUD는 _overlay.top_level이라 그대로)
 func _apply_zoom() -> void:
 	scale = Vector2.ONE * _zoom
-	position.y = get_viewport_rect().size.y * (1.0 - _zoom)
+	position = Vector2(0.0, get_viewport_rect().size.y * (1.0 - _zoom)) + Juice.shake_offset(_shake_since, _shake_time, _shake_amp)
 
 
 ## 세계 좌표에서 지금 보이는 크기 (화면이 멀어지면 오른쪽이 더 보임). 아래 끝은 그대로
@@ -405,13 +483,17 @@ func _view_size() -> Vector2:
 
 
 ## 이번 step에 일어난 일의 효과음과 발밑 터짐
-func _play_events() -> void:
+## combo_before = step 전 [콤보, 배수]
+func _play_events(combo_before: Array) -> void:
 	var doomed := sim.is_doomed() and not sim.has_box  # 상자가 받아 줄 떨어짐은 끝이 아니다
-	for sound in SfxEvents.sounds(sim, doomed and not _fall_sounded):
+	var sounds := SfxEvents.sounds(sim, doomed and not _fall_sounded)
+	sounds.append_array(SfxEvents.combo_sounds(combo_before[0], combo_before[1], sim.combo, not sim.hit_obstacle.is_empty()))
+	for sound in sounds:
 		if sound == "fish":
 			if not SfxEvents.fish_due(sim.elapsed, _fish_sound_at):
 				continue
 			_fish_sound_at = sim.elapsed
+			_sfx.fish.pitch_scale = SfxEvents.fish_pitch(sim.combo.count)  # 연달아 먹을수록 음계로 한 칸씩
 		_sfx[sound].play()
 	if doomed:
 		_fall_sounded = true
@@ -454,6 +536,10 @@ func restart() -> void:
 	_shards.clear()
 	_pop_texts.clear()
 	_bell_break = 99.0
+	_shake_since = 99.0
+	_rush = 99.0
+	_gold_flash = 99.0
+	_beat_at = 0.0
 	_place_cat(0.0)
 	restarted.emit()
 	queue_redraw()
@@ -463,6 +549,8 @@ func _input(event: InputEvent) -> void:
 	# 휴대폰 터치와 PC 마우스 클릭(터치로 흉내 냄)을 손가락별로 기억한다
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if input_block.has_point(event.position):
+				return  # 손맛 고르기 버튼을 누른 것
 			_touches[event.index] = true
 			_tap_pending = true
 		else:
@@ -531,6 +619,10 @@ func _draw() -> void:
 		_draw_burst(Vector2(burst.x + offset, ground - burst.y + FOOT_SINK), burst)
 	if sim.dashing:
 		_draw_dash_look(offset, ground)
+	if _gold_flash < GOLD_FLASH_TIME:
+		var r := DASH_GLOW_RADIUS * 1.6 * (0.6 + 0.4 * _gold_flash / GOLD_FLASH_TIME)
+		var glow_at := cat.position + Vector2(0.0, -Balance.CAT_BODY_SIZE.y * 0.5)
+		draw_texture_rect(_shadow_texture, Rect2(glow_at - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(DASH_GLOW, 0.7 * (1.0 - _gold_flash / GOLD_FLASH_TIME)))
 
 	var view_right := _view_size().x + 100.0
 	for item in sim.items:
@@ -557,20 +649,20 @@ func _draw_dash_look(offset: float, ground: float) -> void:
 		var ghost: Dictionary = _trail[i]
 		var tex: Texture2D = cat.frame_texture(ghost.frame)
 		draw_set_transform(Vector2(ghost.x + offset, ground - ghost.y + FOOT_SINK), 0.0, cat.scale)
-		draw_texture(tex, -CatView.ANCHOR, Color(1.0, 0.86, 0.5, 0.45 - 0.11 * i))
+		draw_texture(tex, -CatView.ANCHOR, Color(TRAIL_TINT, TRAIL_ALPHAS[i - 1]))
 	draw_set_transform(Vector2.ZERO)
 	var center := cat.position + Vector2(0.0, -Balance.CAT_BODY_SIZE.y * 0.5)
 	var r := DASH_GLOW_RADIUS * (1.0 + 0.08 * sin(sim.elapsed * 18.0))
-	draw_texture_rect(_shadow_texture, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(DASH_GLOW, 0.75))
-	draw_line(Vector2(Balance.CAT_SCREEN_X - 110.0, cat.position.y + 3.0), Vector2(Balance.CAT_SCREEN_X + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.8), 6.0, true)
+	draw_texture_rect(_shadow_texture, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(DASH_GLOW, DASH_GLOW_ALPHA))
+	draw_line(Vector2(Balance.CAT_SCREEN_X - 110.0, cat.position.y + 3.0), Vector2(Balance.CAT_SCREEN_X + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.55), 5.0, true)
 
 
 ## 조각 하나 (별은 _draw_star, 나머지는 작은 사각 조각)
 func _draw_shard(shard: Dictionary, offset: float, ground: float) -> void:
-	var k: float = shard.t / SHARD_LIFE
+	var k: float = shard.t / shard.get("life", SHARD_LIFE)
 	var at := Vector2(shard.x + offset, ground - shard.y + FOOT_SINK)
 	if shard.star:
-		_draw_star(at, 13.0 * (1.0 - 0.4 * k), shard.spin * shard.t, 1.0 - k * k)
+		_draw_star(at, shard.get("size", 13.0) * (1.0 - 0.4 * k), shard.spin * shard.t, 1.0 - k * k)
 		return
 	draw_set_transform(at, shard.spin * shard.t)
 	draw_rect(Rect2(-8.0, -6.0, 16.0, 12.0), Color(shard.color, 1.0 - k * k))
@@ -925,8 +1017,10 @@ func _draw_overlay() -> void:
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 	for pop in _pop_texts:
 		var k: float = pop.t / POP_TEXT_TIME
-		_draw_text(Vector2(pop.x + offset, ground - pop.y + FOOT_SINK - 50.0 * k), pop.text, 54, 1.0 - k * k, ALERT_COLOR)
+		_draw_text(Vector2(pop.x + offset, ground - pop.y + FOOT_SINK - 50.0 * k), pop.text, 54, 1.0 - k * k, pop.get("color", ALERT_COLOR))
 	_overlay.draw_set_transform(Vector2.ZERO)
+	if sim.hearts == 1 and not sim.game_over:
+		_draw_danger_edge()
 	_draw_hearts()
 	if not sim.game_over:
 		_draw_speed_lines()
@@ -985,8 +1079,40 @@ func _draw_hearts() -> void:
 		var k := 1.0 + HEART_PULSE * absf(sin(PI * sim.elapsed)) if sim.hearts == 1 and i == 0 else 1.0
 		var box: Vector2 = HEART_SIZE * k
 		var at := Vector2(x + i * (HEART_SIZE.x + HEART_GAP), HEART_Y) - (box - HEART_SIZE) * 0.5
-		_overlay.draw_texture_rect(HEART_TEXTURES[heart_frame(i, sim.hearts, sim.time_since_hit)], Rect2(at, box), false)
+		var frame := heart_frame(i, sim.hearts, sim.time_since_hit)
+		if frame == "crack":
+			at += Juice.shake_offset(sim.time_since_hit, HEART_CRACK_TIME * 2.0, HEART_SHAKE)  # 금 가며 떨림
+		_overlay.draw_texture_rect(HEART_TEXTURES[frame], Rect2(at, box), false)
+		# 금 간 뒤: 두 쪽으로 깨져 튀어 나간다 (빈 하트 위로)
+		if i == sim.hearts and frame == "empty" and sim.time_since_hit < HEART_BREAK_TIME:
+			var u := (sim.time_since_hit - HEART_CRACK_TIME) / (HEART_BREAK_TIME - HEART_CRACK_TIME)
+			_draw_halves(HEART_TEXTURES.crack, Rect2(at, box), u, 46.0, -40.0)
 	_draw_bell(Vector2(x + total + HEART_GAP, HEART_Y))
+
+
+## 화면 가장자리를 붉게: 바깥이 진하고 안쪽으로 사라지는 띠 4개. 두근거림 박자로 진해진다
+func _draw_danger_edge() -> void:
+	var size := get_viewport_rect().size
+	var c := Color(DANGER_COLOR, DANGER_ALPHA + DANGER_PULSE * absf(sin(PI * sim.elapsed)))
+	var clear := Color(DANGER_COLOR, 0.0)
+	var w := DANGER_WIDTH
+	for edge in [[Vector2.ZERO, Vector2(size.x, 0.0), Vector2(size.x, w), Vector2(0.0, w)],
+			[Vector2(0.0, size.y), Vector2(size.x, size.y), Vector2(size.x, size.y - w), Vector2(0.0, size.y - w)],
+			[Vector2.ZERO, Vector2(0.0, size.y), Vector2(w, size.y), Vector2(w, 0.0)],
+			[Vector2(size.x, 0.0), Vector2(size.x, size.y), Vector2(size.x - w, size.y), Vector2(size.x - w, 0.0)]]:
+		_overlay.draw_polygon(PackedVector2Array(edge), PackedColorArray([c, c, clear, clear]))
+
+
+## 그림을 왼쪽·오른쪽 두 쪽으로 갈라 양옆으로 돌며 튀어 나가게 그린다 (k = 0~1, rise = 처음 위로 튀는 정도)
+func _draw_halves(tex: Texture2D, rect: Rect2, k: float, spread: float, rise: float) -> void:
+	var half := Vector2(tex.get_width() * 0.5, tex.get_height())
+	for side in 2:
+		var dir := side * 2 - 1
+		var center := rect.position + Vector2(rect.size.x * (0.25 + 0.5 * side), rect.size.y * 0.5)
+		_overlay.draw_set_transform(center + Vector2(dir * spread * k, rise * k + 120.0 * k * k), dir * 0.9 * k)
+		_overlay.draw_texture_rect_region(tex, Rect2(-rect.size.x * 0.25, -rect.size.y * 0.5, rect.size.x * 0.5, rect.size.y),
+				Rect2(Vector2(side * half.x, 0.0), half), Color(1, 1, 1, 1.0 - k * k))
+	_overlay.draw_set_transform(Vector2.ZERO)
 
 
 ## 방울 HUD: 가지고 있으면 하트 오른쪽에, 막은 직후에는 두 쪽으로 갈라져 떨어진다
@@ -996,12 +1122,7 @@ func _draw_bell(at: Vector2) -> void:
 	if sim.has_bell:
 		_overlay.draw_texture_rect(tex, Rect2(at, box), false)
 	elif _bell_break < BELL_BREAK_TIME:
-		var k := _bell_break / BELL_BREAK_TIME
-		var half := Vector2(tex.get_width() * 0.5, tex.get_height())
-		for side in 2:
-			var fly := Vector2((side * 2 - 1) * 30.0 * k, 50.0 * k * k)
-			_overlay.draw_texture_rect_region(tex, Rect2(at + Vector2(side * box.x * 0.5, 0.0) + fly, Vector2(box.x * 0.5, box.y)),
-					Rect2(Vector2(side * half.x, 0.0), half), Color(1, 1, 1, 1.0 - k * k))
+		_draw_halves(tex, Rect2(at, box), _bell_break / BELL_BREAK_TIME, 30.0, 0.0)
 
 
 ## 하트 아래 진행 막대: 질주·털실의 아이콘 + 남은 시간
@@ -1029,31 +1150,54 @@ func _draw_speed_lines() -> void:
 		return
 	var size := get_viewport_rect().size
 	var color := Color(SPEED_LINE_COLOR, 0.35 + 0.6 * strength)
-	for i in ceili(SPEED_LINE_COUNT * strength):
-		var length := 140.0 + 280.0 * fposmod(i * 0.37, 1.0)
+	# 질주 시작: 선이 늘고 길어지며 고양이 높이로 몰린다 (화면이 당겨지는 느낌)
+	var rush := 1.0 - smoothstep(0.0, DASH_RUSH_TIME, _rush) if sim.dashing else 0.0
+	var cat_y := (cat.position.y - Balance.CAT_BODY_SIZE.y * 0.5) * _zoom + position.y
+	var fish := _fish_on_screen()
+	for i in ceili(SPEED_LINE_COUNT * strength * (1.0 + 0.6 * rush)):
+		var length := (140.0 + 280.0 * fposmod(i * 0.37, 1.0)) * (1.0 + rush)
 		var flow := (1800.0 + 900.0 * fposmod(i * 0.73, 1.0)) * sim.elapsed + i * 311.0
 		var x := size.x + length - fposmod(flow, size.x + 2.0 * length)
-		var y := size.y * fposmod(i * 0.618, 1.0)
+		var y := lerpf(size.y * fposmod(i * 0.618, 1.0), cat_y, 0.4 * rush)
 		var half := 2.0 + 3.0 * fposmod(i * 0.29, 1.0)
-		_overlay.draw_colored_polygon([Vector2(x - length, y), Vector2(x, y - half), Vector2(x, y + half)], color)
+		var near_fish := fish.any(func(f: Vector2) -> bool: return absf(f.y - y) < SPEED_LINE_FISH_GAP and f.x > x - length - 30.0 and f.x < x + 30.0)
+		_overlay.draw_colored_polygon([Vector2(x - length, y), Vector2(x, y - half), Vector2(x, y + half)],
+				Color(color, color.a * SPEED_LINE_FISH_DIM) if near_fish else color)
+
+
+## 화면에 보이는 생선의 화면 좌표 (속도선을 옅게 할 자리)
+func _fish_on_screen() -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var ground := _ground_y()
+	var offset := Balance.CAT_SCREEN_X - sim.x
+	var view_w := _view_size().x
+	for item in sim.items:
+		var x: float = item.x + offset
+		if (item.kind == "fish" or item.kind == "gold") and x > -50.0 and x < view_w + 50.0:
+			out.append(Vector2(x, ground - item.y + FOOT_SINK) * _zoom + position)
+	return out
 
 
 ## 위 가운데 "빨라진다!" + 발바닥 도장 (단계 수만큼). k = 0~1, 끝에서 옅어짐
 func _draw_stage_signal(k: float) -> void:
 	var alpha := 1.0 - smoothstep(0.7, 1.0, k)
 	var center := get_viewport_rect().size.x * 0.5
-	_draw_text(Vector2(center, STAGE_TEXT_Y), "빨라진다!", 52, alpha)
+	var t := k * STAGE_SIGNAL_TIME
+	var pop := maxf(0.0, 1.0 - t / STAGE_POP_TIME)
+	_draw_text(Vector2(center, STAGE_TEXT_Y), "빨라진다!", roundi(62.0 * (1.0 + 0.5 * pop * pop)), alpha)  # 크게 찍혔다 줄어듦
 	for i in sim.stage:
-		_draw_paw(Vector2(center + (i - (sim.stage - 1) * 0.5) * STAGE_PAW_GAP, STAGE_PAW_Y), alpha)
+		var since := t - i * STAGE_PAW_DELAY  # 도장이 왼쪽부터 하나씩 찍힘
+		if since >= 0.0:
+			_draw_paw(Vector2(center + (i - (sim.stage - 1) * 0.5) * STAGE_PAW_GAP, STAGE_PAW_Y), alpha, 1.0 + 0.6 * maxf(0.0, 1.0 - since / 0.1))
 
 
 ## 발바닥 도장: 크림색 테두리 위에 갈색 발바닥 (큰 볼록살 + 발가락 3개)
-func _draw_paw(at: Vector2, alpha: float) -> void:
+func _draw_paw(at: Vector2, alpha: float, size: float = 1.0) -> void:
 	var dots := [[Vector2(0, 5), 10.0], [Vector2(-11, -5), 5.0], [Vector2(0, -10), 5.0], [Vector2(11, -5), 5.0]]
 	for dot in dots:
-		_overlay.draw_circle(at + dot[0], dot[1] + 3.0, Color(HUD_CREAM, alpha))
+		_overlay.draw_circle(at + dot[0] * size, dot[1] * size + 3.0, Color(HUD_CREAM, alpha))
 	for dot in dots:
-		_overlay.draw_circle(at + dot[0], dot[1], Color(HUD_BROWN, alpha))
+		_overlay.draw_circle(at + dot[0] * size, dot[1] * size, Color(HUD_BROWN, alpha))
 
 
 ## 말풍선 (HUD와 같은 갈색 글자·밝은 테두리, 크림색 바탕)

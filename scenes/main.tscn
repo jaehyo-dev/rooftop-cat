@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world_view.gd" id="2"]
@@ -11,6 +11,10 @@ default_font = ExtResource("5")
 Label/colors/font_color = Color(0.353, 0.275, 0.212, 1)
 Label/colors/font_outline_color = Color(1, 0.97, 0.9, 1)
 Label/constants/outline_size = 6
+
+[sub_resource type="FontVariation" id="tight_space"]
+base_font = ExtResource("5")
+spacing_space = -12
 
 [sub_resource type="StyleBoxFlat" id="retry_box"]
 content_margin_left = 40.0
@@ -92,6 +96,7 @@ offset_top = 8.0
 offset_right = 424.0
 offset_bottom = 76.0
 theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 1)
+theme_override_fonts/font = SubResource("tight_space")
 theme_override_font_sizes/font_size = 60
 text = "0 m"
 

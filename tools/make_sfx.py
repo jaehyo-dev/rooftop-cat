@@ -109,7 +109,33 @@ def jingle() -> np.ndarray:
     return 0.7 * sum(at(bell(f, 0.3, 11.0), s, 0.45) for f, s in [(2093.0, 0.0), (2637.0, 0.1)])
 
 
-SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
+def combo_up() -> np.ndarray:
+    """띵: 콤보 배수가 오를 때 짧고 밝은 두 음 (생선 소리보다 한 옥타브 위, 생선 줄 속에서도 들리게)"""
+    return 0.6 * (at(bell(2349.0, 0.16, 20.0), 0.0, 0.24) + 0.5 * at(bell(3136.0, 0.14, 24.0), 0.03, 0.24))
+
+
+def combo_break() -> np.ndarray:
+    """툭: 콤보가 끊길 때 작고 부드럽게 내려가는 소리 (기분 나쁘지 않게 짧게)"""
+    return 0.5 * fade(sweep(420.0, 260.0, 0.08), 32.0)
+
+
+def hit() -> np.ndarray:
+    """퉁: 장애물에 부딪힐 때 둔탁한 낮은 소리 + 짧은 흔들림"""
+    t = times(0.24)
+    wobble = np.sin(2 * np.pi * (120.0 * t + 6.0 * np.sin(2 * np.pi * 9.0 * t))) * np.exp(-t * 16.0)
+    return 0.9 * (at(fade(sweep(240.0, 75.0, 0.2), 14.0), 0.0, 0.24) + 0.5 * wobble)
+
+
+def heartbeat() -> np.ndarray:
+    """두근: 낮은 두 번 박동 (휴대폰 스피커에서도 들리게 2배음을 섞음)"""
+    def thump(freq: float) -> np.ndarray:
+        t = times(0.12)
+        return (np.sin(2 * np.pi * freq * t) + 0.6 * np.sin(4 * np.pi * freq * t)) * np.exp(-t * 30.0) * np.minimum(1.0, t * 400.0)
+    return 0.8 * (at(thump(95.0), 0.0, 0.32) + 0.7 * at(thump(85.0), 0.17, 0.32))
+
+
+SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up,
+          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

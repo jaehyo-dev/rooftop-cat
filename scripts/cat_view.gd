@@ -20,6 +20,9 @@ const STAGGER_TIME := 0.6
 const STAGGER_RATE := 20.0
 const INVULN_BLINK := 0.08  # 무적 깜빡임 간격 (초)
 const DASH_TINT := Color(1.0, 0.86, 0.5)
+## 부딪힌 직후 빨갛게 깜빡임 (그 뒤는 무적 깜빡임)
+const HIT_FLASH_TIME := 0.3
+const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 진하면 고양이가 빨간 덩어리로 보임
 
 var frame_name := "run_0"
 var _textures := {}
@@ -91,6 +94,8 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	modulate = Color.WHITE
 	if sim.dashing:
 		modulate = DASH_TINT.lerp(Color.WHITE, 0.5 + 0.5 * sin(sim.elapsed * 18.0))  # 금빛으로 번쩍임
+	elif sim.time_since_hit < HIT_FLASH_TIME:
+		modulate = HIT_FLASH_COLOR if int(sim.time_since_hit / INVULN_BLINK) % 2 == 0 else Color.WHITE
 	elif sim.ghost_time > 0.0:
 		modulate.a = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
 	elif sim.invuln_time > 0.0:
@@ -118,6 +123,8 @@ func _kick_events(sim: RunnerSim) -> void:
 		_spring.kick(Balance.KICK_TAKEOFF)
 	if sim.time_since_double_jump < _last.double:
 		_spring.kick(Balance.KICK_DOUBLE)
+	if sim.time_since_stage_rise < _last.stage:
+		_spring.kick(Balance.KICK_TAKEOFF)  # 빨라지는 순간 몸이 앞으로 쭉 (속도 단계 신호)
 	# 그물에 실림 (닿자마자 튕긴 퍼펙트는 실린 프레임이 없으니 튕긴 순간에)
 	if (sim.is_riding() and not _last.riding) or (sim.time_since_bounce < _last.bounce and not _last.riding):
 		_spring.kick(Balance.KICK_TRAMP_RIDE)
@@ -128,4 +135,5 @@ func _kick_events(sim: RunnerSim) -> void:
 
 func _remember(sim: RunnerSim) -> void:
 	_last = {"land": sim.time_since_land, "jump": sim.time_since_jump, "double": sim.time_since_double_jump,
-			"bounce": sim.time_since_bounce, "riding": sim.is_riding()}
+			"bounce": sim.time_since_bounce, "riding": sim.is_riding(),
+			"stage": sim.time_since_stage_rise}
