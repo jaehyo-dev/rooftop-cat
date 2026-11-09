@@ -33,7 +33,13 @@ func test_단계가_오르면_음악이_빨라지고_새_판에서_돌아온다(
 	await wait_frames(2)
 	assert_eq(main.get_node("Music").pitch_scale, 1.0, "단계 1")
 	world.sim.elapsed = 31.0
-	await wait_frames(3)
+	# 빠른 CI는 한 프레임이 STEP보다 짧아 로직이 몇 프레임 늦게 돌 수 있다. 단계가 바뀐 뒤 한 프레임 더:
+	# 부모 Main이 자식 World보다 먼저 _process를 돌아 바뀐 단계를 다음 프레임에 읽는다
+	for i in 60:
+		if world.sim.stage == 3:
+			break
+		await wait_frames(1)
+	await wait_frames(1)
 	assert_eq(world.sim.stage, 3)
 	assert_true(is_equal_approx(main.get_node("Music").pitch_scale, SpeedCurve.music_pitch(3)), "단계 3")
 	world.restart()
