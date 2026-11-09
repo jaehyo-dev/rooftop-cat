@@ -57,8 +57,14 @@ def land() -> np.ndarray:
     return 0.55 * fade(sweep(170.0, 90.0, 0.09), 30.0)
 
 
-def fish() -> np.ndarray:
+def pickup() -> np.ndarray:
+    """황금 생선과 아이템을 먹는 소리 (예전 생선 소리)"""
     return 0.7 * (at(bell(1175.0, 0.1, 24.0), 0.0, 0.2) + at(bell(1568.0, 0.14, 24.0), 0.055, 0.2))
+
+
+def fish() -> np.ndarray:
+    """생선 소리: 촘촘히 먹어도 시끄럽지 않게 짧게"""
+    return 0.7 * (at(bell(1175.0, 0.04, 45.0), 0.0, 0.09) + at(bell(1568.0, 0.06, 45.0), 0.025, 0.09))
 
 
 def boing() -> np.ndarray:
@@ -103,7 +109,7 @@ def jingle() -> np.ndarray:
     return 0.7 * sum(at(bell(f, 0.3, 11.0), s, 0.45) for f, s in [(2093.0, 0.0), (2637.0, 0.1)])
 
 
-SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
+SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

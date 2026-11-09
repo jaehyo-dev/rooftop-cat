@@ -148,7 +148,9 @@ func test_필수_생선을_놓치면_끊기고_보너스와_질주_털실은_안
 		var sim := _fish_sim(cases[name][0])
 		match cases[name][1]:
 			"dash":
+				var missed := sim.items[0]
 				sim._start_dash()
+				sim.items.assign([missed])  # 질주가 앞쪽 생선을 바꿔 까므로 놓칠 생선만 다시 놓는다
 			"yarn":
 				sim.magnet_time = 99.0
 				sim.items[0].y = sim.y + 3000.0

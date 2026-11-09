@@ -16,13 +16,16 @@ def end_pitch(sound):
 
 
 class SfxTest(unittest.TestCase):
-    def test_열한_종류이고_터지지_않으며_짧다(self):
-        self.assertEqual(len(make_sfx.SOUNDS), 11)
+    def test_열두_종류이고_터지지_않으며_짧다(self):
+        self.assertEqual(len(make_sfx.SOUNDS), 12)
         for name, make in make_sfx.SOUNDS.items():
             sound = make()
             self.assertGreater(np.abs(sound).max(), 0.1, name)
             self.assertLess(len(sound) / make_sfx.RATE, 0.7, name)
             self.assertFalse(np.isnan(sound).any(), name)
+
+    def test_생선_소리는_아이템_소리보다_짧다(self):
+        self.assertLess(len(make_sfx.fish()), len(make_sfx.pickup()) * 0.6)
 
     def test_더블점프는_첫_점프보다_높은_음(self):
         self.assertGreater(make_sfx.DOUBLE_TOP, make_sfx.JUMP_TOP)

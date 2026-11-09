@@ -145,7 +145,9 @@ var _dash_land_time := 0.0  # 착지 옥상 위에 들어온 뒤 지난 시간
 var _dash_base := 0.0       # 마지막 보이지 않는 발판 높이 (틈 위에서 이어 씀)
 var _dash_ease := 0.0       # 질주가 끝난 뒤 속도가 돌아오는 남은 시간
 var _next_target_x := 0.0   # 질주 중 다음 부술 것을 놓을 수 있는 위치
-var _next_dash_fish_x := 0.0  # 질주 중 다음 공중 생선 호를 놓을 수 있는 위치
+var _dash_line_x := 0.0    # 질주용 생선 줄: 다음 생선 자리
+var _dash_arc_x := 0.0     # 질주용 생선 줄: 이 자리부터 다음 공중 호
+var _dash_line_top := 0.0  # 질주용 생선 줄: 마지막 발판 높이 (틈 위에서는 그대로)
 var _targets_made := 0      # 지금까지 놓은 부술 것 수 (음수 번호, 종류 차례)
 
 
@@ -443,6 +445,7 @@ func _pick_items(dt: float) -> void:
 	var center_y := y + Balance.CAT_BODY_SIZE.y * 0.5
 	var radius := Balance.CAT_BODY_SIZE * 0.5 + Vector2.ONE * Balance.ITEM_RADIUS
 	var open_can := false
+	var start_dash := false
 	var bites: Array[int] = []  # 이번 step에 먹은 생선 점수 (놓침을 먼저 처리한 뒤 더한다: 끊긴 뒤 먹은 것은 x1)
 	for i in range(items.size() - 1, -1, -1):
 		var item := items[i]
@@ -486,13 +489,15 @@ func _pick_items(dt: float) -> void:
 			"can":
 				open_can = true
 			"dash":
-				_start_dash()
+				start_dash = true
 		picked.append(item)
 		items.remove_at(i)
 	for points in bites:
 		combo.eat(points)
 	if open_can:
 		_open_can()
+	if start_dash:
+		_start_dash()  # 생선을 바꿔 깔므로 위 반복이 끝난 뒤에
 
 
 ## 이미 가지고 있거나 소용없으면 그대로 둔다
@@ -520,8 +525,10 @@ func _open_can() -> void:
 		was.x = left
 		canned.append(was)
 		obstacles.remove_at(i)
+		var cans: Array[Dictionary] = []
 		for n in Balance.CAN_FISH:
-			items.append({"kind": "fish", "x": left + o.w * 0.5 + (n - 1) * Balance.FISH_SPACING, "y": o.base + Balance.ITEM_LIFT})
+			cans.append({"kind": "fish", "x": left + o.w * 0.5 + (n - 1) * Balance.FISH_SPACING, "y": o.base + Balance.ITEM_LIFT})
+		FishRoad.add_one_line(items, cans)
 
 
 ## 질주 시작: 다른 상태를 전부 지우고 전용 분기로 들어간다
@@ -532,7 +539,6 @@ func _start_dash() -> void:
 	_dash_landing = {}
 	_dash_land_time = 0.0
 	_next_target_x = 0.0
-	_next_dash_fish_x = 0.0
 	_dash_base = y
 	on_ground = true  # 그림은 달리기, 일반 착지·떨어짐 코드는 타지 않음
 	vy = 0.0
@@ -548,12 +554,12 @@ func _start_dash() -> void:
 	_floating = false
 	_jumped = false
 	_double_used = false
+	_replace_with_dash_line()
 
 
 ## 질주 중: 보이지 않는 발판을 따라 달리며 뛸 수 있고, 착지 옥상 위 땅에서 끝낸다
 func _dash_step(dt: float, pressed: bool, press_started: bool) -> void:
 	_add_dash_target()
-	_add_dash_fish()
 	var over_landing: bool = not _dash_landing.is_empty() and x - Balance.CAT_FOOT_HALF >= _dash_landing.left
 	if press_started and not over_landing:  # 착지 옥상 길이(DASH_LAND_SECONDS)가 남은 체공보다 길어 그 위에 내려온다
 		if on_ground:
@@ -612,35 +618,62 @@ func _add_dash_target() -> void:
 	_next_target_x = at + Balance.DASH_TARGET_GAP * vx()
 
 
-## 화면 밖 공중에 최대 점프 궤적대로 생선 호를 놓는다 (질주가 끝나기 전에 다 지나는 자리만, 놓쳐도 안 끊김)
-func _add_dash_fish() -> void:
-	var at := x + view_ahead + Balance.DASH_TARGET_AHEAD
+## 질주가 시작되면 앞쪽 생선(땅 줄과 호, 부술 장애물 위 호 포함)을 치우고 질주용 줄로 바꾼다
+func _replace_with_dash_line() -> void:
+	items = items.filter(func(item: Dictionary) -> bool: return item.x <= x or not FishRoad.is_fish(item))
+	_dash_line_x = x + Balance.FISH_SPACING
+	_dash_arc_x = x + Balance.DASH_FISH_GAP * 0.5 * vx()
+	_dash_line_top = _dash_base
+	_lay_dash_line(roofs[-1].right - vx() * Balance.DASH_LOOK)
+
+
+## 질주용 줄을 end까지 깐다: 보이지 않는 발판 위 땅 줄 사이사이에 최대 점프 호가 이어지는 한 줄 (놓쳐도 안 끊김).
+func _lay_dash_line(end: float) -> void:
 	var route := FishRoad.path(JumpModel.max_hold_time(), -1.0)
-	if at < _next_dash_fish_x or at + route[-1].x * vx() > x + dash_time * vx():
-		return
-	_next_dash_fish_x = at + Balance.DASH_FISH_GAP * vx()
-	var roof := roof_at(at)
-	var base: float = _dash_base if roof.is_empty() else roof.top
-	var walked := 0.0
-	for i in range(1, route.size()):
-		walked += Vector2((route[i].x - route[i - 1].x) * vx(), route[i].y - route[i - 1].y).length()
-		if walked >= Balance.FISH_SPACING:
-			walked -= Balance.FISH_SPACING
-			items.append({"kind": "fish", "x": at + route[i].x * vx(), "y": base + route[i].y + Balance.ITEM_LIFT, "bonus": true})
+	var v := vx()
+	var line: Array[Dictionary] = []
+	while _dash_line_x < end:
+		var at := _dash_line_x
+		var top := _dash_top_at(at)
+		_dash_line_top = _dash_line_top if top == -INF else top
+		var arc_end: float = at + route[-1].x * v
+		if at >= _dash_arc_x and arc_end <= x + dash_time * v and (_dash_landing.is_empty() or arc_end <= _dash_landing.left):
+			_dash_arc_x = at + Balance.DASH_FISH_GAP * v
+			var walked := 0.0
+			for i in range(1, route.size()):
+				walked += Vector2((route[i].x - route[i - 1].x) * v, route[i].y - route[i - 1].y).length()
+				if walked >= Balance.FISH_SPACING:
+					walked -= Balance.FISH_SPACING
+					var fish_x: float = at + route[i].x * v
+					# 호 아래로 옥상이 높아지면 그 위로 (건물 속에 묻히지 않게)
+					var fish_y: float = maxf(_dash_line_top + route[i].y, _dash_top_at(fish_x)) + Balance.ITEM_LIFT
+					line.append({"kind": "fish", "x": fish_x, "y": fish_y, "bonus": true})
+			_dash_line_x = arc_end + Balance.FISH_SPACING * 0.5
+		else:
+			if road.is_free(at):
+				line.append({"kind": "fish", "x": at, "y": _dash_line_top + Balance.ITEM_LIFT, "bonus": true})
+			_dash_line_x += Balance.FISH_SPACING
+	FishRoad.add_one_line(items, line)
 
 
 ## 보이지 않는 발판 높이: 발밑과 곧 닿을 옥상(판 제외) 중 가장 높은 곳. 틈 위에서 앞 옥상이 아직 멀면 마지막 발판 높이 그대로
 func _dash_floor() -> float:
-	var horizon := x + vx() * Balance.DASH_LOOK
+	var top := _dash_top_at(x)
+	if top > -INF:
+		_dash_base = top
+	return _dash_base
+
+
+## 몸이 at에 있을 때 발판이 될 옥상 높이. 없으면(틈 위) -INF
+func _dash_top_at(at: float) -> float:
+	var horizon := at + vx() * Balance.DASH_LOOK
 	var top := -INF
 	for roof in roofs:
 		if roof.left > horizon:
 			break
-		if roof.right >= x - Balance.CAT_FOOT_HALF and not roof.get("platform", false):
+		if roof.right >= at - Balance.CAT_FOOT_HALF and not roof.get("platform", false):
 			top = maxf(top, roof.top)
-	if top > -INF:
-		_dash_base = top
-	return _dash_base
+	return top
 
 
 ## 부딪힌 장애물의 하트를 깎는다 (땅 위·탑승·떠오름에서 step이 일찍 끝나므로 아이템 판정 옆에서 본다)
@@ -949,9 +982,17 @@ func _fill_roofs() -> void:
 		for item in placed:
 			if item.y <= roof.top + Balance.ITEM_LIFT:
 				road.reserve(item.x)  # 땅 위 아이템 자리에는 생선을 겹치지 않는다
-		items.append_array(placed)
-		items.append_array(road.extend(roofs[-1], roof, _road_speeds(roof)))
+		var road_fish := road.extend(roofs[-1], roof, _road_speeds(roof))
+		# 질주가 닿는 구간(착지 옥상까지)의 생선은 질주용 줄이 대신한다. 생선 길을 먼저 놓아 아이템 자리 생선이 빠진다
+		var in_dash := dashing and (_dash_landing.is_empty() or is_same(roof, _dash_landing))
+		if in_dash:
+			road_fish.clear()
+			placed = placed.filter(func(item: Dictionary) -> bool: return not FishRoad.is_fish(item))
+		FishRoad.add_one_line(items, road_fish)
+		FishRoad.add_one_line(items, placed)
 		roofs.append(roof)
+		if in_dash:
+			_lay_dash_line(road.next_ground_x() if is_same(roof, _dash_landing) else roof.right - vx() * Balance.DASH_LOOK)
 		if roof.has("line"):
 			structures.append(roof.line)
 		if roof.has("tramp"):

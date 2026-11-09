@@ -145,7 +145,8 @@ const BURST_STARS := 6
 const BURST_STAR_REACH := 90.0
 ## 효과음이 음악(-26 LUFS 안팎)보다 5dB쯤 위에 오게 (v0.5.0 2b 마무리, ffmpeg ebur128로 잼). 착지는 원래 작아서 올린다
 const SFX_VOLUME_DB := -5.0
-const SFX_TRIM_DB := {"land": 4.0}
+const SFX_TRIM_DB := {"land": 4.0, "fish": -8.0}
+const FISH_POLYPHONY := 2  # 동시에 나는 생선 소리 수
 const LINE_SAG := 0.82  # 실린 줄·느슨해진 줄은 이만큼 아래로 처져 보임
 ## 질주 그림: 화면이 멀어지는 배율과 시간, 빛남, 잔상 간격과 개수
 const DASH_ZOOM := 0.92
@@ -188,6 +189,7 @@ var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", 
 var _was_rescuing := false
 var _bursts: Array[Dictionary] = []  # 발밑 터짐 {"x", "y", "t", "stars"}
 var _sfx := {}                       # 효과음 이름 → AudioStreamPlayer
+var _fish_sound_at := -INF           # 마지막 생선 소리 시각 (sim.elapsed)
 var _fall_sounded := false           # 이번 떨어짐에 소리를 냈는지
 var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
 var _shadow_texture := _make_shadow_texture()
@@ -232,6 +234,8 @@ func _ready() -> void:
 		player.name = "Sfx_" + sound
 		player.stream = load("res://assets/audio/sfx/%s.wav" % sound)
 		player.volume_db = SFX_VOLUME_DB + SFX_TRIM_DB.get(sound, 0.0)
+		if sound == "fish":
+			player.max_polyphony = FISH_POLYPHONY
 		add_child(player)
 		_sfx[sound] = player
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 아이템 그림을 크게 줄여 그려도 거칠지 않게
@@ -404,6 +408,10 @@ func _view_size() -> Vector2:
 func _play_events() -> void:
 	var doomed := sim.is_doomed() and not sim.has_box  # 상자가 받아 줄 떨어짐은 끝이 아니다
 	for sound in SfxEvents.sounds(sim, doomed and not _fall_sounded):
+		if sound == "fish":
+			if not SfxEvents.fish_due(sim.elapsed, _fish_sound_at):
+				continue
+			_fish_sound_at = sim.elapsed
 		_sfx[sound].play()
 	if doomed:
 		_fall_sounded = true

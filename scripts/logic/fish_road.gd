@@ -104,6 +104,37 @@ func reserve(at: float) -> void:
 	_reserved.append(at)
 
 
+## 이 자리에 땅 생선을 놓아도 되는지 (아이템 자리 둘레는 안 됨)
+func is_free(at: float) -> bool:
+	for spot in _reserved:
+		if absf(at - spot) < RESERVED_GAP:
+			return false
+	return true
+
+
+## 다음 땅 생선 자리 (질주용 줄이 여기까지 이어 준다)
+func next_ground_x() -> float:
+	return _x
+
+
+static func is_fish(item: Dictionary) -> bool:
+	return item.kind == "fish" or item.kind == "gold"
+
+
+## 어느 x 자리든 생선 줄은 한 줄만: 먼저 놓인 생선과 x 간격이 FISH_SPACING 절반보다 가까우면 나중 것을 뺀다 (가파른 호도 듬성해질 뿐 한 줄)
+static func add_one_line(items: Array[Dictionary], added: Array[Dictionary]) -> void:
+	var near := Balance.FISH_SPACING * 0.5
+	for item in added:
+		var free := true
+		if is_fish(item):
+			for other in items:
+				if is_fish(other) and absf(other.x - item.x) < near:
+					free = false
+					break
+		if free:
+			items.append(item)
+
+
 ## prev 다음에 roof가 생겼을 때 깔 생선들. speeds[0] = 고양이가 도착할 속도, 뒤는 지나는 동안 바뀔 속도
 func extend(prev: Dictionary, roof: Dictionary, speeds: Array) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -149,10 +180,7 @@ static func _sorted_obstacles(roof: Dictionary) -> Array:
 ## 땅 줄: 다음 땅 자리부터 end 앞까지. 앞뒤 호의 흔들림 경로가 날아 넘는 자리는 보너스
 func _ground(out: Array[Dictionary], end: float, top: float, next_flight: Dictionary) -> void:
 	while _x < end:
-		var free := true
-		for at in _reserved:
-			free = free and absf(_x - at) >= RESERVED_GAP
-		if free:
+		if is_free(_x):
 			var fish := {"kind": "fish", "x": _x, "y": top + Balance.ITEM_LIFT}
 			var sure: bool = _x >= _late_land and _ground_sure(fish, _last) and _ground_sure(fish, next_flight)
 			if not sure:

@@ -1,6 +1,6 @@
 extends SceneTree
 ## 2a-4 확인용 캡처: 생선 길을 따라 달리는 자동 조종으로 실제 main 씬을 돌려 PNG를 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_fun.gd -- <shots|gif|result> <출력 폴더> [시드]
+## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_fun.gd -- <shots|gif|result|dash> <출력 폴더> [시드]
 
 const STEP := 1.0 / 120.0
 const GIF_SECONDS := 30.0
@@ -35,6 +35,8 @@ func _init() -> void:
 			await _gif(args[1])
 		"result":
 			await _result(args[1])
+		"dash":
+			await _dash(args[1])
 	DirAccess.remove_absolute("user://capture_fun.cfg")
 	quit()
 
@@ -115,6 +117,24 @@ func _gif(out: String) -> void:
 			await _save(out + "/f%04d.png" % frame)
 			frame += 1
 	print("프레임 ", frame, " 시각 ", sim.elapsed, " 생선 ", sim.fish, " 콤보 ", sim.combo.best, " 점수 ", sim.score(), " 하트 ", sim.hearts)
+
+
+## 질주 구간만 프레임으로 저장한다 (시작 직전부터 끝난 뒤 조금까지, 초당 12장)
+func _dash(out: String) -> void:
+	while not sim.dashing and sim.elapsed < MAX_SECONDS and not sim.game_over:
+		_advance()
+	var frame := 0
+	var count := 0
+	var after := 0
+	while after < 120 and not sim.game_over:
+		_advance()
+		after += 0 if sim.dashing else 1
+		count += 1
+		if count % 10 == 0:
+			main._process(STEP * 10.0)
+			await _save(out + "/f%04d.png" % frame)
+			frame += 1
+	print("프레임 ", frame, " 시각 ", sim.elapsed, " 생선 ", sim.fish, " 콤보 ", sim.combo.best)
 
 
 func _result(out: String) -> void:
