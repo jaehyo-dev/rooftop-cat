@@ -96,3 +96,116 @@ func test_깨진_저장_파일이면_0으로_보고_새_기록을_저장한다()
 	assert_true(BestRecord.submit(10, PATH))
 	assert_eq(BestRecord.load_best(PATH), 10)
 	DirAccess.remove_absolute(PATH)
+
+
+func test_콤보는_연속으로_먹으면_배수가_오르고_x5에서_멈춘다() -> void:
+	var combo := FishCombo.new()
+	assert_eq(combo.multiplier(), 1)
+	for i in Balance.COMBO_STEP - 1:
+		combo.eat(10)
+	assert_eq(combo.points, 10 * (Balance.COMBO_STEP - 1), "x1")
+	combo.eat(10)
+	assert_eq(combo.multiplier(), 2, "COMBO_STEP개째부터 x2")
+	assert_eq(combo.points, 10 * (Balance.COMBO_STEP - 1) + 20, "오른 배수로 더함")
+	for i in Balance.COMBO_STEP * 10:
+		combo.eat(10)
+	assert_eq(combo.multiplier(), Balance.COMBO_MAX, "최대 x5")
+	var best := combo.count
+	combo.cut()
+	assert_eq(combo.count, 0)
+	assert_eq(combo.best, best, "최고 콤보는 남음")
+	assert_eq(combo.multiplier(), 1)
+
+
+func test_콤보는_일정_시간_못_먹으면_끊기고_먹으면_시간이_다시_시작된다() -> void:
+	var combo := FishCombo.new()
+	combo.eat(10)
+	combo.tick(Balance.COMBO_TIMEOUT - 0.1)
+	combo.eat(10)
+	combo.tick(Balance.COMBO_TIMEOUT - 0.1)
+	assert_eq(combo.count, 2, "먹으면 다시 셈")
+	combo.tick(0.2)
+	assert_eq(combo.count, 0, "시간 초과")
+
+
+## 생선 하나를 앞에 둔 sim
+func _fish_sim(bonus: bool) -> RunnerSim:
+	var sim := RunnerSim.new(1, Balance.RUN_SPEED, false)
+	sim.accelerate = false
+	sim.roofs[0].right = 90000.0
+	sim.items.clear()
+	sim.combo.count = 5
+	var fish := {"kind": "fish", "x": sim.x + 200.0, "y": sim.y + 400.0}
+	if bonus:
+		fish.bonus = true
+	sim.items.append(fish)
+	return sim
+
+
+func test_필수_생선을_놓치면_끊기고_보너스와_질주_털실은_안_끊긴다() -> void:
+	var cases := {"필수": [false, ""], "보너스": [true, ""], "질주": [false, "dash"], "털실은 끌어오지 못해도": [false, "yarn"], "투명화": [false, "ghost"]}
+	for name: String in cases:
+		var sim := _fish_sim(cases[name][0])
+		match cases[name][1]:
+			"dash":
+				sim._start_dash()
+			"yarn":
+				sim.magnet_time = 99.0
+				sim.items[0].y = sim.y + 3000.0
+			"ghost":
+				sim.ghost_time = 99.0
+		for i in 100:
+			sim.step(1.0 / 120.0, false)
+		assert_true(sim.x > sim.items[0].x + 150.0, name + ": 지나감")
+		assert_eq(sim.combo.count, 0 if name == "필수" else 5, name)
+
+
+func test_같은_step에_놓치고_먹으면_끊긴_뒤_먹은_것으로_친다() -> void:
+	var sim := RunnerSim.new(1, Balance.RUN_SPEED, false)
+	sim.accelerate = false
+	sim.roofs[0].right = 90000.0
+	sim.items.clear()
+	sim.combo.count = Balance.COMBO_STEP - 1
+	# 배열 앞 = 지금 놓치는 생선, 뒤 = 지금 먹는 생선 (역순으로 돌아 먹는 쪽을 먼저 본다)
+	sim.items.append({"kind": "fish", "x": sim.x - 120.0, "y": sim.y + 400.0})
+	sim.items.append({"kind": "fish", "x": sim.x + 10.0, "y": sim.y + Balance.ITEM_LIFT})
+	sim.step(1.0 / 120.0, false)
+	assert_eq(sim.combo.count, 1, "끊긴 뒤 하나")
+	assert_eq(sim.combo.points, Balance.FISH_POINTS, "x1 점수")
+
+
+func test_부딪히면_콤보가_끊기고_방울이_막으면_안_끊긴다() -> void:
+	for bell in [false, true]:
+		var sim := _fish_sim(true)
+		sim.has_bell = bell
+		sim.obstacles = [{"id": 0, "kind": "ac", "x": sim.x + 100.0, "w": 110.0, "y0": sim.y, "y1": sim.y + 88.0, "base": sim.y}] as Array[Dictionary]
+		for i in 40:
+			sim.step(1.0 / 120.0, false)
+		assert_true(sim.obstacles.is_empty(), "부딪힘")
+		assert_eq(sim.combo.count, 5 if bell else 0)
+
+
+func test_점수는_거리와_생선_점수의_합이고_황금은_크다() -> void:
+	var sim := RunnerSim.new(1, Balance.RUN_SPEED, false)
+	sim.accelerate = false
+	sim.items.clear()
+	sim.items.append({"kind": "fish", "x": sim.x + 80.0, "y": sim.y + Balance.ITEM_LIFT})
+	sim.items.append({"kind": "gold", "x": sim.x + 150.0, "y": sim.y + Balance.ITEM_LIFT})
+	for i in 60:
+		sim.step(1.0 / 120.0, false)
+	assert_eq(sim.combo.points, Balance.FISH_POINTS + Balance.GOLD_POINTS)
+	assert_eq(sim.fish, 1 + Balance.GOLD_FISH)
+	assert_eq(sim.score(), sim.distance() + sim.combo.points)
+
+
+func test_최고_점수_저장과_이전_저장_호환() -> void:
+	const SCORE_PATH := "user://test_best_score.cfg"
+	DirAccess.remove_absolute(SCORE_PATH)
+	BestRecord.submit(50, SCORE_PATH)  # 점수가 없던 이전 저장
+	assert_eq(BestRecord.load_best_score(SCORE_PATH), 0, "없으면 0")
+	assert_true(BestRecord.submit_score(1200, SCORE_PATH))
+	assert_false(BestRecord.submit_score(900, SCORE_PATH), "낮으면 새 기록 아님")
+	assert_false(BestRecord.submit_score(1200, SCORE_PATH), "같아도 새 기록 아님")
+	assert_eq(BestRecord.load_best_score(SCORE_PATH), 1200)
+	assert_eq(BestRecord.load_best(SCORE_PATH), 50, "거리 기록 유지")
+	DirAccess.remove_absolute(SCORE_PATH)

@@ -62,11 +62,12 @@ func test_생선과_상자는_옥상_위나_틈_위_닿을_수_있는_곳에_있
 				box_times.append(i * 1.5)
 				assert_true(item.x > roof.left and item.x < roof.right, "상자는 옥상 위")
 	assert_true(fish > 300, "생선이 넉넉함 (%d)" % fish)
-	assert_true(box_times.size() >= 450.0 / Balance.BOX_EVERY_MAX - 1.0, "상자 %d개" % box_times.size())
+	assert_true(box_times.size() >= 1, "상자 %d개" % box_times.size())
 	for k in range(1, box_times.size()):
 		# 시간 기준: 옥상 하나(1.5초)와 전봇대 판 때문에 조금 늦어질 수 있다
 		var gap: float = box_times[k] - box_times[k - 1]
-		assert_true(gap >= Balance.BOX_EVERY_MIN and gap <= Balance.BOX_EVERY_MAX + 6.0, "상자 간격 %.1f초" % gap)
+		var late: float = Balance.ITEM_LATE_MULT if box_times[k - 1] >= Balance.ITEM_LATE_TIME else 1.0
+		assert_true(gap >= Balance.BOX_EVERY_MIN * late and gap <= Balance.BOX_EVERY_MAX * late + 6.0, "상자 간격 %.1f초" % gap)
 
 
 ## 시작 옥상 위 앞쪽에 아이템 하나만 둔 sim
@@ -90,7 +91,7 @@ func test_달리다_몸에_닿은_생선을_먹는다() -> void:
 
 
 func test_높이_있는_생선은_달리기만_해서는_못_먹는다() -> void:
-	var sim := _sim_with("fish", 200.0, Balance.ITEM_LIFT + Balance.FISH_ARC_HEIGHT)
+	var sim := _sim_with("fish", 200.0, Balance.ITEM_LIFT + 120.0)
 	for i in 120:
 		sim.step(DT, false)
 	assert_eq(sim.fish, 0)

@@ -39,7 +39,7 @@ func test_단계가_오르면_신호가_한_번_켜지고_효과음이_난다() 
 
 func test_속도가_그대로인_단계는_신호가_없다() -> void:
 	var sim := RunnerSim.new(1)
-	sim.elapsed = 420.0 - 2.0 * DT
+	sim.elapsed = 320.0 - 2.0 * DT
 	sim.stage = 10
 	for i in 6:
 		sim.step(DT, false)

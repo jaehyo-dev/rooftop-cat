@@ -70,7 +70,7 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	var world: Node2D = main.get_node("World")
 	await wait_frames(3)
 	assert_false(main.get_node("GameOver").visible, "처음엔 게임 끝 화면 없음")
-	assert_eq(main.get_node("BestLabel").text, "BEST 0 m")
+	assert_eq(main.get_node("BestLabel").text, "BEST 0")
 
 	# 앞으로 조금 간 뒤 화면 아래로 떨어뜨린다
 	world.sim.x += Balance.PX_PER_METER * 42.0
@@ -83,9 +83,14 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	assert_true(meters >= 42, "거리 점수 %d m" % meters)
 	assert_true(main.get_node("GameOver").visible, "게임 끝 화면")
 	assert_true(main.get_node("GameOver/Label").text.contains("%d m" % meters), "이번 거리")
-	assert_true(main.get_node("GameOver/Label").text.contains("NEW BEST"), "첫 기록은 최고 기록")
-	assert_eq(BestRecord.load_best(PATH), meters, "최고 기록 저장")
-	assert_eq(main.get_node("BestLabel").text, "BEST %d m" % meters)
+	var score: int = world.sim.score()
+	var result: String = main.get_node("GameOver/Label").text
+	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보") and result.contains("점수  %d" % score), result)
+	assert_true(result.contains("새 기록"), "첫 기록은 새 기록")
+	assert_eq(BestRecord.load_best(PATH), meters, "최고 거리 저장")
+	assert_eq(BestRecord.load_best_score(PATH), score, "최고 점수 저장")
+	assert_eq(main.get_node("BestLabel").text, "BEST %d" % score)
+	assert_true(main.get_node("GameOver/Retry").visible and main.get_node("GameOver/Retry").text == "다시 하기", "다시 하기 버튼")
 
 	# 바로 누르면 다시 시작하지 않는다 (떨어지며 누르던 손가락)
 	_touch(true)
@@ -102,7 +107,7 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	assert_false(main.get_node("GameOver").visible, "게임 끝 화면 닫힘")
 	assert_true(world.sim.on_ground, "다시 시작한 누름으로는 점프하지 않음")
 	assert_eq(world.sim.distance(), 0, "거리는 0부터")
-	assert_eq(main.get_node("BestLabel").text, "BEST %d m" % meters, "최고 기록은 그대로 보임")
+	assert_eq(main.get_node("BestLabel").text, "BEST %d" % score, "최고 점수는 그대로 보임")
 	_touch(false)
 	await wait_frames(2)
 	_touch(true)
@@ -164,8 +169,9 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 		sim.items.append({"kind": "fish", "x": sim.x + dx, "y": sim.y + Balance.ITEM_LIFT})
 	sim.items.append({"kind": "box", "x": sim.x + 240.0, "y": sim.y + Balance.ITEM_LIFT})
 	await get_tree().create_timer(0.8).timeout
-	assert_eq(sim.fish, 2)
-	assert_eq(main.get_node("FishLabel").text, "2", "이번 판 생선 수")
+	assert_true(sim.fish >= 2, "앞에 놓은 생선을 먹음")
+	assert_eq(main.get_node("FishLabel").text, str(sim.fish), "이번 판 생선 수")
+	assert_eq(main.get_node("ComboLabel").text, "콤보 %d  x%d" % [sim.combo.count, sim.combo.multiplier()], "콤보 숫자와 배수")
 	assert_true(main.get_node("BoxIcon").visible, "상자를 가지면 상자 표시")
 
 	# 상자를 쓰고 떨어져 게임 끝 (FALL_LIMIT 아래로 바로 보내 구제 높이를 건너뜀)
@@ -176,8 +182,9 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	await wait_frames(3)
 	assert_true(sim.game_over)
 	assert_false(main.get_node("BoxIcon").visible, "상자 표시 꺼짐")
-	assert_true(main.get_node("GameOver/Label").text.contains("FISH +2  (TOTAL 12)"), main.get_node("GameOver/Label").text)
-	assert_eq(BestRecord.load_fish(PATH), 12, "모은 생선 저장")
+	assert_true(main.get_node("GameOver/Label").text.contains("먹은 생선  %d  (모은 생선 %d)" % [sim.fish, 10 + sim.fish]), main.get_node("GameOver/Label").text)
+	assert_true(main.get_node("ScoreLabel").text == str(sim.score()), "오른쪽 위 점수")
+	assert_eq(BestRecord.load_fish(PATH), 10 + sim.fish, "모은 생선 저장")
 	main.queue_free()
 	DirAccess.remove_absolute(PATH)
 

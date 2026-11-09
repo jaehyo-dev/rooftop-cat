@@ -1,20 +1,28 @@
 extends SceneTree
 ## 밸런스 비교표 출력 (자동 테스트가 아니라 보고용 도구).
-## 실행: godot --headless --path . -s res://tests/balance_report.gd
-## 시드 1~30, 실력별로 한 판(최대 900초)을 돌려 한 판 길이 가운데값, 끝난 단계, 특수 틈 성공률, 아이템 효과를 찍는다.
+## 실행: godot --headless --path . -s res://tests/balance_report.gd [-- --seeds=200 --effects --skill=초보]
+## 시드 1~SEEDS(기본 30), 실력별로 한 판(최대 900초)을 돌려 한 판 길이 가운데값, 끝난 단계, 특수 틈 성공률, 아이템 효과를 찍는다.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
-const SEEDS := 30
 const MAX_TIME := 900.0
+var SEEDS := 30
 
 
 func _initialize() -> void:
-	print("| 실력 | 가운데값(초) | 하위25% | 상위25% | 끝난 단계 | 첫 30초 안에 끝 | 떨어짐/하트 0 | 하트 잃은 곳 | 트램펄린 틈 성공 | 판 틈 성공 | 떨어진 곳 |")
-	print("|---|---|---|---|---|---|---|---|---|---|---|")
+	var only := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--seeds="):
+			SEEDS = int(arg.get_slice("=", 1))
+		elif arg.begins_with("--skill="):
+			only = arg.get_slice("=", 1)
+	print("| 실력 | 평균(초) | 가운데값(초) | 하위25% | 상위25% | 끝난 단계 | 첫 30초 안에 끝 | 떨어짐/하트 0 | 하트 잃은 곳 | 트램펄린 틈 성공 | 판 틈 성공 | 떨어진 곳 |")
+	print("|---|---|---|---|---|---|---|---|---|---|---|---|")
 	var rates := ""
 	var items := "\n| 실력 | 질주 (판당) | 질주당 부순 수 | 질주 길이 평균/최대 | 끝난 뒤 3초 안 떨어짐 | 첫 질주 시각 (먹은 판) | 털실 중 생선 증가 | 쿠키 먹음 판당 (3개에서) | 방울 먹음/막음 | 통조림 먹음/바뀐 장애물 | 황금 |\n|---|---|---|---|---|---|---|---|---|---|---|\n"
 	var freq := "\n| 실력 | 분당 놓임: 쿠키 | 질주 | 통조림 | 방울 | 털실 | 생선 줄 |\n|---|---|---|---|---|---|---|\n"
 	for skill_name in BalanceBot.SKILLS:
+		if only != "" and only != skill_name:
+			continue
 		var times: Array[float] = []
 		var total := {}
 		var deaths := {}
@@ -52,7 +60,7 @@ func _initialize() -> void:
 				firsts.append(s.first_dash)
 		times.sort()
 		firsts.sort()
-		print("| %s | %.0f | %.0f | %.0f | %d | %d/%d | %d/%d | %s | %s | %s | %s |" % [skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4],
+		print("| %s | %.0f | %.0f | %.0f | %.0f | %d | %d/%d | %d/%d | %s | %s | %s | %s |" % [skill_name, total.time / SEEDS, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4],
 				SpeedCurve.stage_at(times[SEEDS / 2]), early, SEEDS, ends.fall, ends.hearts, _shares(hits),
 				_rate(total.tramp_ok, total.tramp_try), _rate(total.pole_ok, total.pole_try), str(deaths)])
 		rates += "\n%s 단계별 구간 옥상 통과율: " % skill_name
@@ -78,21 +86,25 @@ func _initialize() -> void:
 	print(items)
 	print(freq)
 	if OS.get_cmdline_user_args().has("--effects"):
-		_effects()
+		_effects(only)
 	quit(0)
 
 
-## 아이템 하나씩 끈 판과 비교: 가운데값 (초)
-func _effects() -> void:
+## 아이템 하나씩 끈 판과 비교: 평균 / 가운데값 (초)
+func _effects(only: String) -> void:
 	print("| 끈 것 | 초보 | 익숙함 | 숙련 |\n|---|---|---|---|")
-	for off: Array in [[], ["cookie"], ["bell"], ["dash"], ["can"], ["yarn"], ["cookie", "bell", "dash", "can", "yarn"]]:
+	for off: Array in [[], ["cookie", "bell", "dash", "can", "yarn"]] if SEEDS > 30 else [[], ["cookie"], ["bell"], ["dash"], ["can"], ["yarn"], ["cookie", "bell", "dash", "can", "yarn"]]:
 		var row: Array[String] = []
 		for skill_name in BalanceBot.SKILLS:
+			if only != "" and only != skill_name:
+				continue
 			var times: Array[float] = []
+			var sum := 0.0
 			for seed_value in SEEDS:
 				times.append(BalanceBot.play_stats(BalanceBot.SKILLS[skill_name], seed_value + 1, MAX_TIME, Balance.RUN_SPEED, true, [], off).time)
+				sum += times[-1]
 			times.sort()
-			row.append("%.0f" % times[SEEDS / 2])
+			row.append("%.0f / %.0f" % [sum / SEEDS, times[SEEDS / 2]])
 		print("| %s | %s |" % [", ".join(off) if not off.is_empty() else "없음", " | ".join(row)])
 
 

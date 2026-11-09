@@ -63,8 +63,8 @@ func _play(main: Control, world: Node2D, out: String, hit: bool) -> void:
 			if item[0] == "flock":
 				presses.append({"x": item[1] - 0.4 * SPEED, "hold": JumpModel.max_hold_time(), "dj": false})
 		elif item[0] != "flock":
-			var best: Dictionary = BalanceBot._best_jump(item[0], SPEED, false)
-			presses.append({"x": item[1] - best.lead * SPEED, "hold": best.hold, "dj": best.dj})
+			var action: String = {"pot": "mid", "ac": "long", "tank": "double"}[item[0]]
+			presses.append({"x": item[1] - FishRoad.press_lead(item[0], action, SPEED) * SPEED, "hold": FishRoad.center_variant(action)[0], "dj": action == "double"})
 	var end: float = list[-1][1] + 500.0
 	var left := 0.0
 	var double_at := INF

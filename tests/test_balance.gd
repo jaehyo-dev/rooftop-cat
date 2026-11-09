@@ -10,6 +10,7 @@ const MAX_TIME := 900.0  # 15분 버티면 그만 잰다
 
 func test_실력별_한_판_길이와_끝난_이유() -> void:
 	var medians := {}
+	var ended := {}
 	for skill_name in BalanceBot.SKILLS:
 		var times: Array[float] = []
 		var falls := 0
@@ -23,14 +24,15 @@ func test_실력별_한_판_길이와_끝난_이유() -> void:
 			early += 1 if s.time < 30.0 else 0
 		times.sort()
 		medians[skill_name] = times[SEEDS / 2]
+		ended[skill_name] = falls + hearts
 		print("    밸런스 봇 %s: 가운데값 %.0f초 (하위 25%% %.0f초, 상위 25%% %.0f초), 떨어짐 %d, 하트 0 %d" % [
 			skill_name, times[SEEDS / 2], times[SEEDS / 4], times[SEEDS * 3 / 4], falls, hearts])
 		if skill_name == "초보":
 			assert_true(early * 10 <= SEEDS, "초보도 첫 30초 안에 끝나는 판은 10%% 이하 (%d판)" % early)
-	# 목표는 60~90초. 아이템이 들어온 뒤 시드 200개 가운데값 97초, 앞 30개는 138초까지 흔들려 여기서는 크게 벗어나는 것만 잡는다
-	assert_true(medians["초보"] >= 60.0 and medians["초보"] <= 180.0, "초보 60~180초 (%.0f초)" % medians["초보"])
-	assert_true(medians["익숙함"] >= 180.0, "익숙해지면 3분 이상 (%.0f초)" % medians["익숙함"])
-	assert_true(medians["숙련"] >= 600.0, "숙련 목표 600초 이상 (%.0f초)" % medians["숙련"])
+	# 목표(PLAN 16번): 초보 60~90, 익숙함 180~300, 숙련은 900초 끝까지 가지 않음. 시드 30개라 흔들리니 목표보다 조금 넓게 본다
+	assert_true(medians["초보"] >= 55.0 and medians["초보"] <= 100.0, "초보 60~90초 (%.0f초)" % medians["초보"])
+	assert_true(medians["익숙함"] >= 150.0 and medians["익숙함"] <= 340.0, "익숙함 180~300초 (%.0f초)" % medians["익숙함"])
+	assert_true(ended["숙련"] * 10 >= SEEDS * 7 and medians["숙련"] < 900.0, "숙련도 대부분 끝까지 못 감 (%d판 끝남, 가운데값 %.0f초)" % [ended["숙련"], medians["숙련"]])
 
 
 func test_첫_질주는_첫_판_대본에서_20에서_25초에_나온다() -> void:

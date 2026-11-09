@@ -1,5 +1,5 @@
 class_name BestRecord
-## 최고 기록(거리, 미터)과 모은 생선 수(스킨을 사는 재화)를 기기에 저장하고 불러온다.
+## 최고 기록(거리, 미터), 최고 점수, 모은 생선 수(강화 상점의 돈)를 기기에 저장하고 불러온다.
 ## 웹에서는 user://가 브라우저 저장소(IndexedDB)에 저장된다.
 ## 저장 파일이 없거나 깨졌으면 0으로 본다.
 
@@ -10,6 +10,19 @@ const SAVE_VERSION := 1
 
 static func load_best(path: String = DEFAULT_PATH) -> int:
 	return _load_int("record", "best_distance", path)
+
+
+## 최고 점수 (저장 파일에 없으면 0: v0.6.0 전 저장도 그대로 읽힌다)
+static func load_best_score(path: String = DEFAULT_PATH) -> int:
+	return _load_int("record", "best_score", path)
+
+
+## 이번 점수가 최고 점수보다 높으면 저장한다. 새 최고 점수면 true
+static func submit_score(score: int, path: String = DEFAULT_PATH) -> bool:
+	if score <= load_best_score(path):
+		return false
+	_save_int("record", "best_score", score, path)
+	return true
 
 
 ## 지금까지 모은 생선 수

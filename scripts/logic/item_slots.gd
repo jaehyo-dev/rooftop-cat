@@ -1,7 +1,7 @@
 class_name ItemSlots
 extends RefCounted
 ## 아이템 자리(손으로 짠 구간의 "slot")에 무엇을 놓을지 고른다 (화면과 분리된 로직, PLAN 3번).
-## 우선순위와 간격은 Balance.SLOT_ITEMS. 시간이 된 것 중 앞선 것을 놓고, 없으면 생선 줄.
+## 우선순위와 간격은 Balance.SLOT_ITEMS. 시간이 된 것 중 앞선 것을 놓고, 없으면 생선 한 마리 (생선 길의 빈자리를 메움).
 
 var _rng := RandomNumberGenerator.new()
 var _next := {}  # 종류 → 이 시각부터 나올 수 있음
@@ -23,11 +23,8 @@ func fill(slot: Dictionary, now: float, hearts: int, has_bell: bool) -> Array[Di
 	if slot.has("forced") and not off.has(slot.forced):
 		kind = slot.forced
 	if kind == "fish":
-		var row: Array[Dictionary] = []
-		for n in Balance.SLOT_FISH:
-			row.append({"kind": "fish", "x": slot.x + n * Balance.FISH_SPACING, "y": slot.y})
 		made.fish = made.get("fish", 0) + 1
-		return row
+		return [{"kind": "fish", "x": slot.x, "y": slot.y, "bonus": true}] as Array[Dictionary]
 	_mark(kind, now)
 	return [{"kind": kind, "x": slot.x, "y": slot.y}] as Array[Dictionary]
 
@@ -48,4 +45,4 @@ func _mark(kind: String, now: float) -> void:
 	made[kind] = made.get(kind, 0) + 1
 	for row: Array in Balance.SLOT_ITEMS:
 		if row[0] == kind:
-			_next[kind] = now + _rng.randf_range(row[2], row[3])
+			_next[kind] = now + _rng.randf_range(row[2], row[3]) * (Balance.ITEM_LATE_MULT if now >= Balance.ITEM_LATE_TIME else 1.0)

@@ -1,5 +1,5 @@
 extends Control
-## 시작 화면: 게임 화면(World), 거리·최고 기록·생선 수·종이상자 표시, 게임 끝 화면, 버전 표시.
+## 시작 화면: 게임 화면(World), 거리·최고 점수·생선 수·종이상자, 오른쪽 위 점수·콤보, 결과 화면, 버전 표시.
 ## 글꼴은 Gaegu Bold(main.tscn 테마, 한글 포함). 갈색 글자 + 얇은 밝은 테두리.
 
 ## 최고 기록·생선 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
@@ -25,7 +25,7 @@ var _music := AudioStreamPlayer.new()
 func _ready() -> void:
 	# 버전은 project.godot 한 곳에서 읽는다.
 	$VersionLabel.text = "v" + str(ProjectSettings.get_setting("application/config/version"))
-	_best = BestRecord.load_best(record_path)
+	_best = BestRecord.load_best_score(record_path)
 	_world.game_over.connect(_on_game_over)
 	_world.restarted.connect(_on_restarted)
 	_on_restarted()
@@ -43,6 +43,11 @@ func _process(delta: float) -> void:
 	$DistanceLabel.text = "%d m" % _world.sim.distance()
 	$FishLabel.text = str(_world.sim.fish)
 	$BoxIcon.visible = _world.sim.has_box
+	$ScoreLabel.text = str(_world.sim.score())
+	var combo: FishCombo = _world.sim.combo
+	$ComboLabel.text = "콤보 %d  x%d" % [combo.count, combo.multiplier()] if combo.count > 0 else ""
+	if $GameOver.visible:
+		$GameOver/Retry.modulate.a = 1.0 if _world.can_restart() else 0.5  # 누를 수 있게 되면 진해진다
 	# 단계마다 곡이 조금씩 빨라진다
 	var pitch := SpeedCurve.music_pitch(_world.sim.stage)
 	_pitch_wait -= delta
@@ -53,17 +58,19 @@ func _process(delta: float) -> void:
 
 
 func _on_game_over(meters: int) -> void:
-	var new_best := BestRecord.submit(meters, record_path)
-	_best = maxi(_best, meters)
-	var fish: int = _world.sim.fish
-	# shortcut: 게임 끝에만 저장해 판 중간에 창을 닫으면 그 판 생선은 사라짐, 스킨 상점(8단계) 때 판 중 저장을 검토
-	var total := BestRecord.add_fish(fish, record_path)
-	$GameOver/Label.text = "GAME OVER\n\n%d m\n%s\n\nFISH +%d  (TOTAL %d)\n\nTAP TO RUN AGAIN" % [
-		meters, "NEW BEST!" if new_best else "BEST %d m" % _best, fish, total]
+	BestRecord.submit(meters, record_path)
+	var sim: RunnerSim = _world.sim
+	var score: int = sim.score()
+	var new_best := BestRecord.submit_score(score, record_path)
+	_best = maxi(_best, score)
+	# shortcut: 게임 끝에만 저장해 판 중간에 창을 닫으면 그 판 생선은 사라짐, 강화 상점(v0.7.0) 때 판 중 저장을 검토
+	var total := BestRecord.add_fish(sim.fish, record_path)
+	$GameOver/Label.text = "거리  %d m\n먹은 생선  %d  (모은 생선 %d)\n최고 콤보  %d\n\n점수  %d\n%s" % [
+		meters, sim.fish, total, sim.combo.best, score, "새 기록!" if new_best else "최고 점수  %d" % _best]
 	$GameOver.visible = true
-	$BestLabel.text = "BEST %d m" % _best
+	$BestLabel.text = "BEST %d" % _best
 
 
 func _on_restarted() -> void:
 	$GameOver.visible = false
-	$BestLabel.text = "BEST %d m" % _best
+	$BestLabel.text = "BEST %d" % _best

@@ -6,9 +6,10 @@ scripts/balance.gd, jump_model.gd의 수치·식을 옮겨 다음을 계산한�
   2) 장애물별로 "언제 누르면 피하는가" 창(ms). 톡은 실제 손처럼 50~100ms 누름
   3) 구간(segments.json)을 사람처럼 통과할 수 있는가: 위험마다 누름 창이 100ms 이상(가운데서 ±50ms 흔들려도 통과),
      누름 길이가 흔들려도 통과, 착지 깊이(0.3~0.87초)가 달라도 통과. 만든 뒤 다음 속도 단계로 달려도 통과.
-  4) segments.png: 구간 그림 (점선 = 계획대로 달린 경로)
+  4) 생선 길(segments.json의 roads, tests/export_segments.gd로 내보냄): 호대로 ±50ms·누름 길이 흔들려 달려도 맞지 않고 필수 생선을 다 먹는가.
+  5) segments.png: 구간 그림 (점선 = 계획대로 달린 경로, 파랑 = 생선 길)
 
-실행: python3 review/v0.6.0/design_check.py   (실패가 있으면 종료 코드 1)
+실행: godot --headless --path . -s res://tests/export_segments.gd 뒤 python3 review/v0.6.0/design_check.py   (실패가 있으면 종료 코드 1)
 shortcut: 옥상·장애물 판정만 옮긴 근사이고 실제 RunnerSim이 아니다. 전봇대·트램펄린·코요테·구제는 없다.
           탭 50~100ms는 가정(휴대폰에서 2a에 잰다). 2a에서 GDScript + RunnerSim으로 다시 만든다.
 """
@@ -40,8 +41,8 @@ ROOT = HERE.parent.parent
 
 STAGES = [  # 단계, 시작(초), 속도, 구간 밀도(길이에 곱함: 작을수록 촘촘). PLAN 13번 표
     (1, 0, 430, 1.00), (2, 14, 500, 0.97), (3, 28, 570, 0.94), (4, 45, 640, 0.91), (5, 68, 710, 0.88),
-    (6, 95, 780, 0.85), (7, 125, 850, 0.82), (8, 160, 910, 0.79), (9, 200, 950, 0.77), (10, 260, 950, 0.73),
-    (11, 360, 950, 0.69), (12, 480, 950, 0.65),
+    (6, 95, 780, 0.85), (7, 125, 850, 0.82), (8, 160, 910, 0.79), (9, 200, 950, 0.77), (10, 260, 950, 0.71),
+    (11, 320, 950, 0.65), (12, 400, 950, 0.60),
 ]
 OBST = {  # 판정 상자: 폭, 아래, 위 (옥상 바닥에서 위로). 비둘기는 초당 FLOCK_V로 다가온다
     "pot":   {"w": 48.0,  "y0": 0.0,   "y1": 38.0,  "name": "화분", "color": (200, 96, 60)},
@@ -268,6 +269,45 @@ def self_check():
     assert windows("ac", 430.0)[0]["톡"] == 0, "처음 속도에서 실외기가 톡으로 넘어감"
     assert not hit(0.0, 0.0, -50.0, 50.0, OBST["flock"]["y0"], OBST["flock"]["y1"]), "비둘기가 달리기에 맞음"
     assert plan({"roofs": [{"t": 3.8, "obs": [["tank", 2.0]]}]}, 570.0)["actions"] == ["더블"], "물탱크 정답이 더블이 아님"
+    # 생선 길 검사가 진짜로 잡는지: 호 위로 300 띄운 생선은 못 먹고, 장애물로 뛰어드는 호는 맞는다
+    jump = {"press_x": 800.0, "name": "mid", "hold": 0.155, "double_at": -1.0, "top": 0.0}
+    high = {"id": "시험", "roofs": [{"t": 6.0}], "roads": {"1": {"flights": [jump], "fish": [[1000.0, 500.0, 0]]}}}
+    assert check_road(high), "못 먹는 필수 생선을 못 잡음"
+    hit_road = {"id": "시험", "roofs": [{"t": 6.0, "obs": [["ac", 2.2]]}], "roads": {"1": {"flights": [dict(jump, press_x=900.0, hold=0.05, name="tok")], "fish": []}}}
+    assert check_road(hit_road), "장애물에 맞는 호를 못 잡음"
+
+
+def check_road(seg):
+    """생선 길: 이 계산기의 물리로 호를 따라 달려도 맞지 않고 필수 생선을 다 먹는지 (게임 코드와 따로 계산한 교차 검사)."""
+    bad = []
+    holds = {"tok": (0.05, 0.10), "mid": (0.13, 0.18), "long": (HOLD_MAX, HOLD_MAX), "double": (HOLD_MAX, HOLD_MAX)}
+    for stage, road in seg["roads"].items():
+        v, density = STAGES[int(stage) - 1][2:]
+        roofs, obs, _ = build(seg, v, density)
+        world = (roofs, obs)
+        required = [f for f in road["fish"] if not f[2] and roofs[0][0] + 0.87 * v + 100 <= f[0] <= roofs[-1][1] - 0.8 * v]
+        for shift in (-0.05, 0.0, 0.05):
+            for pick in (0, 1):
+                spans, ok = [], True
+                for f in road["flights"]:
+                    press = f["press_x"] + shift * v
+                    h = holds[f["name"]][pick]
+                    if f["press_x"] < roofs[0][0] + 0.87 * v or press > roofs[-1][1] + FOOT:
+                        continue
+                    dj = f["double_at"] if f["double_at"] >= 0 else None
+                    land = flight(world, press, f["top"], h, dj, v)
+                    if land is None:
+                        bad.append(f"{seg['id']} 단계 {stage} {f['name']} x={f['press_x']:.0f} 어긋남 {shift * 1000:+.0f}ms: 호대로 뛰었는데 맞음")
+                        ok = False
+                        break
+                    spans.append((press, land[0], land[2]))
+                if not ok:
+                    continue
+                for fx, fy, _b in required:
+                    flown = [s for s in spans if s[0] <= fx <= s[1]]
+                    if flown and not any(((px - fx) / (CAT_W / 2 + 24)) ** 2 + ((py + CAT_H / 2 - fy) / (CAT_H / 2 + 24)) ** 2 < 1 for s in flown for px, py in s[2]):
+                        bad.append(f"{seg['id']} 단계 {stage} 어긋남 {shift * 1000:+.0f}ms: 필수 생선 ({fx:.0f}, {fy:.0f}) 못 먹음")
+    return bad
 
 
 def check_seg(seg):
@@ -297,6 +337,7 @@ def check_seg(seg):
     if has_gold:
         fails = [s[2] for s in stages if not plan(seg, s[2], s[3], 0.6, need_gold=True)["ok"]]
         gold = "O" if not fails else "못 먹음: " + ",".join(map(str, fails))
+    bad += check_road(seg)
     return seg, row, bad, worst_w, worst_r, gold
 
 
@@ -336,6 +377,8 @@ def draw(data, out):
                 d.ellipse((ix - r, iy - r, ix + r, iy + r), fill=item_c[it["kind"]], outline=(70, 50, 30))
                 if it["kind"] != "fish":
                     d.text((ix + 13, iy - 11), "황금" if it["kind"] == "gold" else "아이템 자리", fill=item_c[it["kind"]], font=small)
+        for fx, fy, bonus in seg["roads"][str(next(s[0] for s in STAGES if s[2] >= seg["min_speed"]))]["fish"]:
+            d.ellipse((sx(fx) - 4, sy(fy) - 4, sx(fx) + 4, sy(fy) + 4), fill=(170, 200, 225) if bonus else (70, 120, 190))
         for px, py in p["path"]:
             d.ellipse((sx(px) - 2, sy(py + CAT_H / 2) - 2, sx(px) + 2, sy(py + CAT_H / 2) + 2), fill=(240, 120, 40))
     img.save(out)

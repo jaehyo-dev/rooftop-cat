@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world_view.gd" id="2"]
@@ -11,6 +11,22 @@ default_font = ExtResource("5")
 Label/colors/font_color = Color(0.353, 0.275, 0.212, 1)
 Label/colors/font_outline_color = Color(1, 0.97, 0.9, 1)
 Label/constants/outline_size = 6
+
+[sub_resource type="StyleBoxFlat" id="retry_box"]
+content_margin_left = 40.0
+content_margin_top = 6.0
+content_margin_right = 40.0
+content_margin_bottom = 6.0
+bg_color = Color(1, 0.97, 0.9, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.353, 0.275, 0.212, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -42,6 +58,33 @@ theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 1)
 theme_override_font_sizes/font_size = 30
 horizontal_alignment = 2
 
+[node name="ScoreLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -424.0
+offset_top = 8.0
+offset_right = -24.0
+offset_bottom = 76.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 60
+text = "0"
+horizontal_alignment = 2
+
+[node name="ComboLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -424.0
+offset_top = 72.0
+offset_right = -26.0
+offset_bottom = 116.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 38
+horizontal_alignment = 2
+
 [node name="DistanceLabel" type="Label" parent="."]
 layout_mode = 0
 offset_left = 24.0
@@ -60,7 +103,7 @@ offset_right = 426.0
 offset_bottom = 116.0
 theme_override_colors/font_color = Color(0.353, 0.275, 0.212, 1)
 theme_override_font_sizes/font_size = 38
-text = "BEST 0 m"
+text = "BEST 0"
 
 [node name="FishIcon" type="TextureRect" parent="."]
 texture_filter = 4
@@ -111,11 +154,31 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -120.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(1, 0.98, 0.95, 1)
 theme_override_colors/font_outline_color = Color(0.353, 0.275, 0.212, 1)
 theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 48
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Retry" type="Label" parent="GameOver"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -130.0
+offset_top = -112.0
+offset_right = 130.0
+offset_bottom = -36.0
+grow_horizontal = 2
+grow_vertical = 0
 theme_override_font_sizes/font_size = 52
+theme_override_styles/normal = SubResource("retry_box")
+text = "다시 하기"
 horizontal_alignment = 1
 vertical_alignment = 1

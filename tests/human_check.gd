@@ -18,13 +18,14 @@ var run_speed := 0.0
 ## 찾은 동작 이름들 (톡, 중간, 길게, 더블, 트램펄린)
 var actions: Array[String] = []
 var why := ""
+## 생선 길 검사용 (setup_road)
+var road_items: Array[Dictionary] = []
+var road_flights: Array[Dictionary] = []
 
 
 ## 쉬운 동작부터: [이름, [[누름 길이, 더블 누르는 시각(없으면 -1)], ...]]. 흔들린 경우 전부 통과해야 한다
 static func action_list() -> Array:
-	var hold := JumpModel.max_hold_time()
-	var apex := hold + JumpModel.jump_speed() / Balance.GRAVITY
-	return [["톡", [[0.05, -1.0], [0.10, -1.0]]], ["중간", [[0.13, -1.0], [0.18, -1.0]]], ["길게", [[hold, -1.0]]], ["더블", [[hold, apex - 0.05], [hold, apex + 0.05]]]]
+	return [["톡", FishRoad.variants("tok")], ["중간", FishRoad.variants("mid")], ["길게", FishRoad.variants("long")], ["더블", FishRoad.variants("double")]]
 
 
 ## 구간 id를 속도 v·밀도 density로 펴고 뒤에 tail("plain", "tramp", "pole")을 붙인 세계
@@ -50,6 +51,60 @@ func setup_segment(id: String, v: float, density: float, tail: String, speed_whe
 	for roof in made:
 		obs.append_array(roof.obs)
 	setup_world(list, obs, speed_when_run if speed_when_run > 0.0 else v)
+
+
+## 구간 id의 생선 길: 속도 v로 펼치고 run_speeds로 생선을 깐 세계 (뒤에 일반 틈 + 런아웃). road_items·road_flights를 채운다
+func setup_road(id: String, v: float, density: float, run_speeds: Array) -> void:
+	setup_segment(id, v, density, "plain", run_speeds[0])
+	var road := FishRoad.new()
+	var entry := {"left": roofs[0].left - 3000.0, "right": roofs[0].left - 200.0, "top": roofs[0].top}
+	road_items = road.extend(entry, roofs[0], run_speeds)
+	for i in range(1, roofs.size()):
+		road_items.append_array(road.extend(roofs[i - 1], roofs[i], run_speeds))
+	road_flights = road.flights
+
+
+## 생선 길을 따라 달린다: 호마다 누를 자리에서 shift초 어긋나게, 누름 길이는 variant번째 흔들림으로 누른다. 내려앉는 깊이 depth초부터.
+## {"hit": 맞음·벽·떨어짐·호가 겹침, "missed": 못 먹은 필수 생선 x들, "cut": 콤보가 끊겼는지, "eaten": 먹은 생선 수, "required": 필수 생선 수}
+func walk_road(shift: float, variant: int, depth: float, press_at_all: bool = true) -> Dictionary:
+	var start: float = roofs[0].left + depth * run_speed
+	var todo: Array[Dictionary] = []
+	for f in road_flights:
+		if f.press_x > start and press_at_all:
+			todo.append(f)
+	var end: float = roofs[-1].left + 400.0
+	_place(start, roofs[0])
+	sim.combo = FishCombo.new()
+	sim.items = road_items.duplicate(true)
+	var required := {}
+	for item in sim.items:
+		if item.x < start + 100.0:
+			item.bonus = true  # 이미 지나간 자리
+		elif item.kind == "fish" and not item.has("bonus") and item.x < end:
+			required[item.x] = true
+	var result := {"hit": "", "missed": [], "cut": false, "eaten": 0, "required": required.size()}
+	var since := INF
+	var flying := {}
+	while sim.x < end and result.hit == "":
+		if not todo.is_empty() and sim.x + run_speed * DT >= todo[0].press_x + shift * run_speed:
+			flying = todo.pop_front()
+			if not sim.on_ground:
+				result.hit = "x=%.0f %s: 앞 호가 안 끝났는데 눌러야 함" % [flying.press_x, flying.name]
+			since = 0.0
+		var pressed := false
+		if not flying.is_empty():
+			var picked: Array = FishRoad.variants(flying.name)[mini(variant, FishRoad.variants(flying.name).size() - 1)]
+			pressed = since < picked[0] or (picked[1] >= 0.0 and since >= picked[1] and since < picked[1] + JumpModel.double_max_hold())
+			since += DT
+		sim.step(DT, pressed)
+		for item in sim.picked:
+			required.erase(item.x)
+			result.eaten += 1
+		if sim.game_over or sim.ghosted or sim.hearts < Balance.HEARTS_MAX:
+			result.hit = "x=%.0f 부딪힘 (%s)" % [sim.x, "벽" if sim.ghosted else ("떨어짐" if sim.fell else "장애물")]
+	result.missed = required.keys()
+	result.cut = sim.combo.best != result.eaten or sim.combo.count != result.eaten
+	return result
 
 
 ## 직접 만든 세계 (마지막 옥상에 내려서면 통과). 장애물 상자는 GROW만큼 넓혀 둔다

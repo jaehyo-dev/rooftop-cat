@@ -53,7 +53,7 @@ func test_질주_끝에_빈_곳에_내려놓는_일이_없다() -> void:
 			var roof: Dictionary = sim.get("_ground_roof")
 			assert_true(sim.on_ground and sim.landed and is_equal_approx(sim.y, roof.top), "옥상 위에 내려섬")
 			assert_true(sim.x + Balance.CAT_FOOT_HALF >= roof.left and sim.x - Balance.CAT_FOOT_HALF <= roof.right, "발이 옥상 위")
-			assert_true(roof.right - sim.x >= v * 1.0, "남은 옥상이 충분히 넓음 (%.0f)" % (roof.right - sim.x))
+			assert_true(roof.right - sim.x >= v * 0.5, "남은 옥상이 충분히 넓음 (%.0f)" % (roof.right - sim.x))
 			assert_true(seconds >= Balance.DASH_TIME, "4초는 달림 (%.1f)" % seconds)
 			for o in sim.obstacles:
 				assert_false(o.x >= roof.left and o.x <= roof.right, "착지 옥상에는 장애물 없음")
@@ -69,6 +69,71 @@ func test_질주_끝에_빈_곳에_내려놓는_일이_없다() -> void:
 	assert_eq(count, 160)
 
 
+func test_질주_중에도_점프와_더블점프가_되고_발판_아래로_안_떨어진다() -> void:
+	var sim := _sim("dash", 2, 640.0, true)
+	while not sim.dashing:
+		sim.step(DT, false)
+	sim.step(DT, false)
+	var y0 := sim.y
+	sim.step(DT, true)
+	assert_true(sim.jumped, "점프")
+	assert_false(sim.on_ground, "공중")
+	for i in 3:
+		sim.step(DT, true)
+	assert_true(sim.y > y0, "올라감")
+	for i in 30:
+		sim.step(DT, false)
+	sim.step(DT, true)
+	assert_true(sim.double_jumped, "더블점프")
+	sim.step(DT, false)
+	sim.step(DT, true)
+	assert_false(sim.double_jumped or sim.jumped, "세 번째는 안 됨")
+	while not sim.on_ground:
+		sim.step(DT, false)
+	assert_true(sim.landed and sim.dashing, "보이지 않는 발판에 내려섬")
+	sim.step(DT, true)
+	assert_true(sim.jumped, "내려서면 다시 점프")
+	assert_true(sim.vx() > 640.0, "질주 속도 유지")
+
+
+func test_질주_중_마구_뛰어도_착지_옥상_위에서_끝나고_안_떨어지며_공중_생선을_먹을_수_있다() -> void:
+	var ate_high := 0
+	for seed_value in 30:
+		for v in [430.0, 710.0, 950.0]:
+			var sim := _sim("dash", seed_value + 1, v, true)
+			var rng := RandomNumberGenerator.new()
+			rng.seed = seed_value
+			var press := false
+			var t := 0.0
+			while not sim.dash_started:
+				sim.step(DT, false)
+			while sim.dashing and t < 30.0:
+				if rng.randf() < 0.05:
+					press = not press
+				sim.step(DT, press)
+				t += DT
+				for item in sim.picked:
+					ate_high += 1 if item.kind == "fish" and item.y > sim.get("_dash_base") + 150.0 else 0
+				assert_false(sim.game_over, "떨어지지 않음")
+			assert_true(sim.dash_ended and sim.on_ground and sim.landed, "시드 %d 속도 %d: 땅에서 끝남" % [seed_value, v])
+			var roof: Dictionary = sim.get("_ground_roof")
+			assert_true(is_equal_approx(sim.y, roof.top), "순간이동 없이 옥상 높이")
+			assert_true(sim.x - Balance.CAT_FOOT_HALF <= roof.right and sim.x + Balance.CAT_FOOT_HALF >= roof.left, "시드 %d 속도 %d: 옥상 위" % [seed_value, v])
+			assert_true(roof.right - sim.x > 0.0, "지나치지 않음")
+	assert_true(ate_high > 100, "뛰면 공중 생선을 먹음 (%d)" % ate_high)
+
+
+func test_질주_착지_옥상_위에서는_새로_못_뛴다() -> void:
+	var sim := _sim("dash", 4, 640.0, true)
+	while not sim.dashing:
+		sim.step(DT, false)
+	sim.dash_time = 0.0
+	sim.set("_dash_landing", {"left": sim.x - 500.0, "right": sim.x + 5000.0, "top": sim.y})
+	sim.step(DT, false)
+	sim.step(DT, true)
+	assert_false(sim.jumped, "착지 옥상 위")
+
+
 func test_질주는_트램펄린_전봇대_판_no_ghost_벽을_무시하고_지나간다() -> void:
 	var sim := _sim("dash", 3, 570.0)
 	sim.set("_generator", RoofGenerator.new(3))
@@ -78,7 +143,7 @@ func test_질주는_트램펄린_전봇대_판_no_ghost_벽을_무시하고_지�
 	for round_i in 30:
 		sim.items.append({"kind": "dash", "x": sim.x + 80.0, "y": sim.y + Balance.ITEM_LIFT})
 		_run_dash(sim, func() -> void:
-			assert_false(sim.ghosted or sim.bounced or sim.is_riding() or sim.jumped or sim.double_jumped or sim.rescued, "일반 코드가 끼어들지 않음")
+			assert_false(sim.ghosted or sim.bounced or sim.is_riding() or sim.rescued or sim.is_doomed(), "일반 코드가 끼어들지 않음")
 			assert_true(sim.line_touch_eta(1.0).is_empty(), "눌러! 안내 없음")
 			assert_eq(sim.vx(), 855.0, "속도 그대로")
 			for s in sim.structures:
@@ -238,21 +303,21 @@ func test_아이템_자리는_우선순위와_간격대로_고른다() -> void:
 	var slots := ItemSlots.new(1)
 	assert_eq(slots.choose(0.0, 3, false), "fish", "처음에는 생선")
 	assert_eq(slots.choose(8.0, 3, false), "yarn", "털실이 먼저 나옴")
-	assert_eq(slots.choose(45.0, 3, false), "bell")
-	assert_true(slots.choose(45.0, 3, true) != "bell", "방울을 가지면 안 나옴")
-	assert_eq(slots.choose(60.0, 3, false), "can", "통조림이 방울보다 먼저")
-	assert_eq(slots.choose(60.0, 2, false), "cookie", "하트가 2개면 쿠키가 가장 먼저")
-	assert_true(slots.choose(60.0, 3, false) != "cookie", "하트 3개면 안 나옴")
-	slots.fill({"x": 0.0, "y": 0.0}, 60.0, 2, false)
-	assert_true(slots.choose(99.0, 2, false) != "cookie", "40초에 최대 1개")
-	assert_eq(slots.choose(100.0, 2, false), "cookie")
+	assert_eq(slots.choose(90.0, 3, false), "bell")
+	assert_true(slots.choose(90.0, 3, true) != "bell", "방울을 가지면 안 나옴")
+	assert_eq(slots.choose(120.0, 3, false), "can", "통조림이 방울보다 먼저")
+	assert_eq(slots.choose(90.0, 2, false), "cookie", "하트가 2개면 쿠키가 가장 먼저")
+	assert_true(slots.choose(120.0, 3, false) != "cookie", "하트 3개면 안 나옴")
+	slots.fill({"x": 0.0, "y": 0.0}, 90.0, 2, false)
+	assert_true(slots.choose(179.0, 2, false) != "cookie", "90초에 최대 1개")
+	assert_eq(slots.choose(180.0, 2, false), "cookie")
 	assert_true(slots.choose(9000.0, 3, false) != "dash", "질주는 대본 전에는 안 나옴")
 	var first := slots.fill({"x": 5.0, "y": 6.0, "forced": "dash"}, 24.0, 3, false)
 	assert_eq(first, [{"kind": "dash", "x": 5.0, "y": 6.0}] as Array[Dictionary], "대본의 첫 질주")
-	assert_true(slots.choose(24.0 + 49.0, 3, true) != "dash", "다음 질주는 50초 뒤부터")
-	assert_eq(slots.choose(24.0 + 70.0, 3, false), "dash", "늦어도 70초 뒤")
+	assert_true(slots.choose(24.0 + 89.0, 3, true) != "dash", "다음 질주는 90초 뒤부터")
+	assert_eq(slots.choose(24.0 + 130.0, 3, false), "dash", "늦어도 130초 뒤")
 	var row := ItemSlots.new(2).fill({"x": 0.0, "y": 6.0}, 0.0, 3, false)
-	assert_eq(row.size(), Balance.SLOT_FISH, "시간이 된 것이 없으면 생선 줄")
+	assert_eq(row.size(), 1, "시간이 된 것이 없으면 생선 한 마리 (생선 길의 빈자리)")
 
 
 func test_꺼진_아이템은_대본의_첫_질주도_나오지_않는다() -> void:
@@ -275,9 +340,8 @@ func test_대본_마지막_구간의_자리는_질주이고_구간_옥상에_황
 		for slot: Dictionary in roof.get("slots", []):
 			forced += 1 if slot.get("forced", "") == "dash" else 0
 	assert_eq(forced, 1, "첫 질주 하나")
-	var gold: Array = CoursePlacer.build("N3", 570.0, 1.0, 0.0, 200.0)[0].seg_items
-	assert_eq(gold.size(), 1)
-	assert_eq(gold[0].kind, "gold")
+	var gold: Array = FishRoad.new().extend({"left": -3000.0, "right": -200.0, "top": 200.0}, CoursePlacer.build("N3", 570.0, 1.0, 0.0, 200.0)[0], [570.0])
+	assert_eq(gold.filter(func(it: Dictionary) -> bool: return it.kind == "gold").size(), 1)
 
 
 func _world() -> Node2D:

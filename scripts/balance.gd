@@ -16,12 +16,12 @@ const CAT_SCREEN_X := 340.0
 # --- 달리기 ---
 const RUN_SPEED := 430.0  # 처음 속도 (초당 픽셀)
 const SPEED_MAX := 950.0
-## 속도 단계 표 (review/v0.6.0/PLAN.md 13번): [시작 시각(초), 속도, 구간 밀도].
+## 속도 단계 표 (review/v0.6.0/PLAN.md 13·16번): [시작 시각(초), 속도, 구간 밀도]. 2a-4: 단계 10~12를 앞당기고 밀도를 올림 (숙련 봇이 끝까지 가지 않게).
 ## 단계 10~12는 속도가 그대로라 신호를 내지 않고 밀도만 오른다.
 const SPEED_STAGES := [
 	[0.0, RUN_SPEED, 1.00], [14.0, 500.0, 0.97], [28.0, 570.0, 0.94], [45.0, 640.0, 0.91],
 	[68.0, 710.0, 0.88], [95.0, 780.0, 0.85], [125.0, 850.0, 0.82], [160.0, 910.0, 0.79],
-	[200.0, SPEED_MAX, 0.77], [260.0, SPEED_MAX, 0.73], [360.0, SPEED_MAX, 0.69], [480.0, SPEED_MAX, 0.65],
+	[200.0, SPEED_MAX, 0.77], [260.0, SPEED_MAX, 0.71], [320.0, SPEED_MAX, 0.65], [400.0, SPEED_MAX, 0.60],
 ]
 const SPEED_RAMP_TIME := 1.2  # 단계가 오를 때 다음 속도까지 부드럽게 빨라지는 시간 (초)
 ## 단계마다 배경 음악 pitch_scale을 이만큼 올린다 (최대 MUSIC_PITCH_MAX)
@@ -37,6 +37,13 @@ const SPEED_LINE_FADE := 0.3  # 진한 속도선이 끝에서 옅어지는 시�
 const PX_PER_METER := 100.0  # 거리 점수: 100픽셀 = 1미터
 ## 게임 끝 뒤 이 시간이 지나야 다시 시작 (떨어지며 누르던 손가락으로 바로 다시 시작되지 않게)
 const RESTART_DELAY := 0.8
+
+# --- 점수와 콤보 (PLAN 16번): 점수 = 거리(미터) + 생선 점수 합 ---
+const FISH_POINTS := 10
+const GOLD_POINTS := 200
+const COMBO_STEP := 20    # 생선이 촘촘해 예시(10개)보다 크게: x5까지 처음 속도로 약 13초
+const COMBO_MAX := 5
+const COMBO_TIMEOUT := 3.0  # 이 시간(초) 동안 못 먹으면 끊김 (쉼 옥상 + 트램펄린 비행도 이 안에 다음 생선이 있음)
 
 # --- 점프: 누르는 시간만큼 높이 ---
 ## 누르고 있는 동안(최대 JUMP_MAX_HOLD) 같은 속도로 올라가고, 떼면 중력으로 떨어진다.
@@ -67,8 +74,8 @@ const ROOF_TOP_STEP := 110.0       # 옆 옥상과의 높이 차 최대
 const ROOF_GAP_MIN := 70.0
 ## 최대 점프로 닿을 수 있는 거리에 곱하는 여유. 1보다 작을수록 쉬움
 ## 처음 속도에서는 ROOF_GAP_SAFETY_START, 최대 속도로 갈수록 ROOF_GAP_SAFETY까지 넓어진다 (처음은 쉽게)
-const ROOF_GAP_SAFETY_START := 0.5
-const ROOF_GAP_SAFETY := 0.8
+const ROOF_GAP_SAFETY_START := 0.55
+const ROOF_GAP_SAFETY := 0.85
 ## 옥상을 미리 만들어 두는 거리 (고양이 앞쪽)
 const ROOF_LOOKAHEAD := 2200.0
 
@@ -86,16 +93,10 @@ const ITEM_LIFT := CAT_BODY_SIZE.y * 0.5
 ## 아이템을 먹는 거리: 몸 타원을 이만큼 넓혀서 아이템 가운데가 그 안에 들어오면 먹는다
 const ITEM_RADIUS := 24.0
 const FISH_SPACING := 70.0      # 생선 사이 간격
-const FISH_ROW_CHANCE := 0.45   # 옥상 위에 생선 줄을 놓을 확률
-const FISH_ROW_MIN := 3
-const FISH_ROW_MAX := 6
-const FISH_ARC_CHANCE := 0.35   # 틈 위에 생선 무지개를 놓을 확률
-## 생선 무지개 가운데가 양 끝보다 높은 정도. 중간쯤 눌러 뛰어야 닿는다 (최대 점프 높이 JUMP_MAX_HEIGHT보다 낮게)
-const FISH_ARC_HEIGHT := 120.0
 ## 종이상자는 이 시간(초)마다 다음 일반 옥상에 하나 (한 번에 1개만 가질 수 있음).
 ## 예전 "옥상 40~60개"를 v0.5.0 평균 옥상 시간 약 1.5초로 어림한 값 (구간이 들어와도 드물어지지 않게 시간으로 셈)
-const BOX_EVERY_MIN := 60.0
-const BOX_EVERY_MAX := 90.0
+const BOX_EVERY_MIN := 120.0
+const BOX_EVERY_MAX := 180.0
 ## 종이상자 구제: 발이 이 높이(화면 맨 아래)까지 떨어지면 상자가 받쳐서 가까운 앞 옥상 위로 올려 준다
 const RESCUE_HEIGHT := 0.0
 const RESCUE_RISE_SPEED := 900.0  # 구제될 때 올라가는 속도 (초당 픽셀)
@@ -190,9 +191,9 @@ const INVULN_TIME := 1.5  # 부딪힌 뒤 무적 시간 (ghost_time과 따로: �
 const SEGMENT_SCRIPT := ["E1", "E2", "E3", "E4", "E2"]
 ## 단계별 섞임: [이 단계까지, 쉬움, 보통, 어려움, 쉼 옥상 최소, 최대, 쉼 자리 특수 틈 확률]
 const SEGMENT_MIX := [
-	[2, 0.8, 0.2, 0.0, 1, 2, 0.3], [3, 0.6, 0.4, 0.0, 1, 2, 0.4], [4, 0.4, 0.6, 0.0, 1, 2, 0.5],
-	[5, 0.3, 0.5, 0.2, 1, 2, 0.5], [6, 0.2, 0.5, 0.3, 1, 1, 0.5], [9, 0.1, 0.45, 0.45, 1, 1, 0.5],
-	[12, 0.0, 0.4, 0.6, 0, 1, 0.5],
+	[2, 0.7, 0.3, 0.0, 1, 1, 0.3], [3, 0.4, 0.6, 0.0, 1, 1, 0.4], [4, 0.2, 0.7, 0.1, 1, 1, 0.5],
+	[5, 0.1, 0.6, 0.3, 0, 1, 0.6], [6, 0.0, 0.5, 0.5, 0, 1, 0.7], [9, 0.0, 0.35, 0.65, 0, 1, 0.9],
+	[12, 0.0, 0.1, 0.9, 0, 0, 1.0],
 ]
 ## 물탱크가 있는 구간의 옥상 높이 상한 (탱크 꼭대기까지 세로 카메라 안에)
 const SEGMENT_TANK_TOP_MAX := 240.0
@@ -211,6 +212,8 @@ const DASH_LAND_EARLY := 300.0
 const DASH_TARGET_AHEAD := 150.0
 const DASH_TARGET_GAP := 0.6
 const DASH_TARGETS := ["pot", "ac", "pot", "tank"]
+## 질주 중 공중 생선 호: 화면 밖에 이 시간(초) 간격으로 최대 점프 궤적을 놓는다 (뛰어야 먹음, 놓쳐도 안 끊김)
+const DASH_FISH_GAP := 1.3
 ## 착지 옥상: 질주 속도로 이 시간 길이, 장애물 없음. 들어온 지 DASH_LAND_WAIT초 뒤 끝나고 DASH_END_INVULN초 무적, 속도는 DASH_EASE초에 걸쳐 원래대로
 const DASH_LAND_SECONDS := 1.5
 const DASH_LAND_WAIT := 0.3
@@ -225,11 +228,15 @@ const MAGNET_RADIUS := 260.0
 const MAGNET_SPEED := 1400.0
 const GOLD_FISH := 20  # 황금 생선 하나 = 생선 수 (거리 점수에는 안 더함)
 const CAN_FISH := 3    # 통조림으로 바뀐 장애물 하나 = 생선 수
-const SLOT_FISH := 3   # 시간이 된 아이템이 없는 자리 = 생선 줄
 ## 아이템 자리 우선순위 (앞일수록 먼저): [종류, 처음 나올 수 있는 시각(초), 다음까지 간격 최소, 최대].
 ## 쿠키는 하트 2개 이하, 방울은 안 가지고 있을 때만. 첫 질주는 대본(CoursePlacer)이 정한다
 ## 통조림·방울·첫 쿠키 시각은 밸런스 봇으로 정함 (하트 회복이 너무 흔하면 하트로 끝나는 판이 사라짐)
-const SLOT_ITEMS := [["cookie", 40.0, 40.0, 40.0], ["dash", INF, 50.0, 70.0], ["can", 60.0, 80.0, 110.0], ["bell", 45.0, 90.0, 120.0], ["yarn", 8.0, 25.0, 35.0]]
+## 2a-4: 질주·쿠키를 크게 줄임 (아이템이 판을 살려 주느라 긴장이 없었음, PLAN 15번)
+const SLOT_ITEMS := [["cookie", 90.0, 90.0, 90.0], ["dash", INF, 90.0, 130.0], ["can", 120.0, 150.0, 200.0], ["bell", 90.0, 150.0, 200.0], ["yarn", 8.0, 30.0, 45.0]]
+
+## 이 시각(초) 뒤에는 아이템·상자 간격이 ITEM_LATE_MULT배 (오래 버티는 사람이 아이템 덕에 끝없이 가지 않게)
+const ITEM_LATE_TIME := 150.0
+const ITEM_LATE_MULT := 6.0
 
 # --- 고양이 모션 ---
 const CAT_STRIDE := 150.0      # 달리기 한 바퀴(프레임 4장)에 가는 거리 (게임 픽셀)

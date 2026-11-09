@@ -19,8 +19,6 @@ const DT := 1.0 / 120.0
 ## 줄·트램펄린에 닿는 때를 이만큼 앞에서 보고 누를 때를 정한다 (초)
 const LINE_LOOK := 0.6
 
-static var _jump_cache := {}
-
 ## 실력별 실수 크기. 초보 = 처음 해 보는 사람, 익숙함 = 몇 판 해 본 사람, 숙련 = 많이 해 본 사람
 const SKILLS := {
 	"초보": {"timing": 0.085, "short_hold": 0.35},
@@ -71,6 +69,13 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 	var tapped := false      # 이번 닿음에 이미 눌렀는지
 	while not sim.game_over and sim.elapsed < max_time:
 		var ground: Dictionary = sim.get("_ground_roof")
+		if sim.dashing:
+			# 질주 중에는 뛰지 않는다 (남은 계획이 끝난 뒤 입력을 막지 않게 지운다)
+			press_x = INF
+			hold_left = 0.0
+			dj_at = INF
+			tap_at = INF
+			planned_roof = {}
 		if sim.landed:
 			planned_roof = {}  # 착지(같은 옥상에 다시 내려앉은 경우 포함)할 때마다 새로 계획
 			dj_at = INF
@@ -78,7 +83,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			tapped = false
 		# 트램펄린 뒤 긴 옥상은 내려설 때 다음 옥상이 아직 안 만들어졌을 수 있다: 생길 때까지 계획을 미룬다
 		var next_known := sim.roofs.find(ground) + 1 < sim.roofs.size()
-		var unplanned: bool = sim.on_ground and not is_same(ground, planned_roof)
+		var unplanned: bool = sim.on_ground and not sim.dashing and not is_same(ground, planned_roof)
 		var hop := _obstacle_plan(sim, ground) if unplanned else {}
 		if unplanned and not next_known and hop.is_empty():
 			press_x = INF
@@ -86,8 +91,10 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			planned_roof = ground
 			var plan: Dictionary = hop if not hop.is_empty() else _plan(sim)
 			press_x = plan.x + rng.randfn(0.0, skill.timing) * sim.speed
-			var keep := clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
-			hold = plan.get("hold", JumpModel.max_hold_time()) * keep
+			var max_hold := JumpModel.max_hold_time()
+			# 손 떼는 때는 사람처럼 양쪽으로 흔들린다 (톡이 길어지면 비둘기에 맞는다). 최대로 누르는 틈 점프는 짧게만
+			hold = clampf(plan.hold + rng.randfn(0.0, skill.short_hold) * max_hold, 0.02, max_hold) if plan.has("hold") else \
+					max_hold * clampf(1.0 - absf(rng.randfn(0.0, skill.short_hold)), 0.0, 1.0)
 			if hop.is_empty():
 				var needed := _plate_hold(sim, press_x, plan.dj)
 				if needed >= 0.0:
@@ -169,7 +176,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		if gap_roof.is_empty():
 			for i in sim.roofs.size():
 				var r: Dictionary = sim.roofs[i]
-				if not r.get("no_ghost", false) or seen.has(r.left) or i < 2 or sim.dashing:
+				if not r.get("no_ghost", false) or seen.has(r.left) or (i < 2 and not r.has("tramp")) or sim.dashing:
 					continue
 				var start: float = r.line.left if r.has("line") else (r.tramp.left if r.has("tramp") else sim.roofs[i - 2].right)
 				if sim.x > start and sim.x < r.left:
@@ -196,70 +203,16 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 	return stats
 
 
-## 서 있는 옥상의 다음 장애물(비둘기 제외)을 넘는 계획 {"x", "hold", "dj"}. 없으면 빈 Dictionary
+## 서 있는 옥상의 다음 장애물(비둘기 제외)을 구간에 적힌 동작으로 넘는 계획 {"x", "hold", "dj"}. 없으면 빈 Dictionary
 static func _obstacle_plan(sim: RunnerSim, ground: Dictionary) -> Dictionary:
 	var next := {}
 	for o in sim.obstacles:
-		if not o.has("k") and o.x >= ground.left and o.x <= ground.right and o.x + o.w > sim.x and (next.is_empty() or o.x < next.x):
+		if o.has("action") and o.x >= ground.left and o.x <= ground.right and o.x + o.w > sim.x and (next.is_empty() or o.x < next.x):
 			next = o
 	if next.is_empty():
 		return {}
-	var low := false
-	for o in sim.obstacles:
-		low = low or (o.has("k") and absf(o.x - next.x) < 300.0)
-	var best := _best_jump(next.kind, sim.speed, low)
-	return {"x": next.x - best.lead * sim.speed, "hold": best.hold, "dj": best.dj}
-
-
-## 종류·속도별 가장 넓은 창의 동작 {"lead": 장애물 왼쪽 끝 얼마나 앞에서(초) 누를지, "hold", "dj"} (같은 계산을 되풀이하지 않게 기억)
-static func _best_jump(kind: String, speed: float, low: bool) -> Dictionary:
-	var key := "%s %d %s" % [kind, int(speed / 10.0), low]
-	if _jump_cache.has(key):
-		return _jump_cache[key]
-	var max_hold := JumpModel.max_hold_time()
-	var options: Array = [[max_hold, true]] if kind == "tank" else ([[0.075, false]] if low else [[0.075, false], [0.15, false], [max_hold, false]])
-	var info: Dictionary = Balance.OBSTACLES[kind]
-	var o := {"x": 0.0, "w": info.w, "y0": info.y0, "y1": info.y1}
-	var best := {"lead": 0.0, "hold": max_hold, "dj": kind == "tank", "size": -1}
-	for option: Array in options:
-		var path := _jump_path(option[0], option[1])
-		var run := 0
-		for i in 120:
-			var lead := i / 60.0
-			var safe := true
-			for p: Vector2 in path:
-				safe = safe and not RunnerSim.body_hits(o, (p.x - lead) * speed, p.y)
-			# 내려선 자리가 장애물을 넘어야 한다
-			safe = safe and (path[-1].x - lead) * speed > info.w + Balance.CAT_BODY_SIZE.x * 0.4
-			run = run + 1 if safe else 0
-			if run > best.size:
-				best = {"lead": (i - (run - 1) * 0.5) / 60.0, "hold": option[0], "dj": option[1], "size": run}
-	_jump_cache[key] = best
-	return best
-
-
-## 바닥에서 뛰어 내려올 때까지의 경로 [Vector2(시각, 높이), ...]. dj면 첫 점프 꼭대기에서 더블점프(최대)
-static func _jump_path(hold: float, dj: bool) -> Array:
-	var v := JumpModel.jump_speed()
-	var apex := hold + v / Balance.GRAVITY
-	var double_end := apex + JumpModel.double_max_hold()
-	var path: Array = []
-	var y := 0.0
-	var vy := v
-	var t := 0.0
-	var step := 1.0 / 60.0
-	while y >= 0.0:
-		var used := dj and t >= apex
-		if t < hold or (dj and t >= apex and t < double_end):
-			vy = v
-			y += v * step
-		else:
-			var moved := JumpModel.integrate(y, vy, step, used)
-			y = moved.x
-			vy = moved.y
-		t += step
-		path.append(Vector2(t, y))
-	return path
+	var lead := FishRoad.press_lead(next.kind, next.action, roundf(sim.speed / 10.0) * 10.0)
+	return {"x": next.x - lead * sim.speed, "hold": FishRoad.center_variant(next.action)[0], "dj": next.action == "double"}
 
 
 ## 최대 점프 + 첫 점프 꼭대기에서 더블점프(최대)의 체공 시간 (높이 차 rise)

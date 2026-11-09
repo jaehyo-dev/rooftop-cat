@@ -1,7 +1,7 @@
 class_name CoursePlacer
 extends RefCounted
 ## 옥상 생성기(RoofGenerator) 위에 손으로 짠 구간을 얹는다: 구간 → 쉼 옥상 → 구간 → ... (PLAN 5번). 같은 시드면 같은 맵.
-## 쉼 옥상은 생성기의 next_roof 그대로라 여기서 트램펄린·전봇대 틈이 나온다. 구간 옥상에는 "segment", "obs"(장애물), "seg_items"(생선·황금), "slots"(아이템 자리)가 붙는다.
+## 쉼 옥상은 생성기의 next_roof 그대로라 여기서 트램펄린·전봇대 틈이 나온다. 구간 옥상에는 "segment", "obs"(장애물), "slots"(아이템 자리), "jump"(앞 틈 동작)가 붙는다. 생선 길은 FishRoad.
 
 ## 밀도를 곱하지 않는 입구 길이: 첫 장애물까지(빈 옥상은 이 초까지). 줄이면 착지 뒤 판단 시간이 모자란다
 const EMPTY_ROOF_LEAD := 1.4
@@ -73,23 +73,21 @@ static func build(id: String, v: float, density: float, left: float, top: float,
 		x += r.get("gap", 0.0) * JumpModel.max_reach(v, rise)
 		top += rise
 		var lead := _lead(r)
-		var roof := {"left": x, "right": x + _squeeze(r.t, lead, density) * v, "top": top, "segment": id, "obs": [] as Array[Dictionary], "seg_items": [] as Array[Dictionary], "slots": [] as Array[Dictionary]}
+		var roof := {"left": x, "right": x + _squeeze(r.t, lead, density) * v, "top": top, "segment": id, "obs": [] as Array[Dictionary], "slots": [] as Array[Dictionary]}
+		if r.has("jump"):
+			roof.jump = r.jump
 		for o: Array in r.get("obs", []):
 			var info: Dictionary = Balance.OBSTACLES[o[0]]
 			var obstacle := {"id": obstacle_id, "kind": o[0], "x": x + _squeeze(o[1], lead, density) * v, "w": info.w, "y0": top + info.y0, "y1": top + info.y1, "base": top}
 			if o[0] == "flock":
 				obstacle.k = Balance.FLOCK_SPEED / v
+			if o.size() > 2:
+				obstacle.action = o[2]
+				obstacle.gold = o.size() > 3
 			roof.obs.append(obstacle)
 			obstacle_id += 1
 		for it: Array in r.get("items", []):
-			var at: float = x + _squeeze(it[1], lead, density) * v
-			if it[0] == "slot":
-				roof.slots.append({"x": at, "y": top + it[2]})
-			elif it[0] == "gold":
-				roof.seg_items.append({"kind": "gold", "x": at, "y": top + it[2]})
-			else:
-				for n in it[3]:
-					roof.seg_items.append({"kind": "fish", "x": at + n * Balance.FISH_SPACING, "y": top + it[2]})
+			roof.slots.append({"x": x + _squeeze(it[1], lead, density) * v, "y": top + it[2]})
 		roofs.append(roof)
 		x = roof.right
 	return roofs

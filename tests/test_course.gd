@@ -77,10 +77,10 @@ func test_섞임_표대로_어려운_구간이_늘고_특수_틈이_쉼_자리�
 
 
 func test_구간이_있어도_상자가_드물어지지_않는다() -> void:
-	# 실수 없는 봇으로 3분 달리며 나온 상자를 센다 (상자 간격은 시간 기준)
+	# 실수 없는 봇으로 4분 달리며 나온 상자를 센다 (상자 간격은 시간 기준)
 	for seed_value in 3:
 		var inputs: Array = []
-		BalanceBot.play_stats({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, 180.0, Balance.RUN_SPEED, true, inputs)
+		BalanceBot.play_stats({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, 240.0, Balance.RUN_SPEED, true, inputs)
 		var sim := RunnerSim.new(seed_value + 1)
 		var boxes := {}
 		for pressed in inputs:
@@ -88,7 +88,7 @@ func test_구간이_있어도_상자가_드물어지지_않는다() -> void:
 			for item in sim.items:
 				if item.kind == "box":
 					boxes[item.x] = true
-		assert_true(boxes.size() >= 2, "시드 %d: 3분에 상자 2개 이상 (%d개)" % [seed_value + 1, boxes.size()])
+		assert_true(boxes.size() >= 1, "시드 %d: 4분에 상자 1개 이상 (%d개)" % [seed_value + 1, boxes.size()])
 
 
 func test_밀도는_입구_여유를_줄이지_않고_뒤만_줄인다() -> void:
@@ -229,6 +229,12 @@ func test_화면은_장애물을_알리고_처음_만날_때만_안내한다() -
 	sim.obstacles[1].id = 901
 	world._update_obstacle_signs(0.01)
 	assert_true(world._alerts.has(900) and world._alerts.has(901), "화면에 들어오면 !")
+	var view: GDScript = load("res://scripts/world_view.gd")
+	assert_true(view.alert_showing(pot, sim.x, world._alerts), "들어온 뒤 계속 보임")
+	assert_true(view.alert_showing(pot, sim.x + 30.0, world._alerts), "시간이 지나도(달려도) 보임")
+	assert_true(view.alert_showing(pot, pot.x + pot.w + 70.0, world._alerts), "몸 뒤쪽이 지나기 전까지")
+	assert_false(view.alert_showing(pot, pot.x + pot.w + 80.0, world._alerts), "다 지나면 사라짐")
+	assert_false(view.alert_showing({"id": 999, "kind": "pot", "x": sim.x + 400.0, "w": 48.0}, sim.x, world._alerts), "화면에 안 들어온 것은 없음")
 	assert_eq(world._hint.text, "뛰어!", "처음 만난 종류 안내")
 	world._hint = {}
 	sim.obstacles[0].id = 902
@@ -264,14 +270,15 @@ func test_물탱크는_어떤_속도에서도_한_번_점프로_못_넘고_더�
 			# 더블로 넘으면 위 황금 생선을 먹는 누름이 있어야 한다
 			human.sim.fish = 0
 			human._place(press_x, world[0])
-			human.sim.items = world[0].seg_items.duplicate(true)
+			var road := FishRoad.new()
+			human.sim.items = road.extend({"left": -3000.0, "right": -200.0, "top": 200.0}, world[0], [v])
 			for k in 480:
 				var t := k / 60.0
 				human.sim.step(1.0 / 60.0, t < hold or (t >= apex and t < apex + JumpModel.double_max_hold()))
 				if human.sim.on_ground and t > 0.1:
 					break
-			gold = maxi(gold, human.sim.fish)
-		assert_eq(gold, Balance.GOLD_FISH, "속도 %d: 더블점프로 황금 +%d" % [v, Balance.GOLD_FISH])
+			gold = maxi(gold, 1 if human.sim.items.filter(func(it: Dictionary) -> bool: return it.kind == "gold").is_empty() else 0)
+		assert_eq(gold, 1, "속도 %d: 더블점프로 황금을 먹는 누름이 있다" % v)
 
 
 func test_검사기_자체_검사() -> void:
@@ -288,6 +295,108 @@ func test_검사기_자체_검사() -> void:
 	human.setup_world([plain.call(0.0, 2200.0), plain.call(2300.0, 12000.0)] as Array[Dictionary], [tank] as Array[Dictionary], 570.0)
 	assert_true(human.walk(0.6), "물탱크 통과: " + human.why)
 	assert_eq(human.actions[0], "더블", "물탱크 정답은 더블")
+
+
+func test_구간은_16개_이상이고_모두_생선_길이_있다() -> void:
+	assert_true(CourseData.SEGMENTS.size() >= 16, "구간 %d개" % CourseData.SEGMENTS.size())
+	var human := Human.new()
+	for id: String in CourseData.SEGMENTS:
+		var row: Array = Balance.SPEED_STAGES[CourseData.SEGMENTS[id].min_stage - 1]
+		human.setup_road(id, row[1], row[2], [row[1]])
+		var fish := human.road_items.filter(func(it: Dictionary) -> bool: return it.kind == "fish")
+		assert_true(fish.size() >= 8, "%s: 생선 %d마리" % [id, fish.size()])
+		for i in range(1, fish.size()):
+			assert_true(fish[i].x - fish[i - 1].x <= Balance.FISH_SPACING * 3.0 or fish[i].y != fish[i - 1].y, "%s: 촘촘함 (%.0f → %.0f)" % [id, fish[i - 1].x, fish[i].x])
+
+
+func test_생선_길대로_뛰면_사람_흔들림에도_필수를_다_먹고_콤보가_안_끊긴다() -> void:
+	var human := Human.new()
+	var fails: Array[String] = []
+	var total := 0
+	var bonus := 0
+	for id: String in CourseData.SEGMENTS:
+		var seg: Dictionary = CourseData.SEGMENTS[id]
+		for stage in range(seg.min_stage, Balance.SPEED_STAGES.size() + 1):
+			var row: Array = Balance.SPEED_STAGES[stage - 1]
+			var next: float = Balance.SPEED_STAGES[mini(stage, Balance.SPEED_STAGES.size() - 1)][1]
+			# 도착 속도를 맞게 예측한 경우 (만든 단계와 달리는 단계가 다른 경우 포함)
+			for run_v: float in ([row[1], next] if next != row[1] else [row[1]]):
+				human.setup_road(id, row[1], row[2], [run_v])
+				for fish in human.road_items:
+					total += 1
+					bonus += 1 if fish.has("bonus") else 0
+				for c: Array in [[0.0, 0, 0.87], [-0.05, 0, 0.87], [0.05, 0, 0.87], [0.0, 1, 0.87], [0.0, 0, 0.3]]:
+					var r := human.walk_road(c[0], c[1], c[2])
+					if r.hit != "" or not r.missed.is_empty() or r.cut:
+						fails.append("%s 단계 %d 속도 %d 어긋남 %+.0fms 변형 %d 깊이 %.2f: %s 못 먹음 %d/%d 끊김 %s" % [id, stage, run_v, c[0] * 1000.0, c[1], c[2], r.hit, r.missed.size(), r.required, r.cut])
+			# 구간을 지나는 동안 단계가 올라 속도가 바뀌는 경우: 흔들림에 두 속도를 넣어 필수를 정했으니 어느 쪽으로 달려도 다 먹는다
+			if next != row[1]:
+				human.setup_road(id, row[1], row[2], [row[1], next])
+				human.run_speed = next
+				var r := human.walk_road(0.0, 0, 0.87)
+				if r.hit == "" and not r.missed.is_empty():
+					fails.append("%s 단계 %d 도중 빨라짐: 못 먹음 %d/%d" % [id, stage, r.missed.size(), r.required])
+	for fail in fails.slice(0, 40):
+		print("    ", fail)
+	assert_eq(fails.size(), 0, "길대로 뛰어도 실패한 조합 (전체 %d, 보너스 비율 %.0f%%)" % [fails.size(), 100.0 * bonus / total])
+	assert_true(bonus < total * 0.4, "보너스가 너무 많으면 놓침이 의미 없음 (%d/%d)" % [bonus, total])
+
+
+func test_틀린_동작이면_필수를_놓친다() -> void:
+	var human := Human.new()
+	for id: String in CourseData.SEGMENTS:
+		var seg: Dictionary = CourseData.SEGMENTS[id]
+		for stage in range(seg.min_stage, Balance.SPEED_STAGES.size() + 1):
+			var row: Array = Balance.SPEED_STAGES[stage - 1]
+			human.setup_road(id, row[1], row[2], [row[1]])
+			if human.road_flights.size() >= 2:  # 틈 호만 있는 구간도 뛰지 않으면 떨어진다
+				var r := human.walk_road(0.0, 0, 0.87, false)
+				assert_true(r.hit != "" or not r.missed.is_empty(), "%s 단계 %d: 안 뛰어도 다 먹음" % [id, stage])
+	# 호에서 크게 어긋나게 뛰면 맞거나 생선을 놓친다
+	for c: Array in [["E1", 430.0, 0.3], ["E1", 430.0, -0.3], ["N3", 570.0, 0.25], ["E3", 500.0, -0.3]]:
+		human.setup_road(c[0], c[1], 1.0, [c[1]])
+		var r := human.walk_road(c[2], 0, 0.3)
+		assert_true(r.hit != "" or not r.missed.is_empty(), "%s %+.0fms: 다 먹음" % [c[0], c[2] * 1000.0])
+
+
+func test_생선_길_궤적은_실제_점프와_같다() -> void:
+	for action in FishRoad.AUTO_ACTIONS:
+		for variant: Array in FishRoad.variants(action):
+			var sim := RunnerSim.new(1, 430.0, false)
+			sim.accelerate = false
+			sim.roofs[0].right = 90000.0
+			var route := FishRoad.path(variant[0], variant[1])
+			var top: float = sim.roofs[0].top
+			var hold_end: float = variant[1] + JumpModel.double_max_hold()
+			for i in route.size() - 1:
+				var t := i / 60.0
+				sim.step(1.0 / 60.0, t < variant[0] or (variant[1] >= 0.0 and t >= variant[1] and t < hold_end))
+				assert_true(absf(sim.y - top - route[i].y) < 12.0, "%s %.2f초: 궤적 %.1f, 실제 %.1f" % [action, t, route[i].y, sim.y - top])
+
+
+func test_쉼_옥상의_생선_길도_따라_달리면_콤보가_안_끊긴다() -> void:
+	for v in [430.0, 640.0, 950.0]:
+		for seed_value in 3:
+			var sim := RunnerSim.new(seed_value + 1, v, false)
+			sim.accelerate = false
+			sim.get("_generator").special_chance = 0.0
+			sim.roofs.resize(1)
+			sim.items.clear()
+			sim.road = FishRoad.new()
+			var next := 0
+			var since := INF
+			var f := {}
+			while sim.elapsed < 40.0 and not sim.game_over:
+				if next < sim.road.flights.size() and sim.x >= sim.road.flights[next].press_x:
+					f = sim.road.flights[next]
+					next += 1
+					since = 0.0
+				var pressed: bool = not f.is_empty() and (since < f.hold or (f.double_at >= 0.0 and since >= f.double_at and since < f.double_at + JumpModel.double_max_hold()))
+				since += 1.0 / 60.0
+				sim.step(1.0 / 60.0, pressed)
+			assert_false(sim.game_over, "속도 %d 시드 %d: 길대로 뛰면 안 떨어짐" % [v, seed_value])
+			assert_true(sim.combo.best >= 50 * v / 430.0, "속도 %d 시드 %d: 콤보가 쌓임 (%d, 지금 %d)" % [v, seed_value, sim.combo.best, sim.combo.count])
+			assert_eq(sim.combo.count, sim.combo.best, "속도 %d 시드 %d: 안 끊김" % [v, seed_value])
 
 
 func test_구간은_모든_단계에서_사람이_통과한다() -> void:

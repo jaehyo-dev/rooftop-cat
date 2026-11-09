@@ -97,11 +97,12 @@ const OBSTACLE_SHADOW_ALPHA := 0.6
 const OBSTACLE_SHADOW_FLAT := 0.2
 const FLOCK_SHADOW_ALPHA := 0.25  # 비둘기가 옥상에 드리우는 옅은 그림자
 const PROP_CLEAR := 170.0         # 장애물 둘레 이 거리 안의 소품은 그리지 않는다 (겹치면 헷갈림)
-## 장애물이 화면에 들어올 때 위에 떴다 사라지는 "!"
+## 장애물이 화면에 들어올 때부터 고양이가 지나갈 때까지 위에 떠 있는 "!" (살짝 위아래로 통통)
 const ALERT_COLOR := Color("#e0402f")
-const ALERT_TIME := 0.55
 const ALERT_POP := 0.12
 const ALERT_RISE := 24.0
+const ALERT_BOB := 7.0     # 위아래로 움직이는 폭 (픽셀)
+const ALERT_BOB_HZ := 2.2  # 1초에 몇 번
 ## 매 판 처음 만나는 종류마다 고양이 위에 띄우는 안내
 const OBSTACLE_HINTS := {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!"}
 const HINT_TIME := 1.1
@@ -253,7 +254,7 @@ func _process(delta: float) -> void:
 	if sim.game_over:
 		_over_time += delta
 		_tap_pending = false
-		if press_started and _over_time >= Balance.RESTART_DELAY:
+		if press_started and can_restart():
 			restart()
 		return
 	_wait_release = _wait_release and pressed
@@ -302,6 +303,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	_front_mist.queue_redraw()
 	_overlay.queue_redraw()
+
+
+## 게임이 끝나고 다시 시작할 수 있는 때인지
+func can_restart() -> bool:
+	return sim.game_over and _over_time >= Balance.RESTART_DELAY
 
 
 ## 화면에 들어오는 장애물의 "!"와 처음 만남 안내, 비둘기 소리, 튕겨 나간 장애물 시간
@@ -518,7 +524,10 @@ func _draw() -> void:
 	if sim.dashing:
 		_draw_dash_look(offset, ground)
 
+	var view_right := _view_size().x + 100.0
 	for item in sim.items:
+		if item.x + offset > view_right or item.x + offset < -100.0:
+			continue  # 생선 길이 촘촘해 화면 밖까지 그리면 휴대폰에서 낭비
 		# 살짝 위아래로 떠 있어 눈에 띄게 (자리마다 박자를 다르게)
 		var bob := 4.0 * sin(sim.elapsed * 4.0 + item.x * 0.01)
 		_draw_item(item.kind, Vector2(item.x + offset, ground - item.y + FOOT_SINK + bob), 1.0, 1.0)
@@ -927,15 +936,19 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - Balance.CAT_SCREEN_X)
 			if eta > 0.0 and eta <= FLOCK_WARN_TIME:
 				_draw_feather(Vector2(view_w - 34.0, ground - (o.y0 + o.y1) * 0.5))
-		var t: float = _alerts.get(o.id, ALERT_TIME)
-		if t < ALERT_TIME:
+		if alert_showing(o, sim.x, _alerts):
 			var height: float = _obstacle_size(o.kind).y + (o.y0 - o.base)
-			var at := Vector2(minf(left + o.w * 0.5 + offset, view_w - 40.0), maxf(44.0, ground - o.base + FOOT_SINK - height - ALERT_RISE))
-			# 통 떴다가 끝에서 옅어진다
-			var pop := minf(1.0, t / ALERT_POP)
-			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0 - smoothstep(ALERT_TIME * 0.7, ALERT_TIME, t), ALERT_COLOR)
+			var bob: float = ALERT_BOB * absf(sin(PI * ALERT_BOB_HZ * sim.elapsed + o.id))  # 튀어 오르는 느낌: 바닥에서 위로만
+			var at := Vector2(minf(left + o.w * 0.5 + offset, view_w - 40.0), maxf(44.0, ground - o.base + FOOT_SINK - height - ALERT_RISE - bob))
+			var pop: float = minf(1.0, _alerts[o.id] / ALERT_POP)  # 처음에 통 뜬다
+			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0, ALERT_COLOR)
 	if not _hint.is_empty() and not sim.game_over:
 		_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
+
+
+## "!"를 보여 줄 때: 화면에 들어왔고 몸 뒤쪽이 아직 장애물을 다 지나지 않았을 때 (부순 장애물은 목록에서 빠져 같이 사라짐)
+static func alert_showing(o: Dictionary, cat_x: float, alerts: Dictionary) -> bool:
+	return alerts.has(o.id) and RunnerSim.obstacle_left(o, cat_x) + o.w >= cat_x - Balance.CAT_BODY_SIZE.x * 0.5
 
 
 ## 깃털 표시: 크림색 테두리 위에 비스듬한 깃털 (코드 도형)
