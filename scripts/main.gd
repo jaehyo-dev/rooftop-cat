@@ -66,6 +66,8 @@ func _ready() -> void:
 	_world.game_over.connect(_on_game_over)
 	_world.restarted.connect(_on_restarted)
 	_on_restarted()
+	if DevTune.local_build():
+		add_child(DevTune.new(_world))  # 임시, 배포 전 제거 (PLAN 20번): 노을빛 고르기·시험용 빠른 질주
 	# 배경 음악: 끝나면 처음부터 반복. 웹에서는 첫 터치·클릭 뒤부터 소리가 난다 (브라우저 규칙)
 	var music_stream: AudioStreamOggVorbis = MUSIC.duplicate()
 	music_stream.loop = not OS.has_feature("web")

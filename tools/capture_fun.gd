@@ -1,7 +1,7 @@
 extends SceneTree
 ## 2a-4 확인용 캡처: 생선 길을 따라 달리는 자동 조종으로 실제 main 씬을 돌려 PNG를 저장한다.
 ## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_fun.gd -- <모드> <출력 폴더> [시드]
-## 모드: shots, gif, result, dash (2a-4) / hit, heart1, combo, trail, perf, stage (2b 손맛)
+## 모드: shots, gif, result, dash (2a-4) / hit, heart1, combo, trail, perf, stage (2b 손맛) / tint (2b 수정2 노을빛 A·B·C)
 
 const STEP := 1.0 / 120.0
 const GIF_SECONDS := 30.0
@@ -48,6 +48,8 @@ func _init() -> void:
 			await _trail(args[1])
 		"perf":
 			await _perf(args[1])
+		"tint":
+			await _tint(args[1])
 		"stage":
 			await _run_until(Balance.SPEED_STAGES[1][0] - 0.2)
 			await _frames(args[1], 1.4, 15.0, true)
@@ -252,6 +254,22 @@ func _perf(out: String) -> void:
 	print(report)
 	var file := FileAccess.open(out + "/perf.txt", FileAccess.WRITE)
 	file.store_line(report)
+
+
+## 2b 수정2: 질주 전 한 장, 같은 질주 순간을 노을빛 A·B·C로 한 장씩 (DevTune.TINTS)
+func _tint(out: String) -> void:
+	await _run_until(4.0)
+	main._process(0.6)
+	await _save(out + "/before.png")
+	sim._start_dash()
+	for i in 72:
+		world.set("_touches", {})
+		world._process(STEP)
+	main._process(0.6)
+	for key: String in DevTune.TINTS:
+		world.dash_tint = DevTune.TINTS[key]
+		world.get("_tint").queue_redraw()
+		await _save(out + "/dash_%s.png" % key)
 
 
 func _run_until(seconds: float) -> void:
