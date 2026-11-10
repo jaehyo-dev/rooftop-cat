@@ -38,13 +38,14 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 ## inputs를 주면 step마다 누름 여부를 담는다 (캡처 도구가 같은 판을 다시 재생하는 데 씀).
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
 ## 아이템 성적: dash_count/dash_smashed/dash_seconds/dash_fall(끝난 뒤 3초 안에 떨어짐), first_dash(첫 질주 먹은 시각, 못 먹으면 -1), eaten(종류별 먹은 수),
-## made(종류별 놓인 수), yarn_fish/yarn_time·plain_fish/plain_time(털실·평소의 생선과 시간), blocks(방울이 막은 수), canned(통조림으로 바뀐 장애물 수), cookie_full(하트 3개에서 먹은 쿠키).
+## score(판 점수), dash_points(질주 중 생선 점수, 2배 포함), made(종류별 놓인 수), yarn_fish/yarn_time·plain_fish/plain_time(털실·평소의 생선과 시간), blocks(방울이 막은 수), canned(통조림으로 바뀐 장애물 수), cookie_full(하트 3개에서 먹은 쿠키).
 ## off: 끌 아이템 종류 (효과 비교용)
 static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = []) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
 			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {},
 			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "eaten": {}, "made": {},
-			"yarn_fish": 0, "yarn_time": 0.0, "plain_fish": 0, "plain_time": 0.0, "blocks": 0, "canned": 0, "cookie_full": 0}
+			"yarn_fish": 0, "yarn_time": 0.0, "plain_fish": 0, "plain_time": 0.0, "blocks": 0, "canned": 0, "cookie_full": 0,
+			"score": 0, "dash_points": 0}
 	var dash_began := 0.0
 	var dash_over := -99.0
 	var seg_roof := {}     # 지금 지나는 구간 옥상 (단계별 통과율)
@@ -121,7 +122,11 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		var fish_before := sim.fish
 		var hearts_before := sim.hearts
 		var yarn_on := sim.magnet_time > 0.0
+		var points_before := sim.combo.points
+		var dashing_before := sim.dashing
 		sim.step(DT, hold_left > 0.0 or tap)
+		if dashing_before:
+			stats.dash_points += sim.combo.points - points_before  # 질주 중 생선 점수 (2배 포함)
 		inputs.append(hold_left > 0.0 or tap)
 		hold_left -= DT
 		for item in sim.picked:
@@ -190,6 +195,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		elif sim.rescued or sim.game_over or sim.x > gap_roof.right:
 			gap_roof = {}
 	stats.time = minf(sim.elapsed, max_time)
+	stats.score = sim.score()
 	stats.end = sim.end_reason
 	stats.made = sim.slots.made
 	if sim.game_over:

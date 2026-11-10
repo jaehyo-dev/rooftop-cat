@@ -57,14 +57,9 @@ func test_흔들림은_세기_안에서_잦아들어_멈춘다() -> void:
 	assert_eq(Juice.shake_offset(0.0, 0.0, 8.0), Vector2.ZERO, "길이 0이면 흔들지 않음")
 
 
-func test_고르는_손맛은_멈춤_0_04에서_0_08초() -> void:
-	assert_true(Balance.HIT_FEELS.has(Balance.HIT_FEEL_DEFAULT), "기본값이 목록에 있음")
-	var prev := 0.0
-	for name in ["약", "중", "강"]:
-		var feel: Array = Balance.HIT_FEELS[name]
-		assert_true(feel[0] >= 0.04 and feel[0] <= 0.08, name + " 멈춤 시간")
-		assert_true(feel[1] > prev, name + " 흔들림이 점점 셈")
-		prev = feel[1]
+func test_부딪힘_손맛은_중으로_고정() -> void:
+	assert_eq(Balance.HIT_STOP, 0.06, "멈춤 0.06초")
+	assert_eq(Balance.HIT_SHAKE, 8.0, "흔들림 8px")
 
 
 func test_결과_숫자는_하나씩_차오른다() -> void:
@@ -87,48 +82,37 @@ func test_심장_박동은_1초에_한_번() -> void:
 	assert_false(Juice.beat_crossed(90.0, 0.0), "새 판으로 시각이 되돌아가도 소리 없음")
 
 
-func test_손맛_버튼_자리의_터치는_점프가_아니고_버튼은_손맛을_바꾼다() -> void:
+func test_왼쪽_아래_터치도_점프다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.record_path = "user://test_juice_tune.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	await wait_frames(2)
-	assert_false(main.has_node("TunePanel"), "데스크톱·테스트에서는 버튼 없음 (로컬 웹에서만)")
-	main._add_tune_panel()
-	await wait_frames(3)
-	var panel: Control = main.get_node("TunePanel")
-	assert_true(world.input_block.has_point(panel.get_global_rect().get_center()), "버튼 자리를 막음: %s / %s" % [world.input_block, panel.get_global_rect()])
+	assert_false(main.has_node("TunePanel"), "손맛 고르기 버튼은 없음")
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = true
-	touch.position = panel.get_global_rect().get_center()
+	touch.position = Vector2(60.0, 690.0)  # 예전 고르기 버튼 자리
 	world._input(touch)
-	assert_false(world.is_pressed(), "버튼 자리 터치는 점프로 치지 않음")
-	touch.position = Vector2(640.0, 300.0)
-	world._input(touch)
-	assert_true(world.is_pressed(), "다른 자리 터치는 점프")
-	var strong: Button = panel.get_child(3)
-	strong.pressed.emit()
-	assert_eq(world.hit_feel, "강", "강을 누르면 강")
+	assert_true(world.is_pressed(), "왼쪽 아래 터치도 점프")
 	main.queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_juice_tune.cfg")
 
 
-func test_부딪히면_고른_만큼_멈칫하고_흔들리며_빨갛게_깜빡인다() -> void:
+func test_부딪히면_멈칫하고_흔들리며_빨갛게_깜빡인다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.record_path = "user://test_juice_hit.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	await wait_frames(1)
 	world.set_process(false)
-	world.hit_feel = "강"
 	var sim: RunnerSim = world.sim
 	sim.accelerate = false
 	sim.obstacles.clear()
 	sim.obstacles.append({"id": 77, "kind": "pot", "x": sim.x + 60.0, "w": 48.0, "y0": sim.y, "y1": sim.y + 38.0, "base": sim.y})
 	world._process(0.05)
 	assert_eq(sim.hearts, Balance.HEARTS_MAX - 1, "부딪힘")
-	assert_eq(world._hitstop, Balance.HIT_FEELS["강"][0], "강 멈춤 시간")
+	assert_eq(world._hitstop, Balance.HIT_STOP, "멈춤 시간")
 	world._process(0.01)
 	assert_true(world.position.length() > 0.5, "화면이 흔들림")
 	assert_true(world.cat.modulate.g < 0.9, "고양이 빨간 깜빡임")
@@ -157,3 +141,35 @@ func test_마지막_하트를_장애물에_잃어도_결과_화면이_뜬다() -
 	main.queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_juice_last.cfg")
+
+
+func test_질주_시작_당김은_빨리_당기고_멈칫_뒤_풀린다() -> void:
+	assert_eq(Juice.dash_punch(0.0), 0.0, "시작")
+	assert_eq(Juice.dash_punch(Juice.PUNCH_IN), 1.0, "다 당김")
+	assert_eq(Juice.dash_punch(Juice.PUNCH_HOLD - 0.001), 1.0, "멈칫 동안 유지")
+	var mid := Juice.dash_punch(Juice.PUNCH_HOLD + Juice.PUNCH_OUT * 0.5)
+	assert_true(mid > 0.3 and mid < 0.7, "풀리는 중 %.2f" % mid)
+	assert_eq(Juice.dash_punch(Juice.PUNCH_HOLD + Juice.PUNCH_OUT), 0.0, "다 풀림")
+	assert_eq(Juice.dash_punch(99.0), 0.0, "질주 아님")
+
+
+func test_페이드는_켤_때와_끌_때_시간이_다르다() -> void:
+	var v := 0.0
+	for i in 12:
+		v = Juice.fade(v, true, 0.01, 0.1, 0.5)
+	assert_eq(v, 1.0, "0.1초 안에 다 켜짐")
+	for i in 25:
+		v = Juice.fade(v, false, 0.01, 0.1, 0.5)
+	assert_true(absf(v - 0.5) < 0.001, "0.25초면 반")
+	for i in 30:
+		v = Juice.fade(v, false, 0.01, 0.1, 0.5)
+	assert_eq(v, 0.0, "0.5초에 다 꺼짐")
+
+
+func test_결과_카드_테두리는_사각형_둘레를_살짝만_벗어나고_늘_같다() -> void:
+	var rect := Rect2(0.0, 0.0, 500.0, 420.0)
+	var points := Juice.wobbly_rect(rect, 2, 4.0)
+	assert_true(points.size() > 40, "둘레가 촘촘함 %d" % points.size())
+	for p in points:
+		assert_true(rect.grow(4.01).has_point(p), "흔들림 안: %s" % p)
+	assert_eq(points, Juice.wobbly_rect(rect, 2, 4.0), "같은 번호면 같은 모양")

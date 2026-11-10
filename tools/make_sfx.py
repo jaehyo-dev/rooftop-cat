@@ -134,8 +134,18 @@ def heartbeat() -> np.ndarray:
     return 0.8 * (at(thump(95.0), 0.0, 0.32) + 0.7 * at(thump(85.0), 0.17, 0.32))
 
 
+def dash() -> np.ndarray:
+    """슝: 질주 시작. 바람 잡음이 커졌다 빠지며 낮은 음에서 높이 솟는 소리 (점프 소리만큼 크게)"""
+    t = times(0.55)
+    rise = sweep(180.0, 1400.0, 0.55)
+    # 잡음은 시드 고정 대신 사인 여러 개를 겹친 바람 소리 (난수를 쓰지 않는 규칙)
+    wind = sum(np.sin(2 * np.pi * (f * t + 300.0 * t * t)) for f in (713.0, 1091.0, 1597.0, 2207.0, 2963.0)) / 5.0
+    env = np.sin(np.pi * np.minimum(1.0, t / 0.5)) ** 1.5
+    return 0.9 * (0.7 * rise + 0.6 * wind) * env
+
+
 SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up,
-          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat}
+          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

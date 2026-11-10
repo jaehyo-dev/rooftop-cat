@@ -1,10 +1,16 @@
 class_name Juice
-## 손맛 연출의 순수 계산 (화면과 분리, 2b): 화면 흔들림, 결과 숫자 차오름, 심장 박동 박자.
+## 손맛 연출의 순수 계산 (화면과 분리, 2b): 화면 흔들림, 결과 숫자 차오름, 심장 박동 박자, 질주 시작 당김, 켜고 끄는 페이드.
 
 ## 결과 화면에서 숫자 하나가 0에서 끝까지 차오르는 시간 (초). 앞 숫자가 다 차야 다음 숫자가 시작한다
 const COUNT_UP_EACH := 0.35
 ## 하트 1개일 때 박동 박자: 1초에 한 번, HUD 두근거림(|sin(PI t)|)이 가장 클 때(t = n + 0.5)보다 조금 앞에서 소리
 const BEAT_PHASE := 0.4
+
+
+## 질주 시작 순간 화면이 고양이 쪽으로 당겨지는 정도 (0~1): PUNCH_IN초에 다 당겨지고 멈칫(PUNCH_HOLD) 뒤 PUNCH_OUT초에 걸쳐 풀림
+const PUNCH_IN := 0.06
+const PUNCH_HOLD := 0.1
+const PUNCH_OUT := 0.35
 
 
 ## 흔들림: since초 전에 세기 strength(픽셀)로 duration초 흔들기 시작했을 때 화면 어긋남. 갈수록 잦아든다 (무작위 없이 사인 두 개)
@@ -32,3 +38,43 @@ static func count_done(values: Array, t: float) -> bool:
 ## before → now 사이에 박동 소리 박자를 지났는지 (판 안 시각, 새 판이면 시각이 되돌아간다)
 static func beat_crossed(before: float, now: float) -> bool:
 	return now > before and floorf(now - BEAT_PHASE) > floorf(before - BEAT_PHASE)
+
+
+## 질주 시작 당김 (since = 질주 시작 뒤 지난 초). 빨리 당기고 부드럽게 푼다
+static func dash_punch(since: float) -> float:
+	if since < 0.0 or since >= PUNCH_HOLD + PUNCH_OUT:
+		return 0.0
+	if since < PUNCH_IN:
+		return since / PUNCH_IN
+	if since < PUNCH_HOLD:
+		return 1.0
+	var k := 1.0 - (since - PUNCH_HOLD) / PUNCH_OUT
+	return k * k * (3.0 - 2.0 * k)
+
+
+## 켜짐(on)이면 in_time초, 꺼짐이면 out_time초에 걸쳐 0~1 사이를 일정하게 움직인다 (질주 북 소리, 노을빛)
+static func fade(value: float, on: bool, delta: float, in_time: float, out_time: float) -> float:
+	return move_toward(value, 1.0 if on else 0.0, delta / (in_time if on else out_time))
+
+
+## 손으로 그은 듯 살짝 흔들리는 사각형 둘레 점들 (결과 카드). 모서리는 둥글게 깎고, 흔들림은 seed로 정해 늘 같다
+static func wobbly_rect(rect: Rect2, seed_value: int, wobble: float, step: float = 24.0) -> PackedVector2Array:
+	var corner := 18.0
+	var r := rect.grow(-corner)
+	var out := PackedVector2Array()
+	var i := 0
+	for side in 4:
+		var a := TAU * side / 4.0 - PI * 0.5  # 위 → 오른쪽 → 아래 → 왼쪽 모서리 순
+		var c: Vector2 = [Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y), r.position][side]
+		for k in 4:  # 둥근 모서리
+			var t := a + PI * 0.5 * k / 3.0
+			out.append(c + Vector2(cos(t), sin(t)) * corner)
+		var next: Vector2 = [r.end, Vector2(r.position.x, r.end.y), r.position, Vector2(r.end.x, r.position.y)][side]
+		var normal := Vector2(cos(a + PI * 0.5), sin(a + PI * 0.5)) * corner
+		var length := c.distance_to(next)
+		for k in range(1, int(length / step)):
+			var p := c.lerp(next, k * step / length) + normal
+			var n := normal.normalized()
+			out.append(p + n * wobble * sin(i * 1.7 + seed_value * 2.3) * cos(i * 0.61 + seed_value))
+			i += 1
+	return out

@@ -1,6 +1,7 @@
 extends SceneTree
 ## 밸런스 비교표 출력 (자동 테스트가 아니라 보고용 도구).
-## 실행: godot --headless --path . -s res://tests/balance_report.gd [-- --seeds=200 --effects --skill=초보]
+## 실행: godot --headless --path . -s res://tests/balance_report.gd [-- --seeds=200 --effects --score --skill=초보]
+## --score: 질주 생선 2배가 점수 분포를 얼마나 흔드는지 (질주 1번이 한 판 점수의 몇 %인지)
 ## 시드 1~SEEDS(기본 30), 실력별로 한 판(최대 900초)을 돌려 한 판 길이 가운데값, 끝난 단계, 특수 틈 성공률, 아이템 효과를 찍는다.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
@@ -87,7 +88,34 @@ func _initialize() -> void:
 	print(freq)
 	if OS.get_cmdline_user_args().has("--effects"):
 		_effects(only)
+	if OS.get_cmdline_user_args().has("--score"):
+		_score_share(only)
 	quit(0)
+
+
+## 질주 점수 비율: 판 점수 가운데값, 질주 1번 점수가 그 판 점수의 몇 %인지(질주가 있던 판의 가운데값·최대),
+## 2배가 없었다면(질주 점수 절반) 판 점수 가운데값
+func _score_share(only: String) -> void:
+	print("| 실력 | 판 점수 가운데값 | 질주 있던 판 | 질주 1번 / 판 점수 가운데 (최대) | 질주 전체 / 판 점수 가운데 | 2배가 없으면 판 점수 가운데값 |\n|---|---|---|---|---|---|")
+	for skill_name in BalanceBot.SKILLS:
+		if only != "" and only != skill_name:
+			continue
+		var scores: Array[float] = []
+		var plain: Array[float] = []
+		var one: Array[float] = []
+		var all: Array[float] = []
+		for seed_value in SEEDS:
+			var s: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS[skill_name], seed_value + 1, MAX_TIME)
+			scores.append(s.score)
+			plain.append(s.score - s.dash_points / Balance.DASH_FISH_MULT * (Balance.DASH_FISH_MULT - 1))
+			if s.dash_count > 0 and s.score > 0:
+				one.append(100.0 * s.dash_points / s.dash_count / s.score)
+				all.append(100.0 * s.dash_points / s.score)
+		for list in [scores, plain, one, all]:
+			list.sort()
+		var mid := func(list: Array[float]) -> float: return list[list.size() / 2] if not list.is_empty() else 0.0
+		print("| %s | %.0f | %d/%d | %.1f%% (%.1f%%) | %.1f%% | %.0f |" % [skill_name, mid.call(scores), one.size(), SEEDS, mid.call(one),
+				one[-1] if not one.is_empty() else 0.0, mid.call(all), mid.call(plain)])
 
 
 ## 아이템 하나씩 끈 판과 비교: 평균 / 가운데값 (초)

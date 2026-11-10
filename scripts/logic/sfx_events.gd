@@ -4,7 +4,7 @@ class_name SfxEvents
 const FISH_GAP := 0.07  # 생선 소리가 이 시간 안에 다시 나면 하나로 친다 (초)
 
 const ALL := ["jump", "double_jump", "land", "fish", "pickup", "boing", "perfect", "fall", "stage_up", "coo", "pang", "bell",
-		"combo_up", "combo_break", "hit", "heartbeat"]
+		"combo_up", "combo_break", "hit", "heartbeat", "dash"]
 ## 콤보 음계: 생선을 연달아 먹을수록 도레미파솔라시도로 한 칸씩 오르고, 8칸 뒤 처음 칸으로 돈다 (반음 수)
 const FISH_SCALE := [0, 2, 4, 5, 7, 9, 11, 12]
 ## 음계 첫 칸을 원래 생선 소리보다 이만큼(반음) 낮춘다: 맨 위 칸이 원래 소리의 1.5배를 넘지 않아 귀가 아프지 않게
@@ -42,8 +42,10 @@ static func sounds(sim: RunnerSim, fall_start: bool) -> Array[String]:
 		out.append("bell")
 	elif not sim.hit_obstacle.is_empty():
 		out.append("hit")
-	if sim.stage_rose or sim.dash_started:
+	if sim.stage_rose:
 		out.append("stage_up")
+	if sim.dash_started:
+		out.append("dash")  # 슝 (2b 수정: 단계 오름 소리 대신)
 	if fall_start:
 		out.append("fall")
 	return out

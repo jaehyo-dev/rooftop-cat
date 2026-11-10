@@ -89,11 +89,11 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	assert_true(meters >= 42, "거리 점수 %d m" % meters)
 	assert_true(main.get_node("GameOver").visible, "게임 끝 화면")
 	var score: int = world.sim.score()
-	assert_false(main.get_node("GameOver/Label").text.contains("점수  %d" % score) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
+	assert_false(main.get_node("GameOver/Card/Box/Score").text.contains("점수  %d" % score) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
 	assert_eq(BestRecord.load_best(PATH), meters, "최고 거리 저장")
 	assert_eq(BestRecord.load_best_score(PATH), score, "최고 점수 저장")
 	assert_eq(main.get_node("BestLabel").text, "BEST %d" % score)
-	assert_true(main.get_node("GameOver/Retry").visible and main.get_node("GameOver/Retry").text == "다시 하기", "다시 하기 버튼")
+	assert_true(main.get_node("GameOver/Card/Box/Retry").visible and main.get_node("GameOver/Card/Box/Retry").text == "다시 하기", "카드 안 다시 하기 버튼")
 
 	# 바로 누르면 다시 시작하지 않는다 (떨어지며 누르던 손가락)
 	_touch(true)
@@ -104,11 +104,14 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 
 	# 숫자가 다 차오르면 실제 값과 새 기록
 	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout
-	var result: String = main.get_node("GameOver/Label").text
+	var result: String = main.get_node("GameOver/Card/Box/Stats").text
 	assert_true(result.contains("%d m" % meters), "이번 거리")
-	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보") and result.contains("점수  %d" % score), result)
-	assert_true(result.contains("새 기록"), "첫 기록은 새 기록")
-	assert_true(main.get_node("GameOver/Celebrate") != null, "새 기록 축하 별")
+	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보"), result)
+	assert_eq(main.get_node("GameOver/Card/Box/Score").text, "점수  %d" % score, "맨 위 점수")
+	assert_eq(main.get_node("GameOver/Card/Box/Best").text, "새 기록!", "첫 기록은 새 기록")
+	assert_eq(main.get_node("GameOver").get_child(0).name, &"Celebrate", "축하 별은 카드 뒤 (먼저 그림)")
+	var card: Control = main.get_node("GameOver/Card")
+	assert_true(main.get_viewport_rect().encloses(card.get_global_rect()), "카드가 화면 안: %s" % card.get_global_rect())
 
 	# 기다린 뒤 누르면 새 판, 누른 손가락으로 점프하지 않음
 	_touch(true)
@@ -193,7 +196,8 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	assert_true(sim.game_over)
 	assert_false(main.get_node("BoxIcon").visible, "상자 표시 꺼짐")
 	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout  # 결과 숫자가 다 차오를 때까지
-	assert_true(main.get_node("GameOver/Label").text.contains("먹은 생선  %d  (모은 생선 %d)" % [sim.fish, 10 + sim.fish]), main.get_node("GameOver/Label").text)
+	assert_true(main.get_node("GameOver/Card/Box/Stats").text.contains("먹은 생선  %d" % sim.fish), main.get_node("GameOver/Card/Box/Stats").text)
+	assert_eq(main.get_node("GameOver/Card/Box/Total").text, "모은 생선 %d" % (10 + sim.fish), "모은 생선은 작게 따로")
 	assert_true(main.get_node("ScoreLabel").text == str(sim.score()), "오른쪽 위 점수")
 	assert_eq(BestRecord.load_fish(PATH), 10 + sim.fish, "모은 생선 저장")
 	main.queue_free()
@@ -207,3 +211,41 @@ func test_배경_음악이_반복_재생으로_붙어_있다() -> void:
 	var music: AudioStreamPlayer = main.get_node("Music")
 	assert_true(music.stream is AudioStreamOggVorbis and music.stream.loop, "반복 재생")
 	assert_true(music.stream.get_length() >= 55.0 and music.stream.get_length() <= 65.0, "곡 길이 60초 안팎")
+	main.queue_free()
+
+
+func test_질주_북_층은_곡과_길이·빠르기가_같고_질주_중에만_들린다() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.record_path = "user://test_main_drums.cfg"
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	world.set_process(false)
+	main.set_process(false)
+	await wait_frames(1)
+	var music: AudioStreamPlayer = main.get_node("Music")
+	var drums: AudioStreamPlayer = main.get_node("DashDrums")
+	assert_true(drums.stream.loop == music.stream.loop and drums.playing and music.playing, "같이 재생, 반복 설정도 같음")
+	assert_true(absf(drums.stream.get_length() - music.stream.get_length()) < 0.01, "곡과 길이가 같음: %.3f / %.3f" % [drums.stream.get_length(), music.stream.get_length()])
+	world.sim.stage = 9
+	main._process(0.05)
+	assert_eq(drums.pitch_scale, music.pitch_scale, "같은 빠르기")
+	assert_true(drums.volume_db < -60.0, "평소에는 안 들림")
+	assert_false(main.get_node("DashBonus").visible, "평소 x2 없음")
+	world.sim.dashing = true
+	world.sim.combo.eat(10)
+	main._process(main.DRUM_IN)
+	assert_true(absf(drums.volume_db - main.DRUM_VOLUME_DB) < 0.01, "질주 시작 0.1초에 다 들어옴")
+	assert_true(main.get_node("DashBonus").visible, "질주 중 콤보 옆 x2")
+	world.sim.dashing = false
+	main._process(main.DRUM_OUT * 0.5)
+	assert_true(drums.volume_db < main.DRUM_VOLUME_DB - 3.0 and drums.volume_db > -60.0, "빠지는 중")
+	main._process(main.DRUM_OUT * 0.5)
+	assert_true(drums.volume_db < -60.0, "0.5초에 다 빠짐")
+	# 웹에서 곡이 끝나면 곡과 북을 같이 처음부터 (데스크톱은 자동 반복)
+	music.play(1.0)
+	drums.play(3.0)
+	music.finished.emit()
+	assert_true(music.get_playback_position() < 0.1 and drums.get_playback_position() < 0.1, "같이 처음부터")
+	main.queue_free()
+	await wait_frames(1)
+	DirAccess.remove_absolute("user://test_main_drums.cfg")

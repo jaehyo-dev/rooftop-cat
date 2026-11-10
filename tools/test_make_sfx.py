@@ -16,8 +16,8 @@ def end_pitch(sound):
 
 
 class SfxTest(unittest.TestCase):
-    def test_열여섯_종류이고_터지지_않으며_짧다(self):
-        self.assertEqual(len(make_sfx.SOUNDS), 16)
+    def test_열일곱_종류이고_터지지_않으며_짧다(self):
+        self.assertEqual(len(make_sfx.SOUNDS), 17)
         for name, make in make_sfx.SOUNDS.items():
             sound = make()
             self.assertGreater(np.abs(sound).max(), 0.1, name)
@@ -35,6 +35,12 @@ class SfxTest(unittest.TestCase):
         self.assertGreater(end_pitch(make_sfx.combo_up()), end_pitch(make_sfx.fish()) * 1.4)
         self.assertLess(len(make_sfx.combo_break()) / make_sfx.RATE, 0.12)
         self.assertLess(end_pitch(make_sfx.heartbeat()), 250.0)
+
+    def test_질주_슝은_올라가고_생선보다_길다(self):
+        sound = make_sfx.dash()
+        half = len(sound) // 2
+        self.assertGreater(end_pitch(sound[half:]), end_pitch(sound[:half]))
+        self.assertGreater(len(sound), len(make_sfx.fish()) * 3)
 
 
 if __name__ == "__main__":

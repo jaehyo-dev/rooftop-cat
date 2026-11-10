@@ -447,12 +447,14 @@ func _pick_items(dt: float) -> void:
 	var open_can := false
 	var start_dash := false
 	var bites: Array[int] = []  # 이번 step에 먹은 생선 점수 (놓침을 먼저 처리한 뒤 더한다: 끊긴 뒤 먹은 것은 x1)
+	var pull := magnet_radius()
+	var bonus := Balance.DASH_FISH_MULT if dashing else 1  # 질주 중 생선 점수 2배 (콤보 배수와 곱함)
 	for i in range(items.size() - 1, -1, -1):
 		var item := items[i]
 		if item.x < x - 1000.0:
 			items.remove_at(i)  # 지나간 아이템
 			continue
-		if item.x > x + radius.x and magnet_time <= 0.0:
+		if item.x > x + radius.x and pull <= 0.0:
 			continue  # 아직 앞 (생선 길이 촘촘해 대부분 여기서 끝난다)
 		if item.x < x - radius.x:
 			# 먹는 타원 뒤로 지나감: 필수 생선이면 콤보가 끊긴다 (한 번만)
@@ -462,9 +464,9 @@ func _pick_items(dt: float) -> void:
 					combo.cut()
 		if rescuing:
 			continue
-		if magnet_time > 0.0 and (item.kind == "fish" or item.kind == "gold"):
+		if pull > 0.0 and (item.kind == "fish" or item.kind == "gold"):
 			var at := Vector2(item.x, item.y)
-			if at.distance_to(Vector2(x, center_y)) <= Balance.MAGNET_RADIUS:
+			if at.distance_to(Vector2(x, center_y)) <= pull:
 				at = at.move_toward(Vector2(x, center_y), maxf(Balance.MAGNET_SPEED, vx() + 400.0) * dt)  # 질주 중 뒤에 남은 생선도 따라오게
 				item.x = at.x
 				item.y = at.y
@@ -474,10 +476,10 @@ func _pick_items(dt: float) -> void:
 		match item.kind:
 			"fish":
 				fish += 1
-				bites.append(Balance.FISH_POINTS)
+				bites.append(Balance.FISH_POINTS * bonus)
 			"gold":
 				fish += Balance.GOLD_FISH
-				bites.append(Balance.GOLD_POINTS)
+				bites.append(Balance.GOLD_POINTS * bonus)
 			"box":
 				has_box = true
 			"bell":
@@ -498,6 +500,11 @@ func _pick_items(dt: float) -> void:
 		_open_can()
 	if start_dash:
 		_start_dash()  # 생선을 바꿔 깔므로 위 반복이 끝난 뒤에
+
+
+## 생선을 끌어당기는 반경: 털실(MAGNET_RADIUS)과 질주(DASH_MAGNET_RADIUS) 중 큰 쪽, 둘 다 없으면 0
+func magnet_radius() -> float:
+	return maxf(Balance.MAGNET_RADIUS if magnet_time > 0.0 else 0.0, Balance.DASH_MAGNET_RADIUS if dashing else 0.0)
 
 
 ## 이미 가지고 있거나 소용없으면 그대로 둔다

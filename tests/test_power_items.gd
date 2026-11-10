@@ -299,6 +299,31 @@ func test_털실은_반경_안_생선만_끌어오고_8초_뒤_끝난다() -> vo
 	assert_eq(sim.items[0].y, y0, "끝나면 끌어오지 않음")
 
 
+func test_질주_중_생선은_2배이고_작은_자석이_붙는다() -> void:
+	var sim := _sim("dash")
+	while not sim.dashing:
+		sim.step(DT, false)
+	assert_eq(sim.magnet_radius(), Balance.DASH_MAGNET_RADIUS, "질주만: 작은 자석")
+	assert_true(Balance.DASH_MAGNET_RADIUS < Balance.MAGNET_RADIUS, "털실보다 작음")
+	sim.magnet_time = 1.0
+	assert_eq(sim.magnet_radius(), Balance.MAGNET_RADIUS, "털실과 같이: 큰 쪽")
+	sim.magnet_time = 0.0
+	sim.items.clear()
+	var before := sim.combo.points
+	var mult := sim.combo.multiplier()
+	sim.items.append({"kind": "fish", "x": sim.x + 20.0, "y": sim.y + 130.0})   # 몸 위, 질주 자석 반경 안
+	sim.items.append({"kind": "fish", "x": sim.x + 20.0, "y": sim.y + 240.0})   # 질주 자석 밖 (털실이면 안)
+	for i in 20:
+		sim.step(DT, false)
+	assert_eq(sim.items.filter(func(it: Dictionary) -> bool: return it.kind == "fish" and it.y > sim.y + 200.0).size(), 1, "먼 생선은 그대로")
+	assert_true(sim.combo.points - before >= Balance.FISH_POINTS * Balance.DASH_FISH_MULT * mult, "가까운 생선이 끌려와 2배로 먹힘")
+	var plain := FishCombo.new()
+	plain.eat(Balance.FISH_POINTS)
+	assert_eq(plain.points, Balance.FISH_POINTS, "질주가 아니면 그대로")
+	sim.dashing = false
+	assert_eq(sim.magnet_radius(), 0.0, "둘 다 없으면 0")
+
+
 func test_아이템_자리는_우선순위와_간격대로_고른다() -> void:
 	var slots := ItemSlots.new(1)
 	assert_eq(slots.choose(0.0, 3, false), "fish", "처음에는 생선")
@@ -383,6 +408,37 @@ func test_화면은_부술_때_잠깐_멈추고_0점25초_안에_다시_멈추�
 	world.restart()
 	assert_eq(world.scale.x, 1.0, "새 판은 원래 크기")
 	assert_true(world._shards.is_empty())
+	world.get_parent().queue_free()
+	await wait_frames(1)
+	DirAccess.remove_absolute("user://test_power_items.cfg")
+
+
+func test_질주_시작은_멈칫하며_고양이_쪽으로_당겨지고_노을빛이_들었다_빠진다() -> void:
+	var world := _world()
+	await wait_frames(1)
+	world.set_process(false)
+	var sim: RunnerSim = world.sim
+	sim.accelerate = false
+	sim.items.clear()
+	sim.items.append({"kind": "dash", "x": sim.x + 20.0, "y": sim.y + Balance.ITEM_LIFT})
+	world._process(0.02)
+	assert_true(sim.dashing, "질주 시작")
+	assert_eq(world._hitstop, Balance.DASH_START_STOP, "0.1초 멈칫")
+	world._process(Juice.PUNCH_IN)
+	assert_true(world.scale.x > 1.05, "당겨짐 %.3f" % world.scale.x)
+	# 고양이 몸 가운데는 당김이 없을 때와 같은 화면 자리 (고양이를 기준으로 확대)
+	var cat_center: Vector2 = world.cat.position - Vector2(0.0, Balance.CAT_BODY_SIZE.y * 0.5)
+	var plain: Vector2 = Vector2(0.0, world.get_viewport_rect().size.y * (1.0 - world._zoom)) + cat_center * world._zoom
+	assert_true(plain.distance_to(world.position + cat_center * world.scale) < 0.5, "고양이 자리를 기준으로 당김")
+	for i in 30:
+		world._process(0.02)
+	assert_true(world.scale.x < 1.0, "풀린 뒤 멀어짐")
+	assert_eq(world._dash_mood, 1.0, "노을빛")
+	sim.dashing = false
+	world._process(world.DASH_MOOD_OUT * 0.5)
+	assert_true(world._dash_mood > 0.4 and world._dash_mood < 0.6, "0.4초에 걸쳐 빠지는 중")
+	world._process(world.DASH_MOOD_OUT * 0.5)
+	assert_eq(world._dash_mood, 0.0, "원래대로")
 	world.get_parent().queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_power_items.cfg")

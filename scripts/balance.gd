@@ -222,9 +222,11 @@ const DASH_EASE := 0.6
 ## 부순 순간 게임 진행을 멈추는 시간과, 그 뒤 다시 멈추지 않는 시간 (질주 중 무적이라 공정성 문제 없음)
 const HITSTOP_TIME := 0.035
 const HITSTOP_GAP := 0.25
-## 장애물에 부딪힌 순간의 손맛 (2b): 이름 → [멈춤 시간(초), 화면 흔들림 세기(픽셀)]. 로컬 플레이 빌드에서만 고르는 버튼이 보인다
-const HIT_FEELS := {"약": [0.04, 4.0], "중": [0.06, 8.0], "강": [0.08, 12.0]}
-const HIT_FEEL_DEFAULT := "중"
+## 질주를 먹은 순간 멈칫하는 시간 (2b 수정: 판이 바뀌는 신호)
+const DASH_START_STOP := 0.1
+## 장애물에 부딪힌 순간의 손맛 (2b, 약·중·강 중 "중"으로 확정): 멈춤 시간(초), 화면 흔들림 세기(픽셀)
+const HIT_STOP := 0.06
+const HIT_SHAKE := 8.0
 const HIT_SHAKE_TIME := 0.2
 ## 질주로 부순 순간의 흔들림 (부딪힘보다 약하게: 무적이라 위험 신호가 아니라 손맛)
 const SMASH_SHAKE := 4.0
@@ -233,6 +235,9 @@ const SMASH_SHAKE_TIME := 0.12
 const MAGNET_TIME := 8.0
 const MAGNET_RADIUS := 260.0
 const MAGNET_SPEED := 1400.0
+## 질주 보상 (2b 수정): 생선·황금 점수 배율(콤보 배수와 곱함), 작은 자석 반경 (털실보다 작게. 같이 쓰면 큰 쪽)
+const DASH_FISH_MULT := 2
+const DASH_MAGNET_RADIUS := 150.0
 const GOLD_FISH := 20  # 황금 생선 하나 = 생선 수 (거리 점수에는 안 더함)
 const CAN_FISH := 3    # 통조림으로 바뀐 장애물 하나 = 생선 수
 ## 아이템 자리 우선순위 (앞일수록 먼저): [종류, 처음 나올 수 있는 시각(초), 다음까지 간격 최소, 최대].

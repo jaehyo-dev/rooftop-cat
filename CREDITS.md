@@ -83,7 +83,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 
 ## 직접 만든 것
 
-- 효과음 16종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근): 2026-11-09, 뒤 4종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
+- 효과음 17종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근, 질주 슝): 2026-11-09, 뒤 5종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
 - 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)
 - 검토 캡처 `review/v0.5.0/2b/*.gif`, `*.png`: 게임 화면을 캡처해 만듦 (영상 비교 이미지는 저장소에 넣지 않음)
@@ -91,4 +91,5 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 - 프로젝트 아이콘 `icon.svg`: 이 프로젝트에서 직접 만듦
 - 안개 설정 M2·M3 판 `assets/sprites/backdrop/mist_far_m2.png`, `mist_mid_m2.png`, `mist_near_m2.png`, `mist_far_m3.png`, `mist_mid_m3.png`, `mist_near_m3.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 섞음 (M2 크림 75%, M3 채도 낮은 크림·옅은 하늘색 90%, 원본은 그대로 둠). v0.5.0부터 게임은 M2만 쓴다
 - 배경 음악 `assets/audio/mochi_walk.ogg` "찹쌀떡 산책": 2026-11-08, `tools/make_music.py mochi_game`(numpy)으로 직접 작곡·합성한 곡 (118BPM, 마림바·손뼉·쉐이커, 57초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦
+- 질주 북 층 `assets/audio/mochi_dash_drums.ogg`: 2026-11-10, `tools/make_music.py mochi_game drums`(numpy)로 직접 합성 (찹쌀떡 산책과 같은 118BPM·같은 길이, 북·잔북·손뼉). 외부 음원·샘플 없음. 이 프로젝트에서 직접 만듦
 - 이전 배경 음악 `assets/audio/neighborhood.ogg` (v0.4.x, 지금은 쓰지 않고 보관): 2026-11-08, `tools/make_music.py`(numpy)로 직접 합성한 곡 (C-Am-F-G, 96BPM, 40초 루프). 외부 음원·샘플을 쓰지 않았고 시드가 같으면 같은 곡이 나옴. 이 프로젝트에서 직접 만듦

@@ -3,6 +3,7 @@
 사용: python3 tools/make_music.py assets/audio/neighborhood.ogg   (ffmpeg 필요)
      python3 tools/make_music.py <출력.ogg> mochi | swing   (v0.5.0 2b 후보 곡: 아래 SONGS)
      python3 tools/make_music.py assets/audio/mochi_walk.ogg mochi_game   (게임 곡: mochi를 57초로 늘린 것)
+     python3 tools/make_music.py assets/audio/mochi_dash_drums.ogg mochi_game drums   (질주 북 층: 곡과 같은 길이)
 - C-Am-F-G 진행, 96BPM, 16마디. 멜로디(펜타토닉 위 무작위 걷기)는 뜯는 소리, 코드는 부드러운 패드, 베이스는 마디의 1·3박.
 - 곡 끝을 넘어가는 소리를 처음에 겹쳐 더해(감기) 루프가 끊기지 않게 한다.
 개발용 도구 (numpy 필요). 게임은 결과 파일만 쓴다.
@@ -231,10 +232,43 @@ def build_song(name: str) -> np.ndarray:
     return track / max(1e-9, np.abs(track).max()) * 0.8
 
 
+def build_dash_drums(name: str) -> np.ndarray:
+    """질주 북 층(2b 수정): 곡과 같은 길이·박자로 겹치는 빠른 북. 게임이 곡과 동시에 틀어 두고 질주 중에만 소리를 키운다.
+    한 박에 북 둘(8분), 16분 잔북, 2·4박 손뼉, 마디 끝 잔북 몰아치기"""
+    song = SONGS[name]
+    beat = 60.0 / song["bpm"]
+    rng = np.random.default_rng(SEED + 1)
+    bars = len(song["chords"].split())
+    total = int(bars * 4 * beat * RATE)
+    track = np.zeros(total + RATE)
+
+    def put(sound: np.ndarray, start: float) -> None:
+        i = int(start * RATE)
+        track[i:i + len(sound)] += sound[:len(track) - i]
+
+    for bar in range(bars):
+        t0 = bar * 4 * beat
+        for slot in range(16):
+            at = t0 + slot * beat / 4
+            if slot % 2 == 0:
+                put(kick(0.9 if slot % 4 == 0 else 0.55), at)
+            put(shaker(0.16 if slot % 2 else 0.1, rng), at)  # 16분 잔북
+            if slot in (4, 12):
+                put(clap(0.32, rng), at)
+            if slot >= 13 and bar % 2 == 1:
+                put(clap(0.2, rng), at)  # 두 마디마다 끝에서 몰아침
+    track[:RATE] += track[total:total + RATE]  # 끝 소리 감기 (루프)
+    track = track[:total]
+    return track / max(1e-9, np.abs(track).max()) * 0.8
+
+
 def main() -> None:
     out = Path(sys.argv[1])
     out.parent.mkdir(parents=True, exist_ok=True)
-    source = build_song(sys.argv[2]) if len(sys.argv) > 2 else build()
+    if len(sys.argv) > 3 and sys.argv[3] == "drums":
+        source = build_dash_drums(sys.argv[2])
+    else:
+        source = build_song(sys.argv[2]) if len(sys.argv) > 2 else build()
     data = (source * 32767).astype(np.int16)
     with tempfile.TemporaryDirectory() as tmp:
         wav_path = Path(tmp) / "m.wav"

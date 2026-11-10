@@ -48,6 +48,16 @@ class SongTest(unittest.TestCase):
         self.assertTrue(np.array_equal(a, m.build_song("mochi")))
         self.assertLessEqual(float(np.abs(a).max()), 0.8 + 1e-9)
 
+    def test_질주_북_층은_곡과_길이가_같고_북이_박자에_있다(self):
+        drums, song = m.build_dash_drums("mochi_game"), m.build_song("mochi_game")
+        self.assertEqual(len(drums), len(song))  # 같이 틀면 한 바퀴 돌아도 박자가 맞음
+        self.assertTrue(np.array_equal(drums, m.build_dash_drums("mochi_game")))
+        beat = int(60.0 / m.SONGS["mochi_game"]["bpm"] * m.RATE)
+        # 박 자리 바로 뒤가 박 사이보다 크다 (북이 곡 박자에 맞음)
+        on = np.mean([np.abs(drums[i:i + 400]).max() for i in range(beat * 4, beat * 40, beat)])
+        off = np.mean([np.abs(drums[i + beat // 4 + 1500:i + beat // 2 - 200]).max() for i in range(beat * 4, beat * 40, beat)])
+        self.assertGreater(on, off * 2.0)
+
     def test_음이름(self):
         self.assertEqual(m.note_midi("C4"), 60)
         self.assertEqual(m.note_midi("Bb5"), 82)
