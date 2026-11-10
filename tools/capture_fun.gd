@@ -256,7 +256,7 @@ func _perf(out: String) -> void:
 	file.store_line(report)
 
 
-## 2b 수정2: 질주 전 한 장, 같은 질주 순간을 노을빛 A·B·C로 한 장씩 (DevTune.TINTS)
+## 2b 수정2: 질주 전 한 장, 질주 순간 한 장 (노을빛은 DASH_TINT_AMOUNT로 굳힘)
 func _tint(out: String) -> void:
 	await _run_until(4.0)
 	main._process(0.6)
@@ -266,10 +266,8 @@ func _tint(out: String) -> void:
 		world.set("_touches", {})
 		world._process(STEP)
 	main._process(0.6)
-	for key: String in DevTune.TINTS:
-		world.dash_tint = DevTune.TINTS[key]
-		world.get("_tint").queue_redraw()
-		await _save(out + "/dash_%s.png" % key)
+	world.get("_tint").queue_redraw()
+	await _save(out + "/dash.png")
 
 
 func _run_until(seconds: float) -> void:

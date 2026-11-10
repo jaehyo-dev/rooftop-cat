@@ -501,3 +501,10 @@ QUALITY_BAR 3-1 스릴 체크 사용자 판정:
 - 고르기: A 아주 옅게(0.1) / B 옅게(0.33, 지금의 약 1/3) / C 지금의 절반(0.5). 사용자가 고르면 그 값을 `DASH_TINT_AMOUNT`로 굳힘.
 
 **임시, 배포 전 제거**: `scripts/dev_tune.gd`(로컬 빌드에서만 왼쪽 아래 A·B·C 버튼 + 판 시작 3초 뒤·그 뒤 20초마다 앞 옥상 위 시험용 질주), `main.gd`의 붙이는 두 줄, `world_view.gd`의 `input_block`, `tests/test_dev_tune.gd`. 웹 배포(github.io)·밸런스 봇·테스트에는 붙지 않음. 첫 질주 20~25초 규칙은 `test_balance.gd`가 그대로 확인.
+
+## 21. 배포 판정 (2026-11-11)
+
+- 노을빛: 사용자가 **A(0.1)** 를 고름 → `world_view.gd`의 `DASH_TINT_AMOUNT = 0.1`로 굳힘(바꾸던 변수 `dash_tint` 없앰).
+- 스릴 체크 1~5(`QUALITY_BAR.md` 3-1): 사용자 플레이로 모두 통과.
+- 임시 코드 제거: `scripts/dev_tune.gd`, `main.gd`의 붙이는 두 줄, `world_view.gd`의 `input_block`, `tests/test_dev_tune.gd`를 뺌. grep으로 남은 흔적 없음 확인. 첫 질주 20~25초 규칙은 `test_balance.gd`로 계속 확인.
+- 디렉터 판정: **v0.6.0 배포**.

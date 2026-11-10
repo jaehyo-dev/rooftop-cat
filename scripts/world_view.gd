@@ -171,9 +171,9 @@ const DASH_RUSH_TIME := 0.45
 ## 질주 시작 (2b 수정): 화면이 고양이 쪽으로 당겨지는 배율 (Juice.dash_punch로 풀림). 멈칫 시간은 Balance.DASH_START_STOP
 const DASH_PUNCH := 0.12
 ## 질주 중 화면: 노을빛으로 곱해 물들이는 색과 가장자리 금빛. 켜지는·꺼지는 시간
-## 2b 수정2: 노을빛을 화면 전체에 다 곱하면 파란 하늘이 누렇게 됨 → 아주 옅게(dash_tint 비율)만 곱하고 질주 느낌은 가장자리 금빛·고양이 둘레 빛으로
+## 2b 수정2: 노을빛을 화면 전체에 다 곱하면 파란 하늘이 누렇게 됨 → 아주 옅게(DASH_TINT_AMOUNT 비율)만 곱하고 질주 느낌은 가장자리 금빛·고양이 둘레 빛으로
 const DASH_TINT := Color(1.0, 0.9, 0.78)
-const DASH_TINT_AMOUNT := 0.1  # DASH_TINT를 이만큼만 섞는다 (1.0 = 2b 수정 때 진하기)
+const DASH_TINT_AMOUNT := 0.1  # DASH_TINT를 이만큼만 섞는다 (사용자 선택 A, 1.0 = 2b 수정 때 진하기)
 const DASH_EDGE_COLOR := Color("#ffc94a")
 const DASH_EDGE_ALPHA := 0.3
 const DASH_EDGE_PULSE := 0.08
@@ -250,10 +250,6 @@ var _gold_flash := 99.0          # 황금 생선 먹은 뒤 지난 시간
 var _beat_at := 0.0              # 심장 박동 박자를 본 마지막 시각 (sim.elapsed)
 var _dash_mood := 0.0            # 질주 노을빛·금빛 가장자리 진하기 (0~1)
 var _tint := Node2D.new()        # 질주 노을빛: 세계 그림 위에 색을 곱한다 (HUD는 그 위)
-## 노을빛 섞는 비율 (임시: 로컬 빌드의 고르기 버튼 dev_tune.gd가 바꾼다)
-var dash_tint := DASH_TINT_AMOUNT
-## 이 사각형(화면 좌표) 안의 터치는 점프로 치지 않는다 (임시: 로컬 고르기 버튼 자리)
-var input_block := Rect2()
 
 
 ## 가운데가 진하고 가장자리로 사라지는 원 (흰색, 그릴 때 색을 입힘)
@@ -294,7 +290,7 @@ func _ready() -> void:
 	_tint.material = multiply
 	_tint.draw.connect(func() -> void:
 		if _dash_mood > 0.0:
-			_tint.draw_rect(get_viewport_rect(), Color.WHITE.lerp(DASH_TINT, _dash_mood * dash_tint)))
+			_tint.draw_rect(get_viewport_rect(), Color.WHITE.lerp(DASH_TINT, _dash_mood * DASH_TINT_AMOUNT)))
 	add_child(_tint)
 	_overlay.name = "Overlay"
 	_overlay.draw.connect(_draw_overlay)
@@ -579,8 +575,6 @@ func _input(event: InputEvent) -> void:
 	# 휴대폰 터치와 PC 마우스 클릭(터치로 흉내 냄)을 손가락별로 기억한다
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if input_block.has_point(event.position):
-				return  # 고르기 버튼을 누른 것
 			_touches[event.index] = true
 			_tap_pending = true
 		else:
