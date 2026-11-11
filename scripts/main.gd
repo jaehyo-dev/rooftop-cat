@@ -434,6 +434,8 @@ func open_missions() -> void:
 
 ## 상점·미션의 [뒤로]: 온 곳(시작 화면 또는 결과 카드)으로
 func go_back() -> void:
+	if screen not in ["shop", "missions"]:
+		return  # 닫히는 중에 한 번 더 눌림
 	play_ui("page")
 	(shop if screen == "shop" else board).close()
 	show_screen(_back_to)

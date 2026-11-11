@@ -14,6 +14,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tools"))
 from cut_parts import remove_magenta, find_parts  # noqa: E402
 from cut_buildings import despill  # noqa: E402
+from clean_edges import clean  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 UI = ROOT / "assets/sprites/ui"
@@ -27,6 +28,11 @@ ICONS = ["combo", "clock", "dash_start", "bell_start", "fish_bonus", "footprints
 
 def sheet(path: Path) -> np.ndarray:
     return despill(remove_magenta(np.asarray(Image.open(path).convert("RGB"))))
+
+
+def clean_file(path: Path) -> None:
+    """가장자리 분홍 기 지우기 (tools/clean_edges.py, 저장한 크기에서)"""
+    Image.fromarray(clean(np.asarray(Image.open(path).convert("RGBA")))).save(path)
 
 
 def crop(rgba: np.ndarray, box: tuple) -> np.ndarray:
@@ -50,6 +56,7 @@ def save(rgba: np.ndarray, path: Path, max_side: int = MAX_SIDE) -> None:
         img = img.resize((round(img.width * k), round(img.height * k)), Image.LANCZOS)
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path)
+    clean_file(path)
     print(path.relative_to(ROOT), img.size)
 
 
@@ -90,6 +97,7 @@ if __name__ == "__main__":
         for i, box in enumerate(find_parts(rgba, 4)):
             out = ROOT / f"assets/sprites/items/fish_{i}.png"
             Image.fromarray(fit(crop(rgba, box), size)).save(out)
+            clean_file(out)
             print(out.relative_to(ROOT), size)
     elif what == "paper":
         cut_named(ROOT / "assets/raw/ui_paper_sheet.png", PAPER, UI, 1024)
@@ -97,6 +105,7 @@ if __name__ == "__main__":
         for name in ["button_orange", "button_cream"]:
             img = Image.open(UI / f"{name}.png")
             img.resize((round(img.width * 100 / img.height), 100), Image.LANCZOS).save(UI / f"{name}.png")
+            clean_file(UI / f"{name}.png")
             print(name, "높이 100")
     elif what == "icons":
         cut_grid(ROOT / "assets/raw/ui_icons_sheet.png", ICONS, 4, UI / "icons", 256)
@@ -113,6 +122,7 @@ if __name__ == "__main__":
         clock = clock.resize((round(clock.width * k), round(clock.height * k)), Image.LANCZOS)
         canvas.alpha_composite(clock, (side - clock.width - 2, side - clock.height - 2))
         canvas.save(UI / "icons/cookie_clock.png")
+        clean_file(UI / "icons/cookie_clock.png")
         print("assets/sprites/ui/icons/cookie_clock.png", canvas.size)
     elif what == "stamp":
         cut_named(ROOT / "assets/raw/ui_stamp.png", ["stamp"], UI / "icons", 256)

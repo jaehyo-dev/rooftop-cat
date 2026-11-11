@@ -50,7 +50,7 @@ func test_한_판_결과를_저장하고_다시_읽는다() -> void:
 	assert_eq(again.best_score(), 3000)
 	assert_eq(again.best_distance(), 120, "거리 기록은 큰 쪽")
 	assert_eq(again.fish(), 50)
-	assert_eq(again.data.stats, {"runs": 3, "fish_total": 50})
+	assert_eq(again.data.stats, {"runs": 3, "fish_total": 50, "recent": [120, 80, 90]}, "최근 판 거리도 (미션 익숙함 판단)")
 	assert_false(again.score_reset)
 	assert_false(FileAccess.file_exists(PATH + ".tmp"), "임시 파일이 남지 않음")
 	_clear()

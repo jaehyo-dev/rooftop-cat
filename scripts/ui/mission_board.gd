@@ -171,16 +171,12 @@ func claim(weekly: bool, slot: int) -> void:
 		return
 	main.save.save()
 	main.play_ui("claim")
-	_shown_before(before)
+	set_wallet(before)  # 날아온 생선만큼 여기서부터 차오름
 	var note: Control = _notes[slot + (3 if weekly else 0)]
 	fly_to_wallet(note.position + Vector2(90, NOTE.y - 54), got)
 	_stamped[_key(weekly, slot)] = true
 	_fill_note(note, weekly, slot)
 	main.refresh_menus()
-
-
-func _shown_before(fish: int) -> void:
-	set_wallet(fish)
 
 
 ## 바꾸기: 첫 번째는 "정말?"으로 묻고, CONFIRM_TIME 안에 한 번 더 누르면 생선을 내고 바꾼다

@@ -137,6 +137,22 @@ func test_결과_카드에서_상점에_가면_입력이_판에_가지_않고_�
 	_clear()
 
 
+func test_닫히는_중에_다시_열어도_화면이_남는다() -> void:
+	_seed_save(0)
+	var main := _main()
+	await wait_frames(3)
+	main.open_shop()
+	await wait_frames(2)
+	main.go_back()
+	main.open_shop("boosters")  # 0.15초 안에 다시
+	await get_tree().create_timer(MenuScreen.OPEN_TIME + 0.2).timeout
+	assert_true(main.shop.visible, "다시 연 상점이 사라지지 않음")
+	assert_eq(main.shop.find_child("Back", true, false).mouse_filter, Control.MOUSE_FILTER_STOP, "버튼도 눌림")
+	main.queue_free()
+	await wait_frames(1)
+	_clear()
+
+
 func test_판_중에는_상점과_미션에_못_간다() -> void:
 	_seed_save(0)
 	var main := _main()

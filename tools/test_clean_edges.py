@@ -25,7 +25,7 @@ class CleanEdgesTest(unittest.TestCase):
         self.assertTrue((self.ce.clean(img)[..., 3] == img[..., 3]).all())  # 알파(윤곽)는 그대로
 
     def test_실제_그림_가장자리에_분홍_기가_없다(self):
-        files = [p for d in ("buildings", "structures", "items", "backdrop") for p in (ROOT / d).glob("*.png")]
+        files = [p for d in ("buildings", "structures", "items", "backdrop", "ui", "ui/icons") for p in (ROOT / d).glob("*.png")]
         self.assertTrue(files)
         for path in files:
             if path.stem.endswith("_cream"):

@@ -14,6 +14,7 @@ var box := Control.new()
 var wallet := Control.new()
 var _wallet_label := UiKit.label("0", 40)
 var _shown_fish := 0.0  # 지갑에 보이는 수 (날아온 생선만큼 차오름)
+var _closing: Tween    # 닫는 중 (그 사이 다시 열면 멈춤)
 
 
 func _init(main_node: Node, screen_name: String) -> void:
@@ -63,6 +64,10 @@ func _init(main_node: Node, screen_name: String) -> void:
 
 
 func open() -> void:
+	if _closing:
+		_closing.kill()  # 닫히는 중에 다시 열면 "숨기기"가 나중에 실행되지 않게
+		_closing = null
+	_set_buttons(Control.MOUSE_FILTER_STOP)
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_shown_fish = main.save.fish()
@@ -77,14 +82,17 @@ func open() -> void:
 
 func close() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # 사라지는 동안 뒤 화면 터치를 막지 않게
-	for b in find_children("*", "Button", true, false):
-		(b as Button).mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var tween := create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, OPEN_TIME * 0.6)
-	tween.tween_callback(func() -> void:
+	_set_buttons(Control.MOUSE_FILTER_IGNORE)
+	_closing = create_tween()
+	_closing.tween_property(self, "modulate:a", 0.0, OPEN_TIME * 0.6)
+	_closing.tween_callback(func() -> void:
 		visible = false
-		for b in find_children("*", "Button", true, false):
-			(b as Button).mouse_filter = Control.MOUSE_FILTER_STOP)
+		_closing = null)
+
+
+func _set_buttons(filter: Control.MouseFilter) -> void:
+	for b in find_children("*", "Button", true, false):
+		(b as Button).mouse_filter = filter
 
 
 ## 화면 내용 다시 그리기 (자식이 채움)
