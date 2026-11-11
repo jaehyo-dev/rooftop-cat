@@ -6,7 +6,7 @@ extends VBoxContainer
 
 const NAMES := {"dash": "질주", "yarn": "털실", "combo": "콤보", "gold": "황금", "cookie": "쿠키", "fish": "생선점수"}
 const BOOSTER_NAMES := {"dash_start": "질주출발", "bell_start": "방울", "fish_bonus": "생선+50%"}
-const FONT_SIZE := 20
+const FONT_SIZE := 26  # 휴대폰(화면 0.54배)에서도 누를 수 있게
 
 var _main: Node
 var _frame := PanelContainer.new()  # 펼친 내용 (밝은 바탕)
@@ -38,7 +38,9 @@ func _ready() -> void:
 	_frame.visible = false
 	_frame.add_child(_body)
 	add_child(_frame)
-	add_child(_button("시험", func() -> void: _frame.visible = not _frame.visible))  # 펼친 내용은 버튼 위로
+	var toggle := _button("시험", func() -> void: _frame.visible = not _frame.visible)
+	toggle.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN  # 접었을 때는 작은 버튼 하나만
+	add_child(toggle)  # 펼친 내용은 버튼 위로
 	_status.add_theme_font_size_override("font_size", FONT_SIZE)
 	_body.add_child(_status)
 	_body.add_child(_button("생선 +10,000", func() -> void: _change("wallet", "fish", 10000)))

@@ -251,3 +251,44 @@ func test_질주_북_층은_곡과_길이·빠르기가_같고_질주_중에만_
 	main.queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_main_drums.cfg")
+
+
+func test_버튼_자리_터치는_점프도_다시_시작도_아니다() -> void:
+	const PATH := "user://test_main_block.cfg"
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.record_path = PATH
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	var button := Button.new()  # 2a 시험 패널·2c 버튼 자리
+	button.position = Vector2(10.0, 600.0)
+	button.size = Vector2(100.0, 60.0)
+	main.add_child(button)
+	world.touch_blockers.append(button)
+	await wait_frames(3)
+	var to_window := main.get_viewport().get_screen_transform()  # 입력은 창 좌표로 들어와 게임 화면 좌표로 바뀐다 (headless 창은 작음)
+	var tap := func(at: Vector2) -> void:
+		for down in [true, false]:
+			var event := InputEventScreenTouch.new()
+			event.pressed = down
+			event.position = to_window * at
+			Input.parse_input_event(event)
+	tap.call(Vector2(40.0, 630.0))
+	await wait_frames(3)
+	assert_true(world.sim.on_ground, "버튼 자리는 점프 아님")
+	tap.call(Vector2(400.0, 630.0))
+	await wait_frames(3)
+	assert_false(world.sim.on_ground, "다른 자리는 점프")
+	world.sim.on_ground = false
+	world.sim.y = Balance.FALL_LIMIT + 1.0
+	world.sim.vy = -1000.0
+	await get_tree().create_timer(Balance.RESTART_DELAY + 0.2).timeout
+	assert_true(world.sim.game_over)
+	tap.call(Vector2(40.0, 630.0))
+	await wait_frames(3)
+	assert_true(world.sim.game_over, "버튼 자리는 다시 시작 아님")
+	button.visible = false
+	tap.call(Vector2(40.0, 630.0))
+	await wait_frames(3)
+	assert_false(world.sim.game_over, "숨긴 버튼 자리는 다시 받음")
+	main.queue_free()
+	DirAccess.remove_absolute(PATH)
