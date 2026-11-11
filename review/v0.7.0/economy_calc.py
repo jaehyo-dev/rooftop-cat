@@ -20,7 +20,7 @@ MISSION_DAY = {"초보": 1000 + 6000 / 7 + 300, "익숙함": 1500 + 9000 / 7 + 4
 BOOSTER_DAY = 900  # 부스터에 쓰는 생선 (하루 평균 약 2개)
 
 
-def simulate(player, prices, days=60):
+def simulate(player, prices, days=60, human=1.0):
     levels = [0] * UPGRADES
     wallet, earned_runs, earned_missions = 0, 0, 0
     for day in range(1, days + 1):
@@ -28,7 +28,7 @@ def simulate(player, prices, days=60):
         base, top = FISH[skill]
         for _ in range(RUNS_PER_DAY):
             owned = sum(levels) / (UPGRADES * 10)  # 강화를 산 만큼 수입이 0단계 → 10단계 값으로 늘어남
-            run = base + (top - base) * owned
+            run = (base + (top - base) * owned) * human  # human: 사람이 봇보다 못 버는 비율
             wallet += run
             earned_runs += run
         wallet += MISSION_DAY[skill] - BOOSTER_DAY
@@ -47,13 +47,13 @@ def simulate(player, prices, days=60):
 
 
 def main():
-    print("| 플레이어 | 초안 가격 (항목 %s, 전체 %s) | 제안 가격 (항목 %s, 전체 %s) | 미션 비율(제안) |" % (
+    print("| 플레이어 | 초안 가격 (항목 %s, 전체 %s) | 제안 가격 (항목 %s, 전체 %s) | 제안, 판 수입이 봇의 70%% | 미션 비율(제안) |" % (
         f"{sum(DRAFT):,}", f"{sum(DRAFT) * UPGRADES:,}", f"{sum(PROPOSED):,}", f"{sum(PROPOSED) * UPGRADES:,}"))
-    print("|---|---|---|---|")
+    print("|---|---|---|---|---|")
     for name, player in PLAYERS.items():
-        d1, _ = simulate(player, DRAFT)
-        d2, share = simulate(player, PROPOSED)
-        print(f"| {name} | {d1}일 | {d2 if d2 else '60일+'}일 | {share:.0%} |")
+        days = [simulate(player, prices, human=h)[0] for prices, h in ((DRAFT, 1.0), (PROPOSED, 1.0), (PROPOSED, 0.7))]
+        share = simulate(player, PROPOSED)[1]
+        print(f"| {name} | " + " | ".join(f"{d}일" if d else "60일+" for d in days) + f" | {share:.0%} |")
 
 
 if __name__ == "__main__":
