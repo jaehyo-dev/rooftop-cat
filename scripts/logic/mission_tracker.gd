@@ -30,7 +30,8 @@ func observe(sim: RunnerSim) -> void:
 		_add("stage_ups")
 	if sim.bell_blocked:
 		_add("bell")
-	if sim.landed and sim.get("_ground_roof").get("platform", false):
+	# 질주 중 착지는 보이지 않는 발판이라 지금 옥상(_ground_roof)이 질주 전 판 그대로일 수 있어 뺀다 (Codex 지적)
+	if sim.landed and not sim.dashing and sim.get("_ground_roof").get("platform", false):
 		_add("pole")
 	for o in sim.passed:
 		_add("pass_" + o.kind)

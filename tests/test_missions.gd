@@ -362,6 +362,19 @@ func test_추적기가_판_안_사건을_센다() -> void:
 	assert_true(run.get("smash_one", 0) <= run.get("smash", 0))
 
 
+func test_질주_중_착지는_전봇대_판에_선_것으로_세지_않는다() -> void:
+	var sim := RunnerSim.new(1, Balance.RUN_SPEED, false)
+	var tracker := MissionTracker.new()
+	sim.set("_ground_roof", {"left": 0.0, "right": 100.0, "top": 0.0, "platform": true})
+	sim.landed = true
+	sim.dashing = true
+	tracker.observe(sim)
+	assert_eq(tracker.counts.get("pole", 0), 0, "질주 중")
+	sim.dashing = false
+	tracker.observe(sim)
+	assert_eq(tracker.counts.get("pole", 0), 1, "진짜 판 착지")
+
+
 func test_장애물을_뒤로_지나가면_한_번만_피함으로_센다() -> void:
 	var sim := RunnerSim.new(1, Balance.RUN_SPEED, false)
 	sim.obstacles.append({"kind": "pot", "x": sim.x + 30.0, "w": 40.0, "y0": 900.0, "y1": 950.0, "base": 900.0})  # 높이 떠 있어 안 맞음
