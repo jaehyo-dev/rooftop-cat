@@ -1,6 +1,6 @@
 extends SceneTree
 ## 아이템 확인용 캡처: 실제 main 씬에서 PNG 프레임을 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_items.gd -- <dash|yarn|can|bell|tank> <출력 폴더>
+## 사용 (헤드리스 불가. 맥은 창이 잠깐 뜸, WSL은 창 없이 앞에 "xvfb-run -a"): godot --path . --resolution 1280x720 -s res://tools/capture_items.gd -- <dash|yarn|can|bell|tank> <출력 폴더>
 
 const STEP := 1.0 / 120.0
 const STEPS_PER_FRAME := 8  # 초당 15장

@@ -1,6 +1,6 @@
 extends SceneTree
 ## 속도 단계 확인용 캡처: 실제 main 씬(World)을 숙련 봇의 입력으로 재생하며 PNG를 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_speed.gd -- run <출력 폴더>
+## 사용 (헤드리스 불가. 맥은 창이 잠깐 뜸, WSL은 창 없이 앞에 "xvfb-run -a"): godot --path . --resolution 1280x720 -s res://tools/capture_speed.gd -- run <출력 폴더>
 ##   run:    0~70초 한 판. 평소에는 SLOW_STRIDE초마다, 단계가 오를 때는 RISE_STRIDE초마다 한 장 (빨리 감기 GIF용)
 ##   scenes: 같은 옥상·같은 x에서 단계 1 / 단계 4 평소 / 단계 4 오름 신호 / 단계 10 오름 신호
 

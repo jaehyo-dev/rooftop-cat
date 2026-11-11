@@ -3,6 +3,8 @@
 // 준비: 곡이 시작된 뒤(1.5초) World.sim.elapsed = 30.0으로 단계 3을 만드는 스크립트를 autoload로 잠깐 넣어 웹으로 내보내고(project.godot은 되돌림), 그 폴더를 넘긴다.
 // 곡 길이만큼(약 1분) 걸린다.
 // 사용: PLAYWRIGHT=<playwright 폴더> CHROMIUM=<브라우저 실행 파일, 선택> node tools/web_music_check.mjs <내보낸 폴더> [단계 빠르기, 기본 1.026]
+// WSL: 창이 뜨지 않게 가상 화면에서만 돈다 (~/Documents/GitHub/DESKTOP_NOTES.md)
+//   env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 1280x720x24" node tools/web_music_check.mjs <내보낸 폴더>
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -27,11 +29,16 @@ const server = createServer(async (req, res) => {
 	}
 });
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-// WSL은 headless면 WebGL이 소프트웨어 렌더링이라, WSLg 창 + d3d12로 GPU를 쓴다 (맥은 그대로)
+// WSL은 headless면 WebGL이 소프트웨어 렌더링이라, Xvfb 가상 화면 + d3d12로 GPU를 쓴다 (맥은 그대로).
+// 실제 화면(WSLg)에 창을 띄우지 않도록 xvfb-run 밖에서는 멈춘다
 const wsl = process.platform === "linux" && /microsoft/i.test(release());
+if (wsl && (process.env.WAYLAND_DISPLAY || process.env.DISPLAY === ":0")) {
+	console.error('WSL에서는 창 없이 실행: env -u WAYLAND_DISPLAY xvfb-run -a -s "-screen 0 1280x720x24" node tools/web_music_check.mjs ...');
+	process.exit(1);
+}
 const args = ["--autoplay-policy=no-user-gesture-required"];
 const browser = await chromium.launch(wsl
-	? { executablePath: process.env.CHROMIUM, headless: false, args: [...args, "--ignore-gpu-blocklist", "--enable-gpu", "--use-angle=gl"], env: { ...process.env, GALLIUM_DRIVER: "d3d12" } }
+	? { executablePath: process.env.CHROMIUM, headless: false, args: [...args, "--ozone-platform=x11", "--ignore-gpu-blocklist", "--enable-gpu", "--use-angle=gl"], env: { ...process.env, GALLIUM_DRIVER: "d3d12" } }
 	: { executablePath: process.env.CHROMIUM, args });
 let code = 1;
 try {

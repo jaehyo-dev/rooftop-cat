@@ -1,6 +1,6 @@
 extends SceneTree
 ## 검토용 캡처: 실제 main 씬(World)에 정해진 입력을 1/60초 프레임마다 넣어 진행하며 화면을 PNG로 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_review.gd -- <장면> <출력 폴더>
+## 사용 (헤드리스 불가. 맥은 창이 잠깐 뜸, WSL은 창 없이 앞에 "xvfb-run -a"): godot --path . --resolution 1280x720 -s res://tools/capture_review.gd -- <장면> <출력 폴더>
 ## 장면: double(넓은 틈 더블점프·공중제비), line_good(누름→퍼펙트), line_early(너무 이른 누름), line_miss(안 누름),
 ##       pole(판까지 점프+더블점프, 판에서 다시), camera(퍼펙트 + 더블점프로 높이 → 세로 카메라),
 ##       tramp_miss·tramp_good·tramp_perfect·tramp_early(트램펄린에 달려 들어가 안 누름·누름·퍼펙트·너무 이른 누름),

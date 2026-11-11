@@ -1,6 +1,6 @@
 extends SceneTree
 ## 장애물 확인용 캡처: 실제 main 씬에서 긴 옥상 하나에 장애물을 놓고 PNG를 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_obstacles.gd -- <avoid|hit|scene> <출력>
+## 사용 (헤드리스 불가. 맥은 창이 잠깐 뜸, WSL은 창 없이 앞에 "xvfb-run -a"): godot --path . --resolution 1280x720 -s res://tools/capture_obstacles.gd -- <avoid|hit|scene> <출력>
 ##   avoid: 4종을 정답대로 피함 (폴더에 프레임)   hit: 부딪혀 하트를 잃음 (폴더에 프레임)   scene: 소품과 장애물 한 장 (파일)
 
 const BalanceBot := preload("res://tests/balance_bot.gd")

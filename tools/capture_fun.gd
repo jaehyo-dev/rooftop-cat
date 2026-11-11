@@ -1,6 +1,6 @@
 extends SceneTree
 ## 2a-4 확인용 캡처: 생선 길을 따라 달리는 자동 조종으로 실제 main 씬을 돌려 PNG를 저장한다.
-## 사용 (창이 잠깐 뜸, 헤드리스 불가): godot --path . --resolution 1280x720 -s res://tools/capture_fun.gd -- <모드> <출력 폴더> [시드]
+## 사용 (헤드리스 불가. 맥은 창이 잠깐 뜸, WSL은 창 없이 앞에 "xvfb-run -a"): godot --path . --resolution 1280x720 -s res://tools/capture_fun.gd -- <모드> <출력 폴더> [시드]
 ## 모드: shots, gif, result, dash (2a-4) / hit, heart1, combo, trail, perf, stage (2b 손맛) / tint (2b 수정2 노을빛 A·B·C)
 
 const STEP := 1.0 / 120.0
