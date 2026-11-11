@@ -212,6 +212,8 @@ const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어
 const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
 var sim := RunnerSim.new(randi())
+## 이번 판 미션 사건 세기 (판이 끝나면 main이 Missions.end_run에 넘김)
+var tracker := MissionTracker.new()
 ## 판 시작 때 부르는 함수: 이번 판의 Perks를 돌려준다 (main이 저장에서 강화를 읽고 켠 부스터를 줄임). 없으면 0단계
 var make_perks: Callable
 ## 이 컨트롤 위의 터치는 점프·다시 시작으로 받지 않는다 (버튼 자리, 보이는 것만)
@@ -325,6 +327,7 @@ func _process(delta: float) -> void:
 	while _accumulator >= STEP:
 		var combo_before := [sim.combo.count, sim.combo.multiplier()]
 		sim.step(STEP, pressed and not _wait_release)
+		tracker.observe(sim)
 		_play_events(combo_before)
 		for item in sim.picked:
 			_pops.append({"kind": item.kind, "x": item.x, "y": item.y, "t": 0.0})
@@ -547,6 +550,7 @@ func _place_cat(delta: float) -> void:
 ## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다. 강화·부스터는 make_perks로 이 순간에 정한다 (PLAN 3-1)
 func restart() -> void:
 	sim = RunnerSim.new(randi(), Balance.RUN_SPEED, true, make_perks.call() if make_perks.is_valid() else null)
+	tracker = MissionTracker.new()
 	_accumulator = 0.0
 	_pops.clear()
 	_bursts.clear()

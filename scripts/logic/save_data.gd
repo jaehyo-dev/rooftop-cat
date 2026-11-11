@@ -14,9 +14,8 @@ const DEFAULTS := {
 	"wallet": {"fish": 0},
 	"upgrades": {"dash": 0, "yarn": 0, "combo": 0, "gold": 0, "cookie": 0, "fish": 0},
 	"boosters": {"dash_start": 0, "bell_start": 0, "fish_bonus": 0},
-	# 미션·등급 자리 (2b에서 채움)
-	"missions": {"day": "", "week": "", "daily": [], "weekly": [], "prev_daily": [], "prev_weekly": [],
-			"swaps_today": 0, "week_daily_done": 0, "week_full_days": 0},
+	# 미션·등급 (Missions·CatRank가 씀. 이번 주 깬 일일 수는 주간 미션 진행에 바로 들어가 따로 두지 않음)
+	"missions": {"day": "", "week": "", "daily": [], "weekly": [], "prev_daily": [], "prev_weekly": [], "swaps_today": 0},
 	"rank": {"level": 1, "xp": 0},
 	"stats": {"runs": 0, "fish_total": 0},  # fish_total = 배수 전 번 생선 합 (가격 다시 맞추기용)
 }
@@ -59,7 +58,8 @@ func _read() -> void:
 			data[section][key] = _clean(section, key, _file.get_value(section, key, DEFAULTS[section][key]))
 
 
-## 읽은 값을 검사: 타입이 다르면 기본값, 정수는 0 이상 (강화 0~10, 부스터 0~99, 등급 1 이상)
+## 읽은 값을 검사: 타입이 다르면 기본값, 정수는 0 이상 (강화 0~10, 부스터 0~99, 등급 1~마지막 등급).
+## 미션 목록 안쪽 모양은 Missions.refresh가 검사해 이상하면 새로 뽑는다
 static func _clean(section: String, key: String, value: Variant) -> Variant:
 	var fallback: Variant = DEFAULTS[section][key]
 	if typeof(value) != typeof(fallback):
@@ -73,7 +73,7 @@ static func _clean(section: String, key: String, value: Variant) -> Variant:
 			"boosters":
 				return clampi(value, 0, Balance.BOOSTER_MAX)
 			"rank":
-				return maxi(value, 1 if key == "level" else 0)
+				return clampi(value, 1, MissionTable.RANK_NAMES.size()) if key == "level" else maxi(value, 0)
 		return maxi(value, 0)
 	return value
 
@@ -150,6 +150,7 @@ func buy_upgrade(kind: String) -> String:
 		return "money"
 	data.wallet.fish -= price
 	data.upgrades[kind] += 1
+	Missions.on_shop(data)  # 주간 "상점에서 ○번 사기" (깨면 보상도 여기서 들어옴)
 	save()
 	return ""
 
@@ -167,6 +168,7 @@ func buy_booster(kind: String) -> String:
 		return "money"
 	data.wallet.fish -= price
 	data.boosters[kind] += 1
+	Missions.on_shop(data)
 	save()
 	return ""
 

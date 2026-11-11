@@ -9,6 +9,10 @@ var record_path := SaveData.DEFAULT_PATH
 var save: SaveData
 ## 다음 판에 켤 부스터 (판이 시작되면 쓴 만큼 줄고 다시 꺼짐, PLAN 1번). 2c에서 시작 화면·결과 카드의 부스터 칸이 바꿈
 var boosters_on: Array = []
+## 미션 날짜 (테스트·시험 패널이 시각을 바꿈)
+var clock := DayClock.new()
+## 지난 판 미션 결과 {"done", "ranks"} (Missions.count). 2c 결과 카드 쪽지·등급 도장이 읽음
+var mission_result := {}
 
 ## 배경 음악 "찹쌀떡 산책" (tools/make_music.py로 합성한 루프)
 const MUSIC := preload("res://assets/audio/mochi_walk.ogg")
@@ -144,6 +148,7 @@ func _place_dash_bonus(combo: FishCombo) -> void:
 
 ## 판 시작 (World.restart가 부름): 켠 부스터를 줄여 저장하고 이번 판 강화·부스터를 돌려준다
 func _start_run() -> Perks:
+	Missions.start_run(save, clock.now())  # 23:59 결과 카드에서 00:01에 다시 하기를 눌러도 새 날 미션에 들어감 (PLAN 7번)
 	var perks := save.start_run(boosters_on)
 	boosters_on = []
 	return perks
@@ -155,6 +160,7 @@ func _on_game_over(meters: int) -> void:
 	# shortcut: 게임 끝에만 저장해 판 중간에 창을 닫으면 그 판 생선은 사라짐 (PLAN 2-2에서 유지하기로 함)
 	var bonus := sim.perks.has_booster("fish_bonus")
 	var run := save.finish_run(meters, score, sim.fish, bonus)
+	mission_result = Missions.end_run(save, _world.tracker.result(sim), clock.now())
 	_best = save.best_score()
 	_result = {"values": [meters, sim.fish, sim.combo.best, score], "wallet": run.total - run.earned, "bonus": bonus, "new_best": run.new_best, "t": 0.0}
 	_count_result(0.0)

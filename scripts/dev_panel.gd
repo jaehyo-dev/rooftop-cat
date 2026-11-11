@@ -61,6 +61,13 @@ func _ready() -> void:
 		_booster_buttons[kind] = button
 		row.add_child(button)
 	_body.add_child(row)
+	# 미션 시험 (2b): 날짜 넘기기, 미션 즉시 완료, 등급 경험치
+	var mission_row := HBoxContainer.new()
+	mission_row.add_child(_button("+1일", func() -> void: _shift_days(1)))
+	mission_row.add_child(_button("+7일", func() -> void: _shift_days(7)))
+	mission_row.add_child(_button("미션 완료", _complete_missions))
+	mission_row.add_child(_button("경험치 +100", func() -> void: _rank_xp(100)))
+	_body.add_child(mission_row)
 	_body.add_child(_button("저장 지우기", _wipe))
 	_main.get_node("World").touch_blockers.append(self)
 	_refresh()
@@ -94,12 +101,37 @@ func _toggle_booster(kind: String) -> void:
 	_refresh()
 
 
+## 기기 시간에 날을 더해 미션 날짜를 넘긴다 (저장하지 않는 시험용 시계, 새로 켜면 0)
+func _shift_days(days: int) -> void:
+	_main.clock.offset_days += days
+	Missions.start_run(_main.save, _main.clock.now())
+	_refresh()
+
+
+## 남은 일일·주간 미션을 다 깬다 (보상·등급도 실제처럼 들어옴)
+func _complete_missions() -> void:
+	var run := {"daily_done": 1 << 30, "full_day": 1 << 30}
+	for table: Dictionary in [MissionTable.DAILY, MissionTable.WEEKLY]:
+		for id: String in table:
+			run[table[id].stat] = 1 << 30
+	Missions.count(_main.save.data, run)
+	_main.save.save()
+	_refresh()
+
+
+func _rank_xp(xp: int) -> void:
+	CatRank.add_xp(_main.save.data, xp)
+	_main.save.save()
+	_refresh()
+
+
 func _wipe() -> void:
 	var path: String = _main.save.path
 	for file in [path, path + ".tmp"]:
 		if FileAccess.file_exists(file):
 			DirAccess.remove_absolute(file)
 	_main.save = SaveData.open(path)
+	Missions.start_run(_main.save, _main.clock.now())
 	_main.set("_best", 0)
 	_main.boosters_on.clear()
 	_refresh()
@@ -119,4 +151,9 @@ func _refresh() -> void:
 	var boosts: Array[String] = []
 	for kind: String in BOOSTER_NAMES:
 		boosts.append("%s %d" % [BOOSTER_NAMES[kind], save.booster_count(kind)])
-	_status.text = "생선 %d (다음 판부터)\n%s\n%s" % [save.fish(), "  ".join(parts), "  ".join(boosts)]
+	var missions: Array[String] = []  # 일일 한 줄, 주간 한 줄
+	for list: Array in [save.data.missions.daily, save.data.missions.weekly]:
+		missions.append("  ".join(list.map(func(e: Dictionary) -> String: return "%s %d/%d%s" % [e.id, e.progress, e.target, " 깸" if e.done else ""])))
+	var rank: Dictionary = save.data.rank
+	_status.text = "생선 %d (다음 판부터)\n%s\n%s\n%s  %s %d등급 %d/%d\n%s" % [save.fish(), "  ".join(parts), "  ".join(boosts),
+			save.data.missions.day, CatRank.rank_name(rank.level), rank.level, rank.xp, CatRank.next_xp(rank.level), "\n".join(missions)]

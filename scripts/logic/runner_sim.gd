@@ -55,6 +55,8 @@ var bell_blocked := false  # 방울이 부딪힘을 막음 (막힌 장애물은 
 ## 이번 step에 질주로 부순 장애물들, 통조림으로 바뀐 장애물들 (x는 그 순간 판정 왼쪽 끝)
 var smashed: Array[Dictionary] = []
 var canned: Array[Dictionary] = []
+## 이번 step에 부딪히지 않고 몸 뒤로 지나간 장애물들 (미션 "피하기"용. 질주·무적·투명화·구제 중에 지나간 것은 빠짐)
+var passed: Array[Dictionary] = []
 
 var x := 0.0
 var y := 0.0
@@ -192,6 +194,7 @@ func step(dt: float, pressed: bool) -> void:
 	bell_blocked = false
 	smashed.clear()
 	canned.clear()
+	passed.clear()
 	if game_over:
 		return
 	elapsed += dt
@@ -702,6 +705,11 @@ func _hit_obstacles() -> void:
 		var left := obstacle_left(o, x)
 		if left + o.w < x - 1000.0:
 			obstacles.remove_at(i)  # 지나간 장애물
+		elif left + o.w < x - Balance.CAT_BODY_SIZE.x * 0.5:
+			if not o.has("passed"):
+				o.passed = true  # 한 번만
+				if not (safe or dashing):
+					passed.append(o)
 		elif dashing:
 			# 높이와 상관없이 몸 앞이 닿으면 부순다 (이미 지나친 것은 그대로)
 			if left <= front() and left + o.w >= x:
