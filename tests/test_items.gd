@@ -2,7 +2,6 @@ extends TestCase
 ## 아이템: 생선·종이상자 배치, 먹기, 종이상자 구제(1회만, 가까운 앞 옥상으로), 생선 저장.
 
 const DT := 1.0 / 120.0
-const PATH := "user://test_items_save.cfg"
 
 
 ## 시드로 옥상 count개와 그 사이 아이템을 만든다
@@ -183,25 +182,6 @@ func test_구제_중에는_허우적거리지_않고_올라가는_자세() -> vo
 			assert_eq(CatPose.pose(sim).frame, "rise")
 			return
 	assert_true(false, "구제가 시작되지 않음")
-
-
-func test_생선은_판마다_더해서_저장하고_다른_기록은_지우지_않는다() -> void:
-	DirAccess.remove_absolute(PATH)
-	assert_eq(BestRecord.load_fish(PATH), 0, "처음은 0")
-	BestRecord.submit(77, PATH)
-	assert_eq(BestRecord.add_fish(12, PATH), 12)
-	assert_eq(BestRecord.add_fish(0, PATH), 12, "0개면 그대로")
-	assert_eq(BestRecord.add_fish(5, PATH), 17)
-	assert_eq(BestRecord.load_fish(PATH), 17)
-	assert_eq(BestRecord.load_best(PATH), 77, "최고 기록 유지")
-	BestRecord.submit(90, PATH)
-	assert_eq(BestRecord.load_fish(PATH), 17, "최고 기록을 저장해도 생선 유지")
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
-	file.store_string("[wallet]\nfish=\"많이\"\n")
-	file.close()
-	assert_eq(BestRecord.load_fish(PATH), 0, "깨진 값은 0")
-	DirAccess.remove_absolute(PATH)
-
 
 func test_구제_직전에_누른_입력으로_복귀_뒤_점프하지_않는다() -> void:
 	var sim := RunnerSim.new(1)

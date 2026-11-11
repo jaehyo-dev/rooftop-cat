@@ -43,6 +43,9 @@ const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
 const ITEM_TEXTURES := {"fish": preload("res://assets/sprites/items/fish.png"), "box": BOX_TEXTURE, "gold": preload("res://assets/sprites/items/gold.png"),
 		"dash": preload("res://assets/sprites/items/snack.png"), "yarn": preload("res://assets/sprites/items/yarn.png"), "cookie": preload("res://assets/sprites/items/cookie.png"),
 		"can": preload("res://assets/sprites/items/can.png"), "bell": preload("res://assets/sprites/items/bell.png")}
+## 생선 그림: 생선 점수 강화 단계에 따라 0~3 (Perks.fish_look). 그림은 2c, 지금은 4칸 모두 지금 생선
+const FISH_LOOKS := [preload("res://assets/sprites/items/fish.png"), preload("res://assets/sprites/items/fish.png"),
+		preload("res://assets/sprites/items/fish.png"), preload("res://assets/sprites/items/fish.png")]
 const ITEM_WIDTHS := {"fish": 56.0, "box": 60.0, "gold": 96.0, "dash": 62.0, "yarn": 76.0, "cookie": 72.0, "can": 76.0, "bell": 70.0}
 ## 구조물 그림 (assets/sprites/structures/, 화면에 그릴 크기)
 const LINE_TEXTURE := preload("res://assets/sprites/structures/clothesline.png")
@@ -209,6 +212,10 @@ const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어
 const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
 var sim := RunnerSim.new(randi())
+## 판 시작 때 부르는 함수: 이번 판의 Perks를 돌려준다 (main이 저장에서 강화를 읽고 켠 부스터를 줄임). 없으면 0단계
+var make_perks: Callable
+## 이 컨트롤 위의 터치는 점프·다시 시작으로 받지 않는다 (버튼 자리, 보이는 것만)
+var touch_blockers: Array[Control] = []
 var cat := CatView.new()
 var _touches := {}
 var _accumulator := 0.0
@@ -417,7 +424,7 @@ func _item_effects() -> void:
 		elif item.kind == "gold":
 			_sparkle(center, 8, 16.0, 320.0)
 			_gold_flash = 0.0
-			_pop_texts.append({"text": "+%d" % (Balance.GOLD_POINTS * sim.combo.multiplier() * (Balance.DASH_FISH_MULT if sim.dashing else 1)), "x": item.x, "y": item.y + 50.0, "t": 0.0, "color": GOLD_COLOR})
+			_pop_texts.append({"text": "+%d" % (sim.perks.gold_points() * sim.combo.multiplier() * (Balance.DASH_FISH_MULT if sim.dashing else 1)), "x": item.x, "y": item.y + 50.0, "t": 0.0, "color": GOLD_COLOR})
 	for o in sim.smashed:
 		_knocked.append({"kind": o.kind, "x": o.x + o.w * 0.5, "y": o.y0, "t": 0.0})
 		_shatter(o, "팡!")
@@ -537,9 +544,9 @@ func _place_cat(delta: float) -> void:
 	cat.show_state(sim, delta)
 
 
-## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다
+## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다. 강화·부스터는 make_perks로 이 순간에 정한다 (PLAN 3-1)
 func restart() -> void:
-	sim = RunnerSim.new(randi())
+	sim = RunnerSim.new(randi(), Balance.RUN_SPEED, true, make_perks.call() if make_perks.is_valid() else null)
 	_accumulator = 0.0
 	_pops.clear()
 	_bursts.clear()
@@ -574,6 +581,8 @@ func restart() -> void:
 func _input(event: InputEvent) -> void:
 	# 휴대폰 터치와 PC 마우스 클릭(터치로 흉내 냄)을 손가락별로 기억한다
 	if event is InputEventScreenTouch:
+		if event.pressed and touch_blocked(event.position):
+			return
 		if event.pressed:
 			_touches[event.index] = true
 			_tap_pending = true
@@ -581,6 +590,13 @@ func _input(event: InputEvent) -> void:
 			_touches.erase(event.index)
 	elif event is InputEventKey and event.physical_keycode == KEY_SPACE and event.pressed and not event.echo:
 		_tap_pending = true
+
+
+func touch_blocked(at: Vector2) -> bool:
+	for control in touch_blockers:
+		if control.is_visible_in_tree() and control.get_global_rect().has_point(at):
+			return true
+	return false
 
 
 func _notification(what: int) -> void:
@@ -1010,7 +1026,7 @@ static func tramp_look(state: RunnerSim, tramp: Dictionary) -> Dictionary:
 func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
 	if pos.x < -100.0 or pos.x > _view_size().x + 100.0:
 		return
-	var texture: Texture2D = ITEM_TEXTURES[kind]
+	var texture: Texture2D = FISH_LOOKS[sim.perks.fish_look()] if kind == "fish" else ITEM_TEXTURES[kind]
 	var w: float = ITEM_WIDTHS[kind] * zoom
 	var h := w * texture.get_height() / texture.get_width()
 	draw_texture_rect(texture, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, Color(1, 1, 1, alpha))
@@ -1155,9 +1171,9 @@ func _draw_bell(at: Vector2) -> void:
 func _draw_status() -> void:
 	var rows: Array = []
 	if sim.dashing:
-		rows.append(["dash", sim.dash_time / Balance.DASH_TIME])
+		rows.append(["dash", sim.dash_time / sim.perks.dash_time()])
 	if sim.magnet_time > 0.0:
-		rows.append(["yarn", sim.magnet_time / Balance.MAGNET_TIME])
+		rows.append(["yarn", sim.magnet_time / sim.perks.magnet_time()])
 	var row_w := STATUS_ICON + 6.0 + STATUS_BAR.x
 	var x := (get_viewport_rect().size.x - rows.size() * row_w - (rows.size() - 1) * HEART_GAP * 2.0) * 0.5
 	for row: Array in rows:

@@ -121,6 +121,9 @@ var _generator: RoofGenerator
 var _placer: ItemPlacer
 var road := FishRoad.new()  # 생선 길 (옥상 생성 때 깐다)
 var slots: ItemSlots  # 아이템 자리에 놓을 것 고르기
+## 강화 단계와 이번 판 부스터 (review/v0.7.0/PLAN.md 3-1). 없으면 전부 0단계 = v0.6.0 판
+var perks: Perks
+var _dash_boost := false  # "질주로 출발" 부스터: BOOSTER_DASH_AT초에 질주를 아직 시작하지 않음
 var _course: CoursePlacer  # 손으로 짠 구간 배치. null이면 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
 var _start_x := 0.0
 var _ground_roof := {}      # 지금 서 있는 옥상
@@ -153,11 +156,16 @@ var _targets_made := 0      # 지금까지 놓은 부술 것 수 (음수 번호,
 
 ## start_speed: 처음 달리는 속도 (accelerate = false로 속도를 고정하는 테스트용). 앞쪽 옥상 간격을 이 속도에 맞춰 바로 만들기 때문에 생성할 때 정한다
 ## use_course: false면 구간 없이 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
-func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: bool = true) -> void:
+## run_perks: 강화·부스터 (null이면 Perks.new() = 0단계, 부스터 없음)
+func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: bool = true, run_perks: Perks = null) -> void:
+	perks = run_perks if run_perks != null else Perks.new()
 	speed = start_speed
 	_generator = RoofGenerator.new(seed_value)
 	_placer = ItemPlacer.new(seed_value)
-	slots = ItemSlots.new(seed_value)
+	slots = ItemSlots.new(seed_value, perks.cookie_gap())
+	combo.step = perks.combo_step()
+	has_bell = perks.has_booster("bell_start")
+	_dash_boost = perks.has_booster("dash_start")
 	if use_course:
 		_course = CoursePlacer.new(_generator, seed_value)
 	roofs.append(RoofGenerator.first_roof(-400.0))
@@ -211,6 +219,9 @@ func step(dt: float, pressed: bool) -> void:
 	_move_forward(vx() * dt)
 	_fill_roofs()
 	_pick_items(dt)
+	if _dash_boost and elapsed >= Balance.BOOSTER_DASH_AT and not dashing:
+		_dash_boost = false
+		_start_dash()
 	_hit_obstacles()
 	if not dashing:
 		combo.tick(dt)
@@ -476,16 +487,16 @@ func _pick_items(dt: float) -> void:
 		match item.kind:
 			"fish":
 				fish += 1
-				bites.append(Balance.FISH_POINTS * bonus)
+				bites.append(perks.fish_points() * bonus)
 			"gold":
 				fish += Balance.GOLD_FISH
-				bites.append(Balance.GOLD_POINTS * bonus)
+				bites.append(perks.gold_points() * bonus)
 			"box":
 				has_box = true
 			"bell":
 				has_bell = true
 			"yarn":
-				magnet_time = Balance.MAGNET_TIME
+				magnet_time = perks.magnet_time()
 			"cookie":
 				hearts += 1
 			"can":
@@ -502,9 +513,9 @@ func _pick_items(dt: float) -> void:
 		_start_dash()  # 생선을 바꿔 깔므로 위 반복이 끝난 뒤에
 
 
-## 생선을 끌어당기는 반경: 털실(MAGNET_RADIUS)과 질주(DASH_MAGNET_RADIUS) 중 큰 쪽, 둘 다 없으면 0
+## 생선을 끌어당기는 반경: 털실(MAGNET_RADIUS x 털실 강화)과 질주(DASH_MAGNET_RADIUS) 중 큰 쪽, 둘 다 없으면 0
 func magnet_radius() -> float:
-	return maxf(Balance.MAGNET_RADIUS if magnet_time > 0.0 else 0.0, Balance.DASH_MAGNET_RADIUS if dashing else 0.0)
+	return maxf(perks.magnet_radius() if magnet_time > 0.0 else 0.0, Balance.DASH_MAGNET_RADIUS if dashing else 0.0)
 
 
 ## 이미 가지고 있거나 소용없으면 그대로 둔다
@@ -542,7 +553,7 @@ func _open_can() -> void:
 func _start_dash() -> void:
 	dashing = true
 	dash_started = true
-	dash_time = Balance.DASH_TIME
+	dash_time = perks.dash_time()
 	_dash_landing = {}
 	_dash_land_time = 0.0
 	_next_target_x = 0.0

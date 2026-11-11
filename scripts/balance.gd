@@ -39,11 +39,34 @@ const PX_PER_METER := 100.0  # 거리 점수: 100픽셀 = 1미터
 const RESTART_DELAY := 0.8
 
 # --- 점수와 콤보 (PLAN 16번): 점수 = 거리(미터) + 생선 점수 합 ---
-const FISH_POINTS := 10
+const FISH_POINTS := 5  # v0.7.0: 생선 점수 강화 0단계 (10단계 25점, UPGRADES)
 const GOLD_POINTS := 200
 const COMBO_STEP := 20    # 생선이 촘촘해 예시(10개)보다 크게: x5까지 처음 속도로 약 13초
 const COMBO_MAX := 5
 const COMBO_TIMEOUT := 3.0  # 이 시간(초) 동안 못 먹으면 끊김 (쉼 옥상 + 트램펄린 비행도 이 안에 다음 생선이 있음)
+
+# --- 강화 상점 (review/v0.7.0/PLAN.md 3·4·13번) ---
+## 영구 강화 6개: [0단계, 10단계]. 그 사이는 단계마다 같은 만큼 (Perks.value). 0단계 = v0.6.0 판과 같은 값
+const UPGRADE_MAX := 10
+const UPGRADES := {
+	"dash": [4.0, 6.0],        # 질주 시간 (초). 0단계는 DASH_TIME
+	"yarn": [1.0, 1.5],        # 털실 시간·반경 배율 (MAGNET_TIME, MAGNET_RADIUS에 곱함)
+	"combo": [20.0, 12.0],     # 콤보 가속: 배수가 오르는 생선 수 (0단계는 COMBO_STEP, 반올림)
+	"gold": [200.0, 500.0],    # 황금 생선 점수. 0단계는 GOLD_POINTS
+	"cookie": [90.0, 70.0],    # 하트 쿠키 간격 (첫 쿠키 시각도 같음, SLOT_ITEMS의 쿠키 줄을 바꿈)
+	"fish": [5.0, 25.0],       # 생선 점수. 0단계는 FISH_POINTS
+}
+## 한 단계 가격 (1→10단계, 6개 공통). 항목 33,700, 전체 202,200 (PLAN 4-2 제안 가격, 2026-11-11 승인)
+const UPGRADE_PRICES := [300, 800, 1500, 2200, 2900, 3600, 4400, 5200, 6000, 6800]
+## 생선 점수 강화가 이 단계에 이르면 생선 그림이 바뀐다 (0·3·6·10단계 → 그림 0~3, 그림은 2c)
+const FISH_LOOK_LEVELS := [0, 3, 6, 10]
+## 한 판 부스터: 값, 가질 수 있는 최대 개수
+const BOOSTER_PRICES := {"dash_start": 500, "bell_start": 400, "fish_bonus": 800}
+const BOOSTER_MAX := 99
+## 질주로 출발: 판 시작 뒤 이 시간(초)에 질주 시작 (첫 옥상 1500px 위)
+const BOOSTER_DASH_AT := 1.0
+## 생선 +50%: 지갑에 더하는 생선 배율 (점수·미션·통계는 그대로)
+const FISH_BONUS_MULT := 1.5
 
 # --- 점프: 누르는 시간만큼 높이 ---
 ## 누르고 있는 동안(최대 JUMP_MAX_HOLD) 같은 속도로 올라가고, 떼면 중력으로 떨어진다.

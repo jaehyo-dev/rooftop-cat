@@ -5,8 +5,8 @@ const DT := 1.0 / 120.0
 
 
 ## 고양이 바로 앞에 아이템을 놓은 sim
-func _sim(kind: String, seed_value: int = 1, v: float = Balance.RUN_SPEED, use_course: bool = false) -> RunnerSim:
-	var sim := RunnerSim.new(seed_value, v, use_course)
+func _sim(kind: String, seed_value: int = 1, v: float = Balance.RUN_SPEED, use_course: bool = false, perks: Perks = null) -> RunnerSim:
+	var sim := RunnerSim.new(seed_value, v, use_course, perks)
 	sim.accelerate = false
 	sim.items.clear()
 	if not kind.is_empty():
@@ -40,8 +40,10 @@ func _run_dash(sim: RunnerSim, check: Callable = func() -> void: pass) -> float:
 func test_질주_끝에_빈_곳에_내려놓는_일이_없다() -> void:
 	var count := 0
 	for seed_value in 40:
-		for v in [430.0, 640.0, 850.0, 950.0]:
-			var sim := _sim("dash", seed_value + 1, v, true)
+		for k in 8:
+			var v: float = [430.0, 640.0, 850.0, 950.0][k % 4]
+			var perks := Perks.new() if k < 4 else Perks.all(Balance.UPGRADE_MAX)  # 0단계 4초, 10단계 6초 질주
+			var sim := _sim("dash", seed_value + 1, v, true, perks)
 			sim.x = 300.0  # 구간이 만들어진 뒤
 			sim.items[0].x = 380.0
 			sim.items[0].y = sim.y + Balance.ITEM_LIFT
@@ -54,7 +56,7 @@ func test_질주_끝에_빈_곳에_내려놓는_일이_없다() -> void:
 			assert_true(sim.on_ground and sim.landed and is_equal_approx(sim.y, roof.top), "옥상 위에 내려섬")
 			assert_true(sim.x + Balance.CAT_FOOT_HALF >= roof.left and sim.x - Balance.CAT_FOOT_HALF <= roof.right, "발이 옥상 위")
 			assert_true(roof.right - sim.x >= v * 0.5, "남은 옥상이 충분히 넓음 (%.0f)" % (roof.right - sim.x))
-			assert_true(seconds >= Balance.DASH_TIME, "4초는 달림 (%.1f)" % seconds)
+			assert_true(seconds >= perks.dash_time(), "강화 질주 시간만큼 달림 (%.1f / %.1f)" % [seconds, perks.dash_time()])
 			for o in sim.obstacles:
 				assert_false(o.x >= roof.left and o.x <= roof.right, "착지 옥상에는 장애물 없음")
 			assert_true(absf(sim.invuln_time - Balance.DASH_END_INVULN) < 0.02, "끝나면 1초 무적")
@@ -66,7 +68,7 @@ func test_질주_끝에_빈_곳에_내려놓는_일이_없다() -> void:
 			assert_false(sim.game_over, "내려선 뒤 1초 안전")
 			assert_eq(sim.hearts, Balance.HEARTS_MAX)
 			assert_true(sim.vx() <= v + 0.01 and sim.vx() < dash_vx, "속도가 돌아옴")
-	assert_eq(count, 160)
+	assert_eq(count, 320)  # 40 시드 x 4 속도 x (0단계, 10단계)
 
 
 func test_질주_중에도_점프와_더블점프가_되고_발판_아래로_안_떨어진다() -> void:
@@ -286,6 +288,7 @@ func test_털실은_반경_안_생선만_끌어오고_8초_뒤_끝난다() -> vo
 	for i in 30:
 		sim.step(DT, false)
 	assert_true(absf(sim.magnet_time - Balance.MAGNET_TIME) < 0.3, "8초 시작")
+	assert_eq(sim.perks.magnet_time(), Balance.MAGNET_TIME, "0단계 = 기본값")
 	sim.items.append({"kind": "fish", "x": sim.x + 40.0, "y": sim.y + 200.0})  # 달리기로는 못 먹는 높이, 반경 안
 	sim.items.append({"kind": "fish", "x": sim.x, "y": sim.y + 1000.0})        # 반경 밖
 	for i in 30:
@@ -307,6 +310,9 @@ func test_질주_중_생선은_2배이고_작은_자석이_붙는다() -> void:
 	assert_true(Balance.DASH_MAGNET_RADIUS < Balance.MAGNET_RADIUS, "털실보다 작음")
 	sim.magnet_time = 1.0
 	assert_eq(sim.magnet_radius(), Balance.MAGNET_RADIUS, "털실과 같이: 큰 쪽")
+	sim.perks = Perks.all(Balance.UPGRADE_MAX)
+	assert_eq(sim.magnet_radius(), Balance.MAGNET_RADIUS * 1.5, "털실 10단계: 반경 +50%")
+	sim.perks = Perks.new()
 	sim.magnet_time = 0.0
 	sim.items.clear()
 	var before := sim.combo.points

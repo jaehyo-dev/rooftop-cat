@@ -1,7 +1,6 @@
 extends TestCase
 ## 속도 곡선, 최고 기록 저장·불러오기.
 
-const PATH := "user://test_best_record.cfg"
 
 
 func test_속도는_단계_표를_따르고_최대에서_멈춘다() -> void:
@@ -68,34 +67,6 @@ func test_속도_단계_신호_값() -> void:
 	assert_eq(SpeedCurve.line_strength(12, 99.0), Balance.SPEED_LINE_REST_MAX, "단계 10 뒤로는 그대로")
 	assert_eq(SpeedCurve.line_strength(3, Balance.SPEED_RAMP_TIME - Balance.SPEED_LINE_FADE), 1.0, "끝나기 전까지 진함")
 	assert_eq(SpeedCurve.line_strength(3, Balance.SPEED_RAMP_TIME), Balance.SPEED_LINE_REST_MIN, "1.2초 뒤에는 옅은 선으로")
-
-
-func test_기록이_없으면_0() -> void:
-	DirAccess.remove_absolute(PATH)
-	assert_eq(BestRecord.load_best(PATH), 0)
-
-
-func test_더_높은_기록만_저장하고_다시_불러온다() -> void:
-	DirAccess.remove_absolute(PATH)
-	assert_true(BestRecord.submit(120, PATH), "첫 기록은 최고 기록")
-	assert_eq(BestRecord.load_best(PATH), 120)
-	assert_false(BestRecord.submit(80, PATH), "낮은 기록은 최고 기록이 아님")
-	assert_false(BestRecord.submit(120, PATH), "같은 기록도 최고 기록이 아님")
-	assert_eq(BestRecord.load_best(PATH), 120, "낮은 기록으로 덮어쓰지 않음")
-	assert_true(BestRecord.submit(300, PATH))
-	assert_eq(BestRecord.load_best(PATH), 300)
-	DirAccess.remove_absolute(PATH)
-
-
-func test_깨진_저장_파일이면_0으로_보고_새_기록을_저장한다() -> void:
-	for content in ["이건 설정 파일이 아님 [[[", "[record]\nbest_distance=\"많이\"\n", "[record]\nbest_distance=-5\n"]:
-		var file := FileAccess.open(PATH, FileAccess.WRITE)
-		file.store_string(content)
-		file.close()
-		assert_eq(BestRecord.load_best(PATH), 0, content)
-	assert_true(BestRecord.submit(10, PATH))
-	assert_eq(BestRecord.load_best(PATH), 10)
-	DirAccess.remove_absolute(PATH)
 
 
 func test_콤보는_연속으로_먹으면_배수가_오르고_x5에서_멈춘다() -> void:
@@ -198,16 +169,3 @@ func test_점수는_거리와_생선_점수의_합이고_황금은_크다() -> v
 	assert_eq(sim.combo.points, Balance.FISH_POINTS + Balance.GOLD_POINTS)
 	assert_eq(sim.fish, 1 + Balance.GOLD_FISH)
 	assert_eq(sim.score(), sim.distance() + sim.combo.points)
-
-
-func test_최고_점수_저장과_이전_저장_호환() -> void:
-	const SCORE_PATH := "user://test_best_score.cfg"
-	DirAccess.remove_absolute(SCORE_PATH)
-	BestRecord.submit(50, SCORE_PATH)  # 점수가 없던 이전 저장
-	assert_eq(BestRecord.load_best_score(SCORE_PATH), 0, "없으면 0")
-	assert_true(BestRecord.submit_score(1200, SCORE_PATH))
-	assert_false(BestRecord.submit_score(900, SCORE_PATH), "낮으면 새 기록 아님")
-	assert_false(BestRecord.submit_score(1200, SCORE_PATH), "같아도 새 기록 아님")
-	assert_eq(BestRecord.load_best_score(SCORE_PATH), 1200)
-	assert_eq(BestRecord.load_best(SCORE_PATH), 50, "거리 기록 유지")
-	DirAccess.remove_absolute(SCORE_PATH)

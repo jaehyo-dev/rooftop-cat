@@ -75,7 +75,8 @@ func _run() -> void:
 			_catcher.take()
 			await test.call(name)
 			for error in _catcher.take():
-				test.failures.append("실행 중 오류: " + error)
+				if not Array(test.expected_errors).any(func(part: String) -> bool: return error.contains(part)):
+					test.failures.append("실행 중 오류: " + error)
 			if test.failures.is_empty():
 				print("통과  %s :: %s" % [file.get_file(), name])
 				passed += 1

@@ -5,8 +5,8 @@ const DT := 1.0 / 60.0
 
 
 ## 긴 판을 자동으로 달린다. 떨어져도 상자로 살리고, 질주·통조림을 주기적으로 앞에 놓는다. 일정 간격마다 check를 부른다
-func _long_run(seed_value: int, seconds: float, check: Callable) -> RunnerSim:
-	var sim := RunnerSim.new(seed_value)
+func _long_run(seed_value: int, seconds: float, check: Callable, perks: Perks = null) -> RunnerSim:
+	var sim := RunnerSim.new(seed_value, Balance.RUN_SPEED, true, perks)
 	var next_flight := 0
 	var hold_left := 0.0
 	var next_power := 20.0
@@ -48,7 +48,10 @@ static func _crossed_pairs(sim: RunnerSim) -> Array:
 
 
 func test_긴_판에서_생선_줄이_겹치지_않는다() -> void:
-	for seed_value in [1, 2, 3, 4, 5, 6, 7, 8]:
+	# 0단계, 강화 전부 10단계(질주 6초·털실 +50%) + 질주로 출발
+	for case in 16:
+		var seed_value := case % 8 + 1
+		var perks := Perks.new() if case < 8 else Perks.all(Balance.UPGRADE_MAX, ["dash_start"])
 		var pairs := []
 		var dashes := [0]
 		var checked := [0]
@@ -57,7 +60,7 @@ func test_긴_판에서_생선_줄이_겹치지_않는다() -> void:
 			if s.magnet_time > 0.0:
 				return  # 털실은 생선을 끌어당겨 일부러 모은다
 			checked[0] += 1
-			pairs.append_array(_crossed_pairs(s)))
+			pairs.append_array(_crossed_pairs(s)), perks)
 		assert_true(dashes[0] > 0, "시드 %d: 질주가 나옴" % seed_value)
 		assert_true(checked[0] > 100, "시드 %d: 충분히 검사함 (%d)" % [seed_value, checked[0]])
 		assert_eq(pairs.size(), 0, "시드 %d (%.0f초): 겹친 쌍 %s" % [seed_value, sim.elapsed, str(pairs.slice(0, 2))])

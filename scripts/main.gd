@@ -3,8 +3,12 @@ extends Control
 ## 글꼴은 Gaegu Bold(main.tscn 테마, 한글 포함). 갈색 글자 + 얇은 밝은 테두리.
 ## 손맛(2b): 콤보 배수가 오르면 숫자가 톡 튀고, 생선 점수가 오르면 점수가 살짝 흔들린다. 결과 숫자는 하나씩 차오르고 새 기록이면 별이 내린다.
 
-## 최고 기록·생선 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
-var record_path := BestRecord.DEFAULT_PATH
+## 저장 위치 (테스트에서 바꿔 실제 기록을 건드리지 않는다)
+var record_path := SaveData.DEFAULT_PATH
+## 기록·지갑·강화·부스터 (_ready에서 읽음)
+var save: SaveData
+## 다음 판에 켤 부스터 (판이 시작되면 쓴 만큼 줄고 다시 꺼짐, PLAN 1번). 2c에서 시작 화면·결과 카드의 부스터 칸이 바꿈
+var boosters_on: Array = []
 
 ## 배경 음악 "찹쌀떡 산책" (tools/make_music.py로 합성한 루프)
 const MUSIC := preload("res://assets/audio/mochi_walk.ogg")
@@ -62,10 +66,13 @@ var _dash_bonus := Label.new()
 func _ready() -> void:
 	# 버전은 project.godot 한 곳에서 읽는다.
 	$VersionLabel.text = "v" + str(ProjectSettings.get_setting("application/config/version"))
-	_best = BestRecord.load_best_score(record_path)
+	save = SaveData.open(record_path)
+	_best = save.best_score()
 	_world.game_over.connect(_on_game_over)
 	_world.restarted.connect(_on_restarted)
-	_on_restarted()
+	_world.make_perks = _start_run
+	_world.restart()  # 첫 판도 강화를 넣어 다시 만든다 (World가 처음 만든 판은 강화 전)
+	DevPanel.attach(self)
 	# 배경 음악: 끝나면 처음부터 반복. 웹에서는 첫 터치·클릭 뒤부터 소리가 난다 (브라우저 규칙)
 	var music_stream: AudioStreamOggVorbis = MUSIC.duplicate()
 	music_stream.loop = not OS.has_feature("web")
@@ -135,15 +142,21 @@ func _place_dash_bonus(combo: FishCombo) -> void:
 	_dash_bonus.position = Vector2(label.position.x + label.size.x - width - _dash_bonus.size.x - 8.0, label.position.y + 6.0)
 
 
+## 판 시작 (World.restart가 부름): 켠 부스터를 줄여 저장하고 이번 판 강화·부스터를 돌려준다
+func _start_run() -> Perks:
+	var perks := save.start_run(boosters_on)
+	boosters_on = []
+	return perks
+
+
 func _on_game_over(meters: int) -> void:
-	BestRecord.submit(meters, record_path)
 	var sim: RunnerSim = _world.sim
 	var score: int = sim.score()
-	var new_best := BestRecord.submit_score(score, record_path)
-	_best = maxi(_best, score)
-	# shortcut: 게임 끝에만 저장해 판 중간에 창을 닫으면 그 판 생선은 사라짐, 강화 상점(v0.7.0) 때 판 중 저장을 검토
-	var total := BestRecord.add_fish(sim.fish, record_path)
-	_result = {"values": [meters, sim.fish, sim.combo.best, score], "total": total, "new_best": new_best, "t": 0.0}
+	# shortcut: 게임 끝에만 저장해 판 중간에 창을 닫으면 그 판 생선은 사라짐 (PLAN 2-2에서 유지하기로 함)
+	var bonus := sim.perks.has_booster("fish_bonus")
+	var run := save.finish_run(meters, score, sim.fish, bonus)
+	_best = save.best_score()
+	_result = {"values": [meters, sim.fish, sim.combo.best, score], "wallet": run.total - run.earned, "bonus": bonus, "new_best": run.new_best, "t": 0.0}
 	_count_result(0.0)
 	$GameOver.visible = true
 	$BestLabel.text = "BEST %d" % _best
@@ -159,9 +172,9 @@ func _count_result(delta: float) -> void:
 	if done:
 		last = "새 기록!" if _result.new_best else "최고 점수  %d" % _best
 	$GameOver/Card/Box/Score.text = "점수  %d" % shown[3]
-	$GameOver/Card/Box/Stats.text = "거리  %d m\n먹은 생선  %d\n최고 콤보  %d" % [shown[0], shown[1], shown[2]]
+	$GameOver/Card/Box/Stats.text = "거리  %d m\n먹은 생선  %d%s\n최고 콤보  %d" % [shown[0], shown[1], "  +50%" if _result.bonus else "", shown[2]]
 	$GameOver/Card/Box/Best.text = last if done else " "  # 빈 줄로 자리를 잡아 카드 크기가 변하지 않게
-	$GameOver/Card/Box/Total.text = "모은 생선 %d" % (_result.total - _result.values[1] + shown[1])
+	$GameOver/Card/Box/Total.text = "모은 생선 %d" % (_result.wallet + ceili(shown[1] * (Balance.FISH_BONUS_MULT if _result.bonus else 1.0)))
 	var label: Label = $GameOver/Card/Box/Score
 	label.pivot_offset = label.size * 0.5
 	if done and not was_done and _result.new_best:

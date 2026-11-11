@@ -39,11 +39,11 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
 ## 아이템 성적: dash_count/dash_smashed/dash_seconds/dash_fall(끝난 뒤 3초 안에 떨어짐), first_dash(첫 질주 먹은 시각, 못 먹으면 -1), eaten(종류별 먹은 수),
 ## score(판 점수), dash_points(질주 중 생선 점수, 2배 포함), made(종류별 놓인 수), yarn_fish/yarn_time·plain_fish/plain_time(털실·평소의 생선과 시간), blocks(방울이 막은 수), canned(통조림으로 바뀐 장애물 수), cookie_full(하트 3개에서 먹은 쿠키).
-## off: 끌 아이템 종류 (효과 비교용)
-static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = []) -> Dictionary:
+## off: 끌 아이템 종류 (효과 비교용). perks: 강화·부스터 (null = 0단계, v0.7.0). dash_at: 질주를 시작한 시각들
+static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
 			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {},
-			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "eaten": {}, "made": {},
+			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "dash_at": [], "eaten": {}, "made": {},
 			"yarn_fish": 0, "yarn_time": 0.0, "plain_fish": 0, "plain_time": 0.0, "blocks": 0, "canned": 0, "cookie_full": 0,
 			"score": 0, "dash_points": 0}
 	var dash_began := 0.0
@@ -54,7 +54,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 	var seen := {}         # 이미 센 특수 틈 (다음 옥상 왼쪽 x)
 	var gap_roof := {}     # 지금 건너는 중인 특수 틈의 다음 옥상
 	var gap_kind := ""
-	var sim := RunnerSim.new(seed_value, start_speed)
+	var sim := RunnerSim.new(seed_value, start_speed, true, perks)
 	sim.accelerate = accelerate
 	sim.slots.off = off
 	var rng := RandomNumberGenerator.new()
@@ -149,6 +149,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		if sim.dash_started:
 			stats.dash_count += 1
 			dash_began = sim.elapsed
+			stats.dash_at.append(sim.elapsed)
 			if stats.first_dash < 0.0:
 				stats.first_dash = sim.elapsed
 		if sim.dash_ended:

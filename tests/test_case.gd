@@ -6,6 +6,8 @@ extends Node
 
 ## 현재 실행 중인 테스트 함수의 실패 메시지 목록
 var failures: PackedStringArray = []
+## 이 글이 든 엔진 오류는 테스트가 일부러 낸 것이라 실패로 치지 않는다 (예: 깨진 저장 파일 읽기)
+var expected_errors: PackedStringArray = []
 
 
 ## 속도 단계 표의 서로 다른 속도들 (옥상·구조물 테스트가 단계마다 확인한다)

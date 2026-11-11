@@ -9,12 +9,16 @@ var _next := {}  # 종류 → 이 시각부터 나올 수 있음
 var made := {}
 ## 켜지 않을 종류 (밸런스 봇이 효과를 비교할 때만)
 var off: Array = []
+## Balance.SLOT_ITEMS에서 쿠키 줄만 강화 값(첫 시각·간격 = cookie_gap)으로 바꾼 표
+var _rows: Array = []
 
 
-func _init(seed_value: int) -> void:
+## cookie_gap: 하트 쿠키 간격 (하트 쿠키 강화, Perks.cookie_gap). 0 이하면 SLOT_ITEMS 그대로
+func _init(seed_value: int, cookie_gap: float = 0.0) -> void:
 	_rng.seed = hash(seed_value) ^ 0x1b873593
 	for row: Array in Balance.SLOT_ITEMS:
-		_next[row[0]] = row[1]
+		_rows.append(["cookie", cookie_gap, cookie_gap, cookie_gap] if row[0] == "cookie" and cookie_gap > 0.0 else row)
+		_next[row[0]] = _rows[-1][1]
 
 
 ## 자리 하나에 놓을 아이템들. slot.forced가 있으면 그 종류 (대본의 첫 질주)
@@ -31,7 +35,7 @@ func fill(slot: Dictionary, now: float, hearts: int, has_bell: bool) -> Array[Di
 
 ## 시간이 된 아이템 중 우선순위가 가장 높은 종류. 없으면 "fish"
 func choose(now: float, hearts: int, has_bell: bool) -> String:
-	for row: Array in Balance.SLOT_ITEMS:
+	for row: Array in _rows:
 		var kind: String = row[0]
 		if now < _next[kind] or off.has(kind):
 			continue
@@ -43,6 +47,6 @@ func choose(now: float, hearts: int, has_bell: bool) -> String:
 
 func _mark(kind: String, now: float) -> void:
 	made[kind] = made.get(kind, 0) + 1
-	for row: Array in Balance.SLOT_ITEMS:
+	for row: Array in _rows:
 		if row[0] == kind:
 			_next[kind] = now + _rng.randf_range(row[2], row[3]) * (Balance.ITEM_LATE_MULT if now >= Balance.ITEM_LATE_TIME else 1.0)

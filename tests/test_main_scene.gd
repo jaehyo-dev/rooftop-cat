@@ -90,8 +90,8 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	assert_true(main.get_node("GameOver").visible, "게임 끝 화면")
 	var score: int = world.sim.score()
 	assert_false(main.get_node("GameOver/Card/Box/Score").text.contains("점수  %d" % score) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
-	assert_eq(BestRecord.load_best(PATH), meters, "최고 거리 저장")
-	assert_eq(BestRecord.load_best_score(PATH), score, "최고 점수 저장")
+	assert_eq(SaveData.open(PATH).best_distance(), meters, "최고 거리 저장")
+	assert_eq(SaveData.open(PATH).best_score(), score, "최고 점수 저장")
 	assert_eq(main.get_node("BestLabel").text, "BEST %d" % score)
 	assert_true(main.get_node("GameOver/Card/Box/Retry").visible and main.get_node("GameOver/Card/Box/Retry").text == "다시 하기", "카드 안 다시 하기 버튼")
 
@@ -168,7 +168,9 @@ func test_한_프레임_안에_누르고_뗀_짧은_탭도_점프와_다시_시�
 func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장한다() -> void:
 	const PATH := "user://test_main_fish.cfg"
 	DirAccess.remove_absolute(PATH)
-	BestRecord.add_fish(10, PATH)
+	var before := SaveData.open(PATH)
+	before.data.wallet.fish = 10
+	before.save()
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.record_path = PATH
 	add_child(main)
@@ -199,7 +201,7 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	assert_true(main.get_node("GameOver/Card/Box/Stats").text.contains("먹은 생선  %d" % sim.fish), main.get_node("GameOver/Card/Box/Stats").text)
 	assert_eq(main.get_node("GameOver/Card/Box/Total").text, "모은 생선 %d" % (10 + sim.fish), "모은 생선은 작게 따로")
 	assert_true(main.get_node("ScoreLabel").text == str(sim.score()), "오른쪽 위 점수")
-	assert_eq(BestRecord.load_fish(PATH), 10 + sim.fish, "모은 생선 저장")
+	assert_eq(SaveData.open(PATH).fish(), 10 + sim.fish, "모은 생선 저장")
 	main.queue_free()
 	DirAccess.remove_absolute(PATH)
 

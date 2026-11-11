@@ -137,7 +137,7 @@ func test_마지막_하트를_장애물에_잃어도_결과_화면이_뜬다() -
 	world._process(0.05)
 	assert_true(sim.game_over, "하트 0")
 	assert_true(main.get_node("GameOver").visible, "결과 화면 (멈춤 때문에 game_over 알림을 건너뛰지 않음)")
-	assert_eq(BestRecord.load_best_score("user://test_juice_last.cfg"), sim.score(), "기록 저장")
+	assert_eq(SaveData.open("user://test_juice_last.cfg").best_score(), sim.score(), "기록 저장")
 	main.queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_juice_last.cfg")
