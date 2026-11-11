@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { release } from "node:os";
 
 const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT ?? "playwright");
 const dir = process.argv[2];
@@ -26,7 +27,12 @@ const server = createServer(async (req, res) => {
 	}
 });
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM, args: ["--autoplay-policy=no-user-gesture-required"] });
+// WSL은 headless면 WebGL이 소프트웨어 렌더링이라, WSLg 창 + d3d12로 GPU를 쓴다 (맥은 그대로)
+const wsl = process.platform === "linux" && /microsoft/i.test(release());
+const args = ["--autoplay-policy=no-user-gesture-required"];
+const browser = await chromium.launch(wsl
+	? { executablePath: process.env.CHROMIUM, headless: false, args: [...args, "--ignore-gpu-blocklist", "--enable-gpu", "--use-angle=gl"], env: { ...process.env, GALLIUM_DRIVER: "d3d12" } }
+	: { executablePath: process.env.CHROMIUM, args });
 let code = 1;
 try {
 	const page = await browser.newPage();
