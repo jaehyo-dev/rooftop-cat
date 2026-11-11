@@ -17,7 +17,7 @@ const DEFAULTS := {
 	# 미션·등급 (Missions·CatRank가 씀. 이번 주 깬 일일 수는 주간 미션 진행에 바로 들어가 따로 두지 않음)
 	"missions": {"day": "", "week": "", "daily": [], "weekly": [], "prev_daily": [], "prev_weekly": [], "swaps_today": 0},
 	"rank": {"level": 1, "xp": 0},
-	"stats": {"runs": 0, "fish_total": 0},  # fish_total = 배수 전 번 생선 합 (가격 다시 맞추기용)
+	"stats": {"runs": 0, "fish_total": 0, "recent": []},  # fish_total = 배수 전 번 생선 합 (가격 다시 맞추기용), recent = 최근 판 거리 (미션 "익숙함 이상")
 }
 
 var path: String
@@ -125,8 +125,17 @@ func finish_run(meters: int, score: int, run_fish: int, fish_bonus: bool = false
 	data.wallet.fish += earned
 	data.stats.runs += 1
 	data.stats.fish_total += maxi(run_fish, 0)
+	push_recent(data, meters)
 	save()
 	return {"new_best": new_best, "earned": earned, "total": data.wallet.fish}
+
+
+## 최근 판 거리에 하나 더한다 (MissionTable.RECENT_RUNS개까지, 봇도 씀)
+static func push_recent(data: Dictionary, meters: int) -> void:
+	var recent: Array = data.stats.recent
+	recent.append(maxi(meters, 0))
+	while recent.size() > MissionTable.RECENT_RUNS:
+		recent.pop_front()
 
 
 # --- 상점 ---

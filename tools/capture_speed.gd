@@ -19,6 +19,7 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(args[1])
 	AudioServer.set_bus_mute(0, true)
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://capture_speed.cfg"  # 실제 최고 기록을 건드리지 않게
 	root.add_child(main)
 	await process_frame

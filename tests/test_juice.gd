@@ -84,6 +84,7 @@ func test_심장_박동은_1초에_한_번() -> void:
 
 func test_왼쪽_아래_터치도_점프다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_juice_tune.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -101,6 +102,7 @@ func test_왼쪽_아래_터치도_점프다() -> void:
 
 func test_부딪히면_멈칫하고_흔들리며_빨갛게_깜빡인다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_juice_hit.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -125,6 +127,7 @@ func test_부딪히면_멈칫하고_흔들리며_빨갛게_깜빡인다() -> voi
 
 func test_마지막_하트를_장애물에_잃어도_결과_화면이_뜬다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_juice_last.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")

@@ -14,11 +14,13 @@ func _clear() -> void:
 		DirAccess.remove_absolute(file)
 
 
-## 빈 저장 데이터 (파일 없이)
-func _data(best_distance: int = 0) -> Dictionary:
+## 빈 저장 데이터 (파일 없이). recent_meters > 0이면 최근 10판이 모두 그 거리 ("익숙함 이상" 판단)
+func _data(recent_meters: int = 0) -> Dictionary:
 	_clear()
 	var data := SaveData.open(PATH).data
-	data.record.best_distance = best_distance
+	if recent_meters > 0:
+		for n in MissionTable.RECENT_RUNS:
+			SaveData.push_recent(data, recent_meters)
 	return data
 
 
@@ -76,6 +78,16 @@ func test_후보는_일일_32개_주간_12개이고_칸이_다_있다() -> void:
 	assert_eq(Missions.reward("w_alldays"), {"fish": 3500, "xp": 70})
 
 
+func test_남은_시간은_자정과_다음_월요일까지() -> void:
+	assert_eq(DayClock.seconds_to_next_day(_at(2026, 11, 12, 23, 59)), 60)
+	assert_eq(DayClock.seconds_to_next_day(_at(2026, 12, 31, 0, 0)), 86400, "연말")
+	assert_eq(DayClock.seconds_to_next_week(_at(2026, 11, 22, 23, 59)), 60, "일요일 23:59")
+	assert_eq(DayClock.seconds_to_next_week(_at(2026, 11, 16, 0, 0)), 7 * 86400, "월요일 0시")
+	assert_eq(DayClock.left_text(60), "1분")
+	assert_eq(DayClock.left_text(5 * 3600 + 12 * 60 + 30), "5시간 12분")
+	assert_eq(DayClock.left_text(3 * 86400 + 4 * 3600), "3일 4시간")
+
+
 # --- 뽑기 ---
 
 func test_일일은_365일_내내_기록_누적_행동_하나씩_주제_다르고_쉬움_보통_어제_것_없음() -> void:
@@ -94,8 +106,9 @@ func test_일일은_365일_내내_기록_누적_행동_하나씩_주제_다르�
 			tiers.append(MissionTable.DAILY[id].tier)
 			assert_false(prev.has(id), "%s 어제 것 %s" % [key, id])
 			if n % 2 == 1:
-				assert_false(MissionTable.DAILY[id].get("skilled", false) or MissionTable.DAILY[id].tier == 3, "%s 초보에게 %s" % [key, id])
+				assert_false(Missions._skilled_only(MissionTable.DAILY, id), "%s 초보에게 %s" % [key, id])
 			seen[id] = true
+		assert_true(Missions._skilled_count(ids) <= 1, "%s 익숙함 이상은 하루 1개까지 %s" % [key, ids])
 		assert_eq(topics.size(), 3, key)
 		assert_true(tiers.has(1) and tiers.has(2), "%s 쉬움·보통 %s" % [key, tiers])
 		prev = ids
@@ -136,12 +149,38 @@ func test_날이_바뀌면_새로_뽑고_어제_목록을_남기며_바꾼_횟�
 
 
 func test_통조림_방울_어려움은_익숙함_이상만() -> void:
-	var data := _data(MissionTable.SKILLED_DISTANCE - 1)
+	var data := _data(MissionTable.SKILLED_MEDIAN - 1)
 	for n in 60:
 		data.missions.day = ""
 		Missions.refresh(data, DayClock.shift(_at(2026, 1, 1), n))
 		for e: Dictionary in data.missions.daily:
 			assert_false(e.id in ["d_can", "d_bell"] or MissionTable.DAILY[e.id].tier == 3, "익숙함 전에게 " + e.id)
+
+
+func test_익숙함_이상은_최근_10판_거리의_가운데_값으로_정한다() -> void:
+	var data := _data()
+	assert_false(Missions.skilled(data), "판이 없으면 아님")
+	SaveData.push_recent(data, 5000)
+	assert_true(Missions.skilled(data), "한 판뿐이면 그 판")
+	for n in 9:
+		SaveData.push_recent(data, 300)
+	assert_false(Missions.skilled(data), "운 좋은 한 판으로는 안 됨")
+	for n in 10:
+		SaveData.push_recent(data, MissionTable.SKILLED_MEDIAN)
+	assert_eq(data.stats.recent.size(), MissionTable.RECENT_RUNS, "최근 10판만")
+	assert_true(Missions.skilled(data))
+	data.stats.recent = [MissionTable.SKILLED_MEDIAN - 100, MissionTable.SKILLED_MEDIAN + 100]
+	assert_true(Missions.skilled(data), "짝수면 가운데 둘의 평균")
+
+
+func test_바꾸기도_익숙함_이상을_하루_1개로_지킨다() -> void:
+	var data := _data(3000)
+	_use(data, ["d_dist_3", "d_fish_c1", "d_double"], ["w_daily_10", "w_fish_10k", "w_dist"])
+	for slot in [1, 2]:
+		for id: String in Missions._swap_pool(data, false, slot):
+			assert_false(Missions._skilled_only(MissionTable.DAILY, id), "이미 어려움이 있는데 " + id)
+	assert_true(Missions._swap_pool(data, false, 0).any(func(id: String) -> bool: return Missions._skilled_only(MissionTable.DAILY, id)),
+			"어려움 자리는 어려움으로 바꿀 수 있음")
 
 
 # --- 진행과 보상 ---
@@ -153,7 +192,7 @@ func _use(data: Dictionary, daily: Array, weekly: Array) -> void:
 	data.missions.weekly = Missions._entries(weekly, MissionTable.WEEKLY)
 
 
-func test_기록형은_그_판_값_누적형은_더하고_깨면_바로_생선과_경험치() -> void:
+func test_기록형은_그_판_값_누적형은_더하고_깨면_경험치는_바로_생선은_받기로() -> void:
 	var data := _data()
 	_use(data, ["d_dist_2", "d_fish_c1", "d_double"], ["w_daily_10", "w_fish_10k", "w_dist"])
 	var r := Missions.count(data, {"meters": 400, "fish": 600, "double": 4, "runs": 1})
@@ -162,8 +201,13 @@ func test_기록형은_그_판_값_누적형은_더하고_깨면_바로_생선�
 	assert_eq(data.missions.daily[0].progress, 400, "기록형은 판 최고 (더하지 않음)")
 	assert_eq(r.done.map(func(d: Dictionary) -> String: return d.id), ["d_fish_c1"])
 	assert_eq(data.missions.daily[1].progress, 1000, "목표에서 멈춤")
-	assert_eq(data.wallet.fish, 400, "보상 자동")
-	assert_eq(data.rank.xp, 10)
+	assert_eq(data.wallet.fish, 0, "생선은 아직")
+	assert_eq(data.rank.xp, 10, "경험치는 바로")
+	assert_eq(Missions.pending(data), 1)
+	assert_eq(Missions.claim(data, false, 0), 0, "안 깬 미션은 못 받음")
+	assert_eq(Missions.claim(data, false, 1), 400)
+	assert_eq(Missions.claim(data, false, 1), 0, "두 번 못 받음")
+	assert_eq([data.wallet.fish, Missions.pending(data)], [400, 0])
 	assert_eq(data.missions.weekly[0].progress, 1, "일일 하나 깸 → 주간 축")
 	assert_eq(data.missions.weekly[1].progress, 1200)
 	Missions.count(data, {"fish": 999999})
@@ -192,7 +236,7 @@ func test_판_도중_자정을_넘기면_어제_미션에_넣은_뒤_새_날로_
 	var old_fish := save.fish()
 	var r := Missions.end_run(save, {"meters": 350, "runs": 1}, _at(2026, 11, 13, 0, 1))
 	assert_eq(r.done.map(func(d: Dictionary) -> String: return d.id), ["d_dist_1"], "어제 미션으로 깸")
-	assert_eq(save.fish(), old_fish + 400, "보상은 사라지지 않음")
+	assert_eq(save.fish(), old_fish + 400, "안 받은 보상은 새 날로 넘어갈 때 자동으로 받음")
 	assert_eq(save.data.missions.day, "2026-11-13", "그다음 새 날")
 	assert_eq(save.data.missions.prev_daily, ["d_dist_1", "d_runs", "d_double"])
 	assert_eq(save.data.missions.daily.map(func(e: Dictionary) -> int: return e.progress), [0, 0, 0])
@@ -223,9 +267,22 @@ func test_강화나_부스터를_사면_주간_상점_미션이_오른다() -> v
 	assert_eq(save.data.missions.weekly[1].progress, 2)
 	save.buy_booster("bell_start")
 	assert_eq(save.data.missions.weekly[1].done, true, "3번째(부스터)에 깸")
-	assert_eq(save.fish(), 2500, "주간 보상 2,500")
+	assert_eq(save.fish(), 0)
+	assert_eq(Missions.claim(save.data, true, 1), 2500, "주간 보상 2,500")
+	save.save()
 	assert_eq(SaveData.open(PATH).fish(), 2500, "저장됨")
 	_clear()
+
+
+func test_2b_저장처럼_받기_칸이_없는_깬_미션은_이미_받은_것() -> void:
+	var data := _data()
+	_use(data, ["d_dist_1", "d_runs", "d_double"], ["w_daily_10", "w_runs", "w_double"])
+	data.missions.daily[0].progress = 300
+	data.missions.daily[0].done = true  # claimed 칸 없음
+	assert_eq(Missions.pending(data), 0)
+	assert_eq(Missions.claim(data, false, 0), 0)
+	Missions.refresh(data, _at(2026, 11, 13))
+	assert_eq(data.wallet.fish, 0, "새 날에도 다시 주지 않음")
 
 
 # --- 바꾸기 ---

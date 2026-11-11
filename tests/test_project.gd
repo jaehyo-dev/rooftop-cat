@@ -51,6 +51,7 @@ func test_모바일_가로_화면_기준() -> void:
 
 func test_시작_화면에_게임_버전이_보임() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	add_child(main)
 	await wait_frames()
 	var version := str(ProjectSettings.get_setting("application/config/version"))

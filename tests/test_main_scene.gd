@@ -4,6 +4,7 @@ extends TestCase
 
 func test_게임_화면이_달리고_터치하면_점프() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	await wait_frames(5)
@@ -28,6 +29,7 @@ func test_게임_화면이_달리고_터치하면_점프() -> void:
 
 func test_단계가_오르면_음악이_빨라지고_새_판에서_돌아온다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	await wait_frames(2)
@@ -51,6 +53,7 @@ func test_단계가_오르면_음악이_빨라지고_새_판에서_돌아온다(
 func test_판_안에서는_같은_단계여도_곡_빠르기를_계속_다시_넘긴다() -> void:
 	# 웹은 곡이 한 바퀴 돌면 빠르기가 1.0으로 풀린다 (재현: tools/web_music_check.mjs). 게임은 그걸 알 수 없으니 계속 다시 넘겨야 곧 돌아온다
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	world.set_process(false)
@@ -71,6 +74,7 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	const PATH := "user://test_main_best.cfg"
 	DirAccess.remove_absolute(PATH)
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = PATH
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -140,6 +144,7 @@ func _touch(pressed: bool) -> void:
 func test_한_프레임_안에_누르고_뗀_짧은_탭도_점프와_다시_시작으로_받는다() -> void:
 	const PATH := "user://test_main_tap.cfg"
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = PATH
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -172,6 +177,7 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	before.data.wallet.fish = 10
 	before.save()
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = PATH
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -208,6 +214,7 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 
 func test_배경_음악이_반복_재생으로_붙어_있다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	add_child(main)
 	await wait_frames(2)
 	var music: AudioStreamPlayer = main.get_node("Music")
@@ -218,6 +225,7 @@ func test_배경_음악이_반복_재생으로_붙어_있다() -> void:
 
 func test_질주_북_층은_곡과_길이·빠르기가_같고_질주_중에만_들린다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_main_drums.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")
@@ -256,6 +264,7 @@ func test_질주_북_층은_곡과_길이·빠르기가_같고_질주_중에만_
 func test_버튼_자리_터치는_점프도_다시_시작도_아니다() -> void:
 	const PATH := "user://test_main_block.cfg"
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = PATH
 	add_child(main)
 	var world: Node2D = main.get_node("World")

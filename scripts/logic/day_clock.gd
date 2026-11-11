@@ -31,3 +31,26 @@ static func week_key(at: Dictionary) -> String:
 	var date := {"year": at.year, "month": at.month, "day": at.day}
 	var weekday: int = Time.get_datetime_dict_from_unix_time(Time.get_unix_time_from_datetime_dict(date)).weekday
 	return day_key(shift(date, -((weekday + 6) % 7)))
+
+
+## 다음 자정까지 남은 초 (일일 미션 남은 시간)
+static func seconds_to_next_day(at: Dictionary) -> int:
+	var midnight := {"year": at.year, "month": at.month, "day": at.day, "hour": 0, "minute": 0, "second": 0}
+	return int(Time.get_unix_time_from_datetime_dict(shift(midnight, 1)) - Time.get_unix_time_from_datetime_dict(at))
+
+
+## 다음 월요일 0시까지 남은 초 (주간 미션 남은 시간)
+static func seconds_to_next_week(at: Dictionary) -> int:
+	var parts := week_key(at).split("-")
+	var monday := {"year": int(parts[0]), "month": int(parts[1]), "day": int(parts[2]), "hour": 0, "minute": 0, "second": 0}
+	return int(Time.get_unix_time_from_datetime_dict(shift(monday, 7)) - Time.get_unix_time_from_datetime_dict(at))
+
+
+## 남은 시간 글자: 하루 넘으면 "3일 4시간", 아니면 "5시간 12분", 1시간 안이면 "12분"
+static func left_text(seconds: int) -> String:
+	var minutes := maxi(seconds, 0) / 60
+	if minutes >= 24 * 60:
+		return "%d일 %d시간" % [minutes / (24 * 60), minutes / 60 % 24]
+	if minutes >= 60:
+		return "%d시간 %d분" % [minutes / 60, minutes % 60]
+	return "%d분" % maxi(minutes, 1)

@@ -218,6 +218,7 @@ func test_하트_그림과_소품_규칙과_안내() -> void:
 
 func test_화면은_장애물을_알리고_처음_만날_때만_안내한다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_course_scene.cfg"
 	add_child(main)
 	var world: Node2D = main.get_node("World")

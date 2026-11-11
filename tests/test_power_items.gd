@@ -377,6 +377,7 @@ func test_대본_마지막_구간의_자리는_질주이고_구간_옥상에_황
 
 func _world() -> Node2D:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_power_items.cfg"
 	add_child(main)
 	return main.get_node("World")

@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/world_view.gd" id="2"]
@@ -15,22 +15,6 @@ Label/constants/outline_size = 6
 [sub_resource type="FontVariation" id="tight_space"]
 base_font = ExtResource("5")
 spacing_space = -12
-
-[sub_resource type="StyleBoxFlat" id="retry_box"]
-content_margin_left = 40.0
-content_margin_top = 6.0
-content_margin_right = 40.0
-content_margin_bottom = 6.0
-bg_color = Color(1, 0.97, 0.9, 1)
-border_width_left = 4
-border_width_top = 4
-border_width_right = 4
-border_width_bottom = 4
-border_color = Color(0.353, 0.275, 0.212, 1)
-corner_radius_top_left = 22
-corner_radius_top_right = 22
-corner_radius_bottom_right = 22
-corner_radius_bottom_left = 22
 
 [sub_resource type="StyleBoxEmpty" id="card_box"]
 content_margin_left = 48.0
@@ -207,11 +191,7 @@ theme_override_font_sizes/font_size = 28
 text = "모은 생선 0"
 horizontal_alignment = 1
 
-[node name="Retry" type="Label" parent="GameOver/Card/Box"]
+[node name="Retry" type="Button" parent="GameOver/Card/Box"]
 layout_mode = 2
 size_flags_horizontal = 4
-theme_override_font_sizes/font_size = 52
-theme_override_styles/normal = SubResource("retry_box")
 text = "다시 하기"
-horizontal_alignment = 1
-vertical_alignment = 1

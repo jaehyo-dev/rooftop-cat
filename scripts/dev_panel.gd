@@ -1,6 +1,7 @@
 class_name DevPanel
 extends VBoxContainer
-## 임시 시험 패널 (v0.7.0 2a, review/v0.7.0/PLAN.md 13번 "임시"): 2c에서 진짜 상점·시작 화면이 생기면 이 파일과 main.gd의 DevPanel.attach 한 줄을 지운다.
+## 임시 시험 패널 (v0.7.0 2a, review/v0.7.0/PLAN.md 13번 "임시"). **배포 전 제거**: v0.7.0을 main에 올리기 전에 이 파일과 main.gd의 DevPanel.attach 한 줄을 지운다.
+## 2c: 사용자가 로컬에서 해 볼 수 있게 남겨 둠. 상점·미션 화면에서는 숨는다(main.show_screen).
 ## github.io가 아닌 웹 주소(tools/play_local.sh)에서만 왼쪽 아래 "시험" 버튼이 보인다. 바꾼 강화·부스터는 다음 판부터.
 ## 패널 자리 터치는 World.touch_blockers로 점프·다시 시작이 되지 않는다.
 

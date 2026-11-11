@@ -81,7 +81,7 @@ func _each_mission(pools: Dictionary) -> void:
 ## 날짜별 플레이어 PLAYERS명 x WEEKS주
 func _players(skill: String, pool: Array) -> void:
 	var day_runs := []      # 그날 일일 3개를 다 깨는 데 든 판 수 (못 깨면 DAY_CAP + 1)
-	var day_skilled := []   # 그날 "익숙함 이상"이었는지 (최고 거리 SKILLED_DISTANCE 넘음)
+	var day_skilled := []   # 그날 "익숙함 이상"이었는지 (최근 판 거리 가운데 값 SKILLED_MEDIAN 이상)
 	var week_days := []     # 주간 3개를 다 깬 날 (1~7, 못 깨면 8)
 	var weekly_fail := {}   # 그 주에 못 깬 주간 id → 횟수
 	var weekly_seen := {}
@@ -96,14 +96,18 @@ func _players(skill: String, pool: Array) -> void:
 			if d % 7 == 0:
 				done_day = 8
 			Missions.refresh(data, now)
-			day_skilled.append(data.record.best_distance >= MissionTable.SKILLED_DISTANCE)
+			day_skilled.append(Missions.skilled(data))
 			var runs := 0
 			while not Missions._all_done(data.missions.daily) and runs < DAY_CAP:
 				var run: Dictionary = pool[rng.randi_range(0, pool.size() - 1)]
 				runs += 1
 				data.record.best_distance = maxi(data.record.best_distance, run.meters)
 				data.wallet.fish += run.fish
+				SaveData.push_recent(data, run.meters)
 				Missions.count(data, run)
+				for weekly: bool in [false, true]:
+					for slot in 3:
+						Missions.claim(data, weekly, slot)  # 사람은 미션 화면에서 받음 (봇은 바로)
 				_buy(data)
 			if data.upgrades.values().all(func(lv: int) -> bool: return lv >= Balance.UPGRADE_MAX) and data.wallet.fish >= 400:
 				data.wallet.fish -= 400  # 강화를 다 샀으면 하루에 부스터 하나
@@ -121,8 +125,7 @@ func _players(skill: String, pool: Array) -> void:
 					if not e.done:
 						weekly_fail[e.id] = weekly_fail.get(e.id, 0) + 1
 	print("## %s 플레이어 %d명 x %d주 (하루 최대 %d판, 일일만 함)\n" % [skill, PLAYERS, WEEKS, DAY_CAP])
-	var long_runs := pool.filter(func(run: Dictionary) -> bool: return run.meters >= MissionTable.SKILLED_DISTANCE).size()
-	print("- 한 판에 %dm 넘는 비율: %d%% (넘으면 그다음 날부터 \"익숙함 이상\" 미션이 나옴)" % [MissionTable.SKILLED_DISTANCE, roundi(100.0 * long_runs / pool.size())])
+	_median_odds(pool)
 	for part in [["전체", -1], ["익숙함 이상 전", 0], ["익숙함 이상 뒤", 1]]:
 		var runs_of := []
 		for i in day_runs.size():
@@ -142,6 +145,24 @@ func _players(skill: String, pool: Array) -> void:
 	print("- 주간 3개 다 깸 (%d주): %s" % [w, ", ".join(wline)])
 	print("- 주간 미션별 못 깬 주 / 나온 주: %s" % ", ".join(weekly_seen.keys().map(func(id: String) -> String: return "%s %d/%d" % [id, weekly_fail.get(id, 0), weekly_seen[id]])))
 	print("")
+
+
+## 판 10개를 무작위로 골랐을 때 거리 가운데 값이 기준 이상인 비율 ("익숙함 이상" 기준 고르기, 시드 고정)
+static func _median_odds(pool: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var line := []
+	for limit in [600, 800, 1000, 1200, 1500]:
+		var ok := 0
+		for t in TRIALS:
+			var data := {"stats": {"recent": []}}
+			for n in MissionTable.RECENT_RUNS:
+				SaveData.push_recent(data, pool[rng.randi_range(0, pool.size() - 1)].meters)
+			var recent: Array = data.stats.recent
+			recent.sort()
+			ok += 1 if (recent[4] + recent[5]) / 2 >= limit else 0
+		line.append("%dm %d%%" % [limit, roundi(100.0 * ok / TRIALS)])
+	print("- 최근 %d판 가운데 값이 기준 이상인 비율: %s (지금 기준 %dm)" % [MissionTable.RECENT_RUNS, ", ".join(line), MissionTable.SKILLED_MEDIAN])
 
 
 ## 살 수 있는 가장 싼 강화를 산다 (w_shop)

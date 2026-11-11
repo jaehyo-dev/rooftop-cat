@@ -19,6 +19,7 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(out)
 	AudioServer.set_bus_mute(0, true)  # 캡처 중에는 소리를 내지 않는다
 	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	root.add_child(main)
 	await process_frame
 	var world: Node2D = main.get_node("World")

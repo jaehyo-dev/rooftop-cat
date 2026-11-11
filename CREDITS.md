@@ -43,6 +43,10 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/concept/cat_mascot.png` | 2026-11-06 | 시안 I·J·K | 마스코트 비교용 (게임에 포함 안 됨) | 3장을 잘라 나란히 붙이고 글자를 넣음 |
 | `assets/concept/cat_reference_sheet.png` | 2026-11-06 | 사용자가 다른 세션에서 AI로 만들어 제공 (요청문 기록 없음) | 기준 캐릭터 참고 시트, 6가지 동작 (게임에 포함 안 됨) | 없음 |
 | `assets/concept/poses/walk·crouch·run·jump·land·dash.png` | 2026-11-06 | 위 참고 시트 | 모션 참고용 동작 6장 (게임에 포함 안 됨) | 시트에서 잘라 남색 배경을 색 거리로 지움 |
+| `assets/sprites/items/fish_0~3.png` | 2026-11-11 (2c에 씀) | Codex 내장 이미지 생성: v0.7.0 시안 10 "세트 1"(`review/v0.7.0/concept/10_fish_set1.png`) | 생선 점수 강화 0·3·6·10단계 생선 그림 (멸치·고등어·분홍 도미·하늘보라 물고기) | 마젠타 배경을 지우고(`tools/cut_parts.py`) 지금 생선과 같은 240x136 칸에 맞춤, 반짝이 조각은 뺌 (`review/v0.7.0/2c/cut_art.py`) |
+| `assets/raw/ui_paper_sheet.png` → `assets/sprites/ui/panel·note·cork·button_orange·button_cream·pin_red·pin_yellow·clip.png` | 2026-11-12 | Codex 내장 이미지 생성 (시안 05·08 첨부) | 시작 화면·상점·미션·결과 카드의 종이 패널, 쪽지, 코르크판, 버튼, 압정, 빨래집게 | 마젠타 배경을 지우고 잘라 냄, 버튼은 높이 100으로 줄임 (`review/v0.7.0/2c/cut_art.py`) |
+| `assets/raw/ui_icons_sheet.png` → `assets/sprites/ui/icons/*.png` (16개) | 2026-11-12 | Codex 내장 이미지 생성 (아이템 시트·기준 고양이 첨부) | 강화·부스터·미션 종류·바꾸기·등급 배지·상점·별·뒤로 아이콘 | 마젠타 배경을 지우고 4x4 칸으로 잘라 냄. `cookie_clock.png`는 지금 쿠키 그림에 시계 아이콘을 작게 겹쳐 붙임 |
+| `assets/raw/ui_stamp.png` → `assets/sprites/ui/icons/stamp.png` | 2026-11-12 | Codex 내장 이미지 생성 (이 PC에서 그림이 되는지 시험한 그림) | 미션 받은 쪽지의 빨간 발바닥 도장 | 마젠타 배경을 지우고 잘라 냄 |
 | `assets/raw/cat_base_run.png` | 2026-11-06 | Codex 내장 이미지 생성 (참고 시트와 run 동작을 기준 그림으로 첨부) | 기준 캐릭터 달리는 옆모습 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_base_run.png` | 2026-11-06 | 위 원본 | 기준 그림 (3단계에서 고양이 그림의 기준) | 마젠타 배경을 마젠타 우세도(min(R, B) - G)로 지우고 1024x1024로 줄임 |
 | `assets/raw/cat_parts_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 참고 시트를 첨부) | 고양이 부품 시트 원본: 머리, 몸통(초록 목도리), 꼬리, 앞다리 2, 뒷다리 2 (게임에 포함 안 됨) | 없음 |
@@ -83,6 +87,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 
 ## 직접 만든 것
 
+- 메뉴 효과음 8종 `assets/audio/sfx/buy·booster_buy·booster_on·no_money·claim·rank_up·swap·page.wav` (강화 사기, 부스터 사기, 부스터 켜기, 생선 부족, 미션 받기, 등급 오름, 바꾸기, 화면 넘김): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 생선 소리와 같은 -17dB로 틂
 - 효과음 17종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근, 질주 슝): 2026-11-09, 뒤 5종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
 - 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)

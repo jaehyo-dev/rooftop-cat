@@ -3,7 +3,7 @@ extends RefCounted
 ## 미션 후보·보상·바꾸기 값·고냥이 등급 표 (review/v0.7.0/PLAN.md 5·6번). 미션·등급 수치는 이 파일 한 곳에서만 고친다.
 ## 후보 칸: kind = 일일 record(한 판 기록, 그 판 값의 최고) / sum(누적) / action(행동, 누적), 주간 daily(일일 미션 축) / sum
 ##   topic = 같은 날(주) 하나만 나오는 주제, stat = MissionTracker가 세는 값 이름, target = 목표, tier = 1 쉬움 / 2 보통 / 3 어려움(보상 칸),
-##   text = 화면 문구(%s = 목표), skilled = "익숙함 이상"(한 판 최고 거리 SKILLED_DISTANCE m 이상)에게만 뽑음 (tier 3도 마찬가지)
+##   text = 화면 문구(%s = 목표), skilled = "익숙함 이상"(최근 판 거리 가운데 값 SKILLED_MEDIAN m 이상)에게만 뽑음 (tier 3도 마찬가지)
 ## 목표 수치는 2b 봇 측정으로 맞춤 (review/v0.7.0/2b/missions.md 전후 표)
 
 const DAILY := {
@@ -67,9 +67,11 @@ const WEEKLY_XP := [50, 60, 70]
 ## 일일 미션 바꾸기 값: 그날 몇 번째인지 (마지막 값이 그 뒤로 계속), 주간은 고정
 const SWAP_PRICES := [200, 400, 800]
 const WEEKLY_SWAP_PRICE := 1000
-## "익숙함 이상": 한 판 최고 거리. 어려움(tier 3)과 skilled 칸(통조림 120초·방울 90초 뒤부터 나옴)은 이 거리를 넘은 사람에게만 뽑는다
-## (2b 봇: 1,000m면 초보 봇도 운 좋은 한 판으로 넘어 일일 4판 안에 깨는 비율이 51%로 떨어짐, review/v0.7.0/2b/missions.md)
-const SKILLED_DISTANCE := 1500
+## "익숙함 이상": 최근 RECENT_RUNS판(모자라면 있는 만큼) 거리의 가운데 값. 어려움(tier 3)과 skilled 칸(통조림 120초·방울 90초 뒤부터 나옴)은
+## 이 값을 넘은 사람에게만, 하루 최대 1개 뽑는다 (2b는 한 판 최고 1,500m였는데 초보 봇도 운 좋은 한 판으로 넘어 4판 안 59%로 떨어짐.
+## 가운데 값은 운 좋은 한 판에 흔들리지 않음. 수치는 봇으로 정함, review/v0.7.0/2b/missions.md "2c 전 수정")
+const SKILLED_MEDIAN := 1000
+const RECENT_RUNS := 10
 
 ## 고냥이 등급 (1~10). NEXT_XP[i] = (i+1)등급에서 다음 등급까지 경험치
 const RANK_NAMES := ["아기 고냥이", "골목 고냥이", "담장 고냥이", "지붕 고냥이", "굴뚝 고냥이",

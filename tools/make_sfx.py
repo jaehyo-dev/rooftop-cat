@@ -144,8 +144,58 @@ def dash() -> np.ndarray:
     return 0.9 * (0.7 * rise + 0.6 * wind) * env
 
 
+# --- 메뉴 소리 (v0.7.0 2c): 모두 짧고 부드럽게. 게임 안 소리보다 작게 튼다 (main.gd UI_VOLUME_DB) ---
+
+def buy() -> np.ndarray:
+    """강화 사기: 동전 같은 두 음 + 위로 올라가는 반짝 (도-솔-도)"""
+    return 0.7 * sum(at(bell(f, 0.22, 16.0), s, 0.45) for f, s in [(784.0, 0.0), (1175.0, 0.07), (1568.0, 0.14)])
+
+
+def booster_buy() -> np.ndarray:
+    """부스터 사기: 봉투에 넣는 툭 + 짧은 딸랑"""
+    return 0.8 * at(fade(sweep(260.0, 180.0, 0.07), 30.0), 0.0, 0.3) + 0.5 * at(bell(1319.0, 0.18, 18.0), 0.05, 0.3)
+
+
+def booster_on() -> np.ndarray:
+    """부스터 켜기: 똑 (짧게 올라감)"""
+    return 0.6 * fade(sweep(520.0, 880.0, 0.06), 40.0)
+
+
+def no_money() -> np.ndarray:
+    """생선 부족: 낮게 두 번 '뿌뿌' (기분 나쁘지 않게 둥글게)"""
+    one = fade(sweep(300.0, 240.0, 0.09), 18.0)
+    return 0.6 * np.concatenate([one, np.zeros(int(0.04 * RATE)), one])
+
+
+def claim() -> np.ndarray:
+    """미션 받기: 반짝 세 음이 위로 (생선이 날아가는 동안)"""
+    return 0.6 * sum(at(bell(f, 0.2, 14.0), s, 0.5) for f, s in [(1047.0, 0.0), (1319.0, 0.08), (1760.0, 0.16)])
+
+
+def rank_up() -> np.ndarray:
+    """등급 오름: 도장 쿵 + 팡파르 네 음 (도-미-솔-도)"""
+    thump = fade(sweep(200.0, 90.0, 0.12), 20.0)
+    notes = sum(at(bell(f, 0.3, 9.0), s, 0.65) for f, s in [(523.0, 0.08), (659.0, 0.16), (784.0, 0.24), (1047.0, 0.32)])
+    return 0.6 * (at(thump, 0.0, 0.65) + notes)
+
+
+def swap() -> np.ndarray:
+    """바꾸기: 종이를 뒤집는 사락 (내려갔다 올라가는 두 음)"""
+    return 0.6 * (at(fade(sweep(700.0, 420.0, 0.08), 20.0), 0.0, 0.22) + at(fade(sweep(420.0, 760.0, 0.09), 20.0), 0.09, 0.22))
+
+
+def page() -> np.ndarray:
+    """화면 넘김: 바람처럼 부드러운 휙 (작게)"""
+    t = times(0.2)
+    wind = sum(np.sin(2 * np.pi * (f * t + 900.0 * t * t)) for f in (613.0, 977.0, 1459.0)) / 3.0
+    return 0.45 * wind * np.sin(np.pi * t / 0.2) ** 2
+
+
+UI_SOUNDS = {"buy": buy, "booster_buy": booster_buy, "booster_on": booster_on, "no_money": no_money, "claim": claim,
+             "rank_up": rank_up, "swap": swap, "page": page}
+
 SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up,
-          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash}
+          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash, **UI_SOUNDS}
 
 
 def write(path: Path, sound: np.ndarray) -> None:

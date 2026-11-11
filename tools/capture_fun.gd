@@ -19,6 +19,7 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	AudioServer.set_bus_mute(0, true)
 	main = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://capture_fun.cfg"  # 실제 기록을 건드리지 않게
 	root.add_child(main)
 	await process_frame

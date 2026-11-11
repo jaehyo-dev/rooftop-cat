@@ -16,8 +16,9 @@ def end_pitch(sound):
 
 
 class SfxTest(unittest.TestCase):
-    def test_열일곱_종류이고_터지지_않으며_짧다(self):
-        self.assertEqual(len(make_sfx.SOUNDS), 17)
+    def test_게임_17종_메뉴_8종이고_터지지_않으며_짧다(self):
+        self.assertEqual(len(make_sfx.SOUNDS), 17 + 8)
+        self.assertEqual(len(make_sfx.UI_SOUNDS), 8)
         for name, make in make_sfx.SOUNDS.items():
             sound = make()
             self.assertGreater(np.abs(sound).max(), 0.1, name)
@@ -41,6 +42,16 @@ class SfxTest(unittest.TestCase):
         half = len(sound) // 2
         self.assertGreater(end_pitch(sound[half:]), end_pitch(sound[:half]))
         self.assertGreater(len(sound), len(make_sfx.fish()) * 3)
+
+
+    def test_메뉴_소리는_생선_소리보다_크게_들리지_않는다(self):
+        # 같은 크기로 저장되므로(최고점 0.9) 평균 크기(RMS)를 비교: 메뉴 소리는 게임에서 생선과 같은 -17dB로 틀어
+        # 생선보다 평균이 1.6배(4dB)를 넘지 않으면 튀지 않는다
+        def rms(sound):
+            sound = sound / np.abs(sound).max()
+            return float(np.sqrt(np.mean(sound ** 2)))
+        for name, make in make_sfx.UI_SOUNDS.items():
+            self.assertLess(rms(make()), rms(make_sfx.fish()) * 1.6, name)
 
 
 if __name__ == "__main__":

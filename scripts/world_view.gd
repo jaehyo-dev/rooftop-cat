@@ -10,6 +10,8 @@ extends Node2D
 signal game_over(meters: int)
 ## 새 판을 시작함
 signal restarted
+## 시작 화면에서 버튼이 아닌 빈 곳을 누르거나 스페이스를 누름 (main이 판을 시작)
+signal start_pressed
 
 ## 로직을 진행시키는 고정 간격 (화면 주사율과 상관없이 같은 손맛)
 const STEP := 1.0 / 120.0
@@ -43,9 +45,9 @@ const BOX_TEXTURE := preload("res://assets/sprites/items/box.png")
 const ITEM_TEXTURES := {"fish": preload("res://assets/sprites/items/fish.png"), "box": BOX_TEXTURE, "gold": preload("res://assets/sprites/items/gold.png"),
 		"dash": preload("res://assets/sprites/items/snack.png"), "yarn": preload("res://assets/sprites/items/yarn.png"), "cookie": preload("res://assets/sprites/items/cookie.png"),
 		"can": preload("res://assets/sprites/items/can.png"), "bell": preload("res://assets/sprites/items/bell.png")}
-## 생선 그림: 생선 점수 강화 단계에 따라 0~3 (Perks.fish_look). 그림은 2c, 지금은 4칸 모두 지금 생선
-const FISH_LOOKS := [preload("res://assets/sprites/items/fish.png"), preload("res://assets/sprites/items/fish.png"),
-		preload("res://assets/sprites/items/fish.png"), preload("res://assets/sprites/items/fish.png")]
+## 생선 그림: 생선 점수 강화 단계에 따라 0~3 (Perks.fish_look, 0·3·6·10단계). 멸치 → 고등어 → 분홍 도미 → 하늘·보라 물고기 (시안 10, 금색 없음)
+const FISH_LOOKS := [preload("res://assets/sprites/items/fish_0.png"), preload("res://assets/sprites/items/fish_1.png"),
+		preload("res://assets/sprites/items/fish_2.png"), preload("res://assets/sprites/items/fish_3.png")]
 const ITEM_WIDTHS := {"fish": 56.0, "box": 60.0, "gold": 96.0, "dash": 62.0, "yarn": 76.0, "cookie": 72.0, "can": 76.0, "bell": 70.0}
 ## 구조물 그림 (assets/sprites/structures/, 화면에 그릴 크기)
 const LINE_TEXTURE := preload("res://assets/sprites/structures/clothesline.png")
@@ -218,6 +220,15 @@ var tracker := MissionTracker.new()
 var make_perks: Callable
 ## 이 컨트롤 위의 터치는 점프·다시 시작으로 받지 않는다 (버튼 자리, 보이는 것만)
 var touch_blockers: Array[Control] = []
+## 시작 화면: 판이 멈춘 채 그려지고, 빈 곳 누름은 start_pressed가 된다 (prepare가 켜고 restart가 끔)
+var waiting := false
+## 상점·미션 화면: 입력을 모두 무시한다 (결과 카드 뒤의 판이 다시 시작되지 않게, 스페이스 포함)
+var input_off := false:
+	set(value):
+		input_off = value
+		_tap_pending = false
+		_touches.clear()
+var _seed := 0
 var cat := CatView.new()
 var _touches := {}
 var _accumulator := 0.0
@@ -312,6 +323,13 @@ func _process(delta: float) -> void:
 	var pressed := is_pressed()
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
+	if waiting or input_off:
+		_tap_pending = false
+		if waiting and press_started and not input_off:
+			start_pressed.emit()
+		_place_cat(0.0)
+		_overlay.queue_redraw()
+		return
 	if sim.game_over:
 		_over_time += delta
 		_tap_pending = false
@@ -547,9 +565,17 @@ func _place_cat(delta: float) -> void:
 	cat.show_state(sim, delta)
 
 
+## 시작 화면: 강화 없이 판을 만들어 멈춰 둔다 (부스터를 줄이지 않음). [시작]은 같은 시드로 restart해 옥상이 그대로다
+func prepare(seed_value: int = randi()) -> void:
+	restart(seed_value, true)
+
+
 ## 새 판: 새 옥상(새 시드)에서 처음 속도로 다시 달린다. 강화·부스터는 make_perks로 이 순간에 정한다 (PLAN 3-1)
-func restart() -> void:
-	sim = RunnerSim.new(randi(), Balance.RUN_SPEED, true, make_perks.call() if make_perks.is_valid() else null)
+## wait = 시작 화면용으로 멈춰 둠 (강화를 넣지 않고 부스터도 줄이지 않음). restarted 신호 전에 정해 둔다
+func restart(seed_value: int = randi(), wait: bool = false) -> void:
+	waiting = wait
+	_seed = seed_value
+	sim = RunnerSim.new(seed_value, Balance.RUN_SPEED, true, make_perks.call() if not wait and make_perks.is_valid() else null)
 	tracker = MissionTracker.new()
 	_accumulator = 0.0
 	_pops.clear()
@@ -582,7 +608,14 @@ func restart() -> void:
 	queue_redraw()
 
 
+## prepare에서 정한 시드 ([시작]이 같은 옥상으로 다시 만들 때)
+func prepared_seed() -> int:
+	return _seed
+
+
 func _input(event: InputEvent) -> void:
+	if input_off:
+		return
 	# 휴대폰 터치와 PC 마우스 클릭(터치로 흉내 냄)을 손가락별로 기억한다
 	if event is InputEventScreenTouch:
 		if event.pressed and touch_blocked(event.position):
@@ -1038,6 +1071,8 @@ func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
 
 ## 맨 앞 안내: 처음 GUIDE_LINES개 줄 틈의 줄어드는 동그라미와 "눌러!" 말풍선, 줄 판정 결과 글자. HUD는 화면 배율 없이 뒤에 그린다
 func _draw_overlay() -> void:
+	if input_off:
+		return  # 상점·미션 화면: 맨 앞 층(top_level)이 메뉴 위에 그려지지 않게
 	var ground := _ground_y()
 	var offset := Balance.CAT_SCREEN_X - sim.x
 	_overlay.draw_set_transform(position, 0.0, scale)
@@ -1053,7 +1088,8 @@ func _draw_overlay() -> void:
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
 			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
-	_draw_obstacle_signs(ground, offset)
+	if not sim.game_over:
+		_draw_obstacle_signs(ground, offset)  # 결과 카드 위에 "!"가 뜨지 않게 (이 층은 카드보다 위)
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
@@ -1067,6 +1103,8 @@ func _draw_overlay() -> void:
 		_draw_edge(DANGER_COLOR, DANGER_ALPHA + DANGER_PULSE * absf(sin(PI * sim.elapsed)))
 	if _dash_mood > 0.0:
 		_draw_edge(DASH_EDGE_COLOR, _dash_mood * (DASH_EDGE_ALPHA + DASH_EDGE_PULSE * absf(sin(TAU * sim.elapsed))))  # 금빛이 은은하게 일렁임
+	if waiting:
+		return  # 시작 화면: 하트·상태 표시 없이 옥상과 고양이만
 	_draw_hearts()
 	if not sim.game_over:
 		_draw_speed_lines()
