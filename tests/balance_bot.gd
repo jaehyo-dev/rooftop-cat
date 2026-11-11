@@ -127,6 +127,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		sim.step(DT, hold_left > 0.0 or tap)
 		if dashing_before:
 			stats.dash_points += sim.combo.points - points_before  # 질주 중 생선 점수 (2배 포함)
+			stats.dash_fish = stats.get("dash_fish", 0) + sim.fish - fish_before
 		inputs.append(hold_left > 0.0 or tap)
 		hold_left -= DT
 		for item in sim.picked:
@@ -161,6 +162,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			stats.touch_try += 1
 			if sim.bounce_result == "perfect" or sim.bounce_result == "good":
 				stats.touch_ok += 1
+			stats.perfects = stats.get("perfects", 0) + (1 if sim.bounce_result == "perfect" else 0)
 		if sim.double_jumped:
 			stats.doubles += 1
 		if not sim.hit_obstacle.is_empty() and not sim.bell_blocked:
@@ -196,6 +198,9 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			gap_roof = {}
 	stats.time = minf(sim.elapsed, max_time)
 	stats.score = sim.score()
+	stats.fish = sim.fish  # 이번 판에 번 생선 (v0.7.0 경제 계산)
+	stats.meters = sim.distance()
+	stats.combo_best = sim.combo.best
 	stats.end = sim.end_reason
 	stats.made = sim.slots.made
 	if sim.game_over:
