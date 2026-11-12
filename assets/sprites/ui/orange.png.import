@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1eepobwv2cnh"
-path="res://.godot/imported/panel.png-dfa286a45bb1ecb8d440437a4d2e0c47.ctex"
+uid="uid://exvvcju5vakf"
+path="res://.godot/imported/orange.png-6fa807826da3465c192cb41cb8d8dbc4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/ui/clean_b/panel.png"
-dest_files=["res://.godot/imported/panel.png-dfa286a45bb1ecb8d440437a4d2e0c47.ctex"]
+source_file="res://assets/sprites/ui/orange.png"
+dest_files=["res://.godot/imported/orange.png-6fa807826da3465c192cb41cb8d8dbc4.ctex"]
 
 [params]
 

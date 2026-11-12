@@ -167,12 +167,3 @@ func test_페이드는_켤_때와_끌_때_시간이_다르다() -> void:
 	for i in 30:
 		v = Juice.fade(v, false, 0.01, 0.1, 0.5)
 	assert_eq(v, 0.0, "0.5초에 다 꺼짐")
-
-
-func test_결과_카드_테두리는_사각형_둘레를_살짝만_벗어나고_늘_같다() -> void:
-	var rect := Rect2(0.0, 0.0, 500.0, 420.0)
-	var points := Juice.wobbly_rect(rect, 2, 4.0)
-	assert_true(points.size() > 40, "둘레가 촘촘함 %d" % points.size())
-	for p in points:
-		assert_true(rect.grow(4.01).has_point(p), "흔들림 안: %s" % p)
-	assert_eq(points, Juice.wobbly_rect(rect, 2, 4.0), "같은 번호면 같은 모양")

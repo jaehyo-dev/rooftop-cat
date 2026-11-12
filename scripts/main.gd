@@ -64,12 +64,10 @@ const CELEBRATE_STARS := 26
 const CELEBRATE_FALL := 2.4
 const STAR_FILL := Color("#ffd166")
 const STAR_LINE := Color("#a8693a")
-## 결과 카드 (2b 수정): 색연필 종이 + 손으로 그은 듯 흔들리는 테두리 두 줄 + 그림자. 별은 카드 뒤로 내린다
+## 결과 카드: 크림 판 + 갈색 테두리 + 그림자. 별은 카드 뒤로 내린다
 const CARD_PAPER := Color("#fff6e6")
-const CARD_HATCH := Color(0.91, 0.78, 0.6, 0.22)  # 종이 결: 옅은 빗금
 const CARD_LINE := Color(0.353, 0.275, 0.212)
 const CARD_SHADOW := Color(0.18, 0.12, 0.08, 0.35)
-const CARD_WOBBLE := 4.0
 
 var _best := 0
 var _combo_pop := 99.0
@@ -238,35 +236,19 @@ func _count_result(delta: float) -> void:
 	_celebrate.queue_redraw()
 
 
-## 결과 카드: 그림자 → 종이 → 빗금 결 → 흔들리는 테두리 두 줄 (번호로 정한 흔들림이라 늘 같은 모양)
+## 결과 카드: 그림자 → 둥근 크림 판 + 같은 굵기 갈색 테두리 (메뉴 종이와 같은 모양, 2c 피드백 B)
 func _draw_card() -> void:
 	var card: Control = $GameOver/Card
 	var rect := Rect2(Vector2.ZERO, card.size)
-	if UiKit.look != "old":  # 깔끔한 종이 (2c 피드백): 번짐·빗금 없이 크림 판 + 같은 굵기 갈색 테두리 + 그림자
-		var flat := StyleBoxFlat.new()
-		flat.set_corner_radius_all(26)
-		flat.anti_aliasing = true
-		flat.bg_color = CARD_SHADOW
-		card.draw_style_box(flat, Rect2(rect.position + Vector2(8, 10), rect.size))
-		flat.bg_color = CARD_PAPER
-		flat.border_color = CARD_LINE
-		flat.set_border_width_all(4)
-		card.draw_style_box(flat, rect)
-		return
-	var paper := Juice.wobbly_rect(rect, 1, CARD_WOBBLE)
-	var shadow := PackedVector2Array()
-	for p in paper:
-		shadow.append(p + Vector2(10.0, 12.0))
-	card.draw_colored_polygon(shadow, CARD_SHADOW)
-	card.draw_colored_polygon(paper, CARD_PAPER)
-	for i in int((rect.size.x - 80.0) / 26.0):  # 빗금이 카드 밖으로 나가지 않게
-		var x := 20.0 + i * 26.0
-		card.draw_line(Vector2(x, rect.size.y - 18.0), Vector2(x + 40.0, rect.size.y - 18.0 - rect.size.y * 0.25), CARD_HATCH, 2.0, true)
-		card.draw_line(Vector2(x, 18.0 + rect.size.y * 0.25), Vector2(x + 40.0, 18.0), CARD_HATCH, 2.0, true)
-	for pass_seed in [2, 3]:
-		var line := Juice.wobbly_rect(rect.grow(-3.0 * (pass_seed - 2)), pass_seed, CARD_WOBBLE)
-		line.append(line[0])
-		card.draw_polyline(line, CARD_LINE, 4.0 if pass_seed == 2 else 2.0, true)
+	var flat := StyleBoxFlat.new()
+	flat.set_corner_radius_all(26)
+	flat.anti_aliasing = true
+	flat.bg_color = CARD_SHADOW
+	card.draw_style_box(flat, Rect2(rect.position + Vector2(8, 10), rect.size))
+	flat.bg_color = CARD_PAPER
+	flat.border_color = CARD_LINE
+	flat.set_border_width_all(4)
+	card.draw_style_box(flat, rect)
 
 
 ## 새 기록이면 위에서 별이 돌며 내린다 (번호로 자리·빠르기를 정해 무작위 없음)

@@ -55,26 +55,3 @@ static func dash_punch(since: float) -> float:
 ## 켜짐(on)이면 in_time초, 꺼짐이면 out_time초에 걸쳐 0~1 사이를 일정하게 움직인다 (질주 북 소리, 노을빛)
 static func fade(value: float, on: bool, delta: float, in_time: float, out_time: float) -> float:
 	return move_toward(value, 1.0 if on else 0.0, delta / (in_time if on else out_time))
-
-
-## 손으로 그은 듯 살짝 흔들리는 사각형 둘레 점들 (결과 카드). 모서리는 둥글게 깎고, 흔들림은 seed로 정해 늘 같다
-static func wobbly_rect(rect: Rect2, seed_value: int, wobble: float, step: float = 24.0) -> PackedVector2Array:
-	var corner := 18.0
-	var r := rect.grow(-corner)
-	var out := PackedVector2Array()
-	var i := 0
-	for side in 4:
-		var a := TAU * side / 4.0 - PI * 0.5  # 위 → 오른쪽 → 아래 → 왼쪽 모서리 순
-		var c: Vector2 = [Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y), r.position][side]
-		for k in 4:  # 둥근 모서리
-			var t := a + PI * 0.5 * k / 3.0
-			out.append(c + Vector2(cos(t), sin(t)) * corner)
-		var next: Vector2 = [r.end, Vector2(r.position.x, r.end.y), r.position, Vector2(r.end.x, r.position.y)][side]
-		var normal := Vector2(cos(a + PI * 0.5), sin(a + PI * 0.5)) * corner
-		var length := c.distance_to(next)
-		for k in range(1, int(length / step)):
-			var p := c.lerp(next, k * step / length) + normal
-			var n := normal.normalized()
-			out.append(p + n * wobble * sin(i * 1.7 + seed_value * 2.3) * cos(i * 0.61 + seed_value))
-			i += 1
-	return out

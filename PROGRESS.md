@@ -228,7 +228,13 @@
 - 검토: 눈 검수 3번(qa.md, 결함 7건 고침), Codex 지적 없음, /ponytail-review 3건 수용, 게임 테스트 299 통과(평소 253초, FULL 489초, 전 454초)·도구 49 통과, 웹 콘솔 오류 0, Actions 첫 실패(numpy 없는 도구 테스트) 고침, final-reviewer 통과(재검토 1번, e4d618b)
 - 확인할 것: PLAN 18-4 (A·B 고르기, 연출·소리 크기), review/v0.7.0/2c-juice/compare·gif
 
+## v0.7.0 3-0 - UI B 확정과 정리 (버전 그대로, 브랜치만)
+- 만든 것: UI B("거의 평면") 확정, UiKit.look·old/A 묶음·"UI A/B" 단추·예전 판·버튼 그림·clean_a/ 지움, B 그림을 assets/sprites/ui/로, 결과 카드 흔들리는 테두리(Juice.wobbly_rect) 지움, 저장소 CLAUDE.md에 한국어 규칙, QUALITY_BAR 4-2(디렉터)
+- 내가 판단한 것: 삭제가 막히지 않아 _to_delete/ 안 씀, make_ui_paper.py는 B만 그리고 저장 그림 = 도구 그림 테스트
+- 검토: 게임 테스트 298·도구 통과, 웹 캡처 24상태 x PC·폰 콘솔 오류 0(이전 B 캡처와 판·버튼 같음), final-reviewer 통과
+- 확인할 것: 없음(눈에 띄는 변화는 기본이 A → B)
+
 ## 이어서 할 일
 - 맥에서 v0.7.0 2c-juice까지 끝냄 (v0.7.0-shop 브랜치, main은 v0.6.0 그대로, 버전 안 올림)
-- 사용자가 `bash tools/play_local.sh`로 A·B를 골라 주면 임시 코드(UiKit.look·PAPER 다른 묶음·LookToggle·안 쓰는 그림) 지우기
+- 유료 게임 품질 작업(QUALITY_BAR 4-2): 0단계 B 정리 끝 → 다음은 1단계 UI 스타일 표(ART_BIBLE) + UiKit 값 고정 테스트
 - 그 뒤 PLAN 16-5 결정 → 시험 패널 제거 → v0.7.0 버전 올려 main 배포

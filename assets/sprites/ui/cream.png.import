@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://pyla4e1w2uap"
-path="res://.godot/imported/cork.png-6badd6635eb9fb4ca4ea3aa89d48b2e7.ctex"
+uid="uid://d0v4alc3330p6"
+path="res://.godot/imported/cream.png-3a088791e22a5052fda5e3c10437b926.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/ui/clean_a/cork.png"
-dest_files=["res://.godot/imported/cork.png-6badd6635eb9fb4ca4ea3aa89d48b2e7.ctex"]
+source_file="res://assets/sprites/ui/cream.png"
+dest_files=["res://.godot/imported/cream.png-3a088791e22a5052fda5e3c10437b926.ctex"]
 
 [params]
 
