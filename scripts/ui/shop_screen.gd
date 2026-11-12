@@ -264,7 +264,7 @@ func buy() -> void:
 				_upgrade_landed(kind, lv, spot), UiKit.ICONS.fish, 40.0, 0.36))
 	else:
 		var owned: Label = _counts[kind]
-		var spot := to_box(owned, owned.size * 0.5)
+		var spot := to_box(owned, Vector2(owned.size.x - 28.0, owned.size.y * 0.5))  # 오른쪽 맞춤 "x2" 글자 자리 (칸 가운데가 아님)
 		track(UiKit.fly(box, to_box(_art, _art.size * 0.5), spot, 1, func(_i: int) -> void: _booster_landed(kind, spot),
 				_icon(kind), 96.0, 0.4))
 

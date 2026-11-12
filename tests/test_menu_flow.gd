@@ -3,6 +3,7 @@ extends TestCase
 ## 버튼 자리 터치가 점프·다시 시작이 아님, 상점·미션에서 입력이 판에 가지 않음, 사기·받기·바꾸기, 화면 크기(버튼 높이·글자 잘림).
 
 const PATH := "user://test_menu_flow.cfg"
+const QA := preload("res://tools/qa_web.gd")  # 메뉴 화면 부품인지 (예전 HUD·시험 패널은 뺌)
 
 
 func _clear() -> void:
@@ -145,11 +146,16 @@ func test_결과_카드_메인_화면_버튼은_시작_화면으로_가고_HUD�
 	main.begin_run()
 	await wait_frames(3)
 	assert_true(main.get_node("BestLabel").visible, "판 중 HUD 보임")
+	var drawn_after := [false]  # 하트는 게임 끝 뒤에는 다시 그리지 않는 맨 앞 층에 있음
+	world._overlay.draw.connect(func() -> void:
+		if world.can_restart():
+			drawn_after[0] = true)
 	_fall(world)
 	await get_tree().create_timer(Balance.RESTART_DELAY + 0.2).timeout
 	assert_eq(main.screen, "result")
 	for node: String in main.HUD:
 		assert_false(main.get_node(node).visible, node + " 결과 카드 뒤에서 숨김")
+	assert_true(drawn_after[0], "결과 카드가 뜬 뒤 맨 앞 층이 스스로 다시 그려짐 (하트를 지운 모습)")
 	var box: Control = main.get_node("GameOver/Card/Box")
 	assert_true(box.find_child("Shop", true, false) == null and box.find_child("Missions", true, false) == null, "상점·미션 아이콘 없음")
 	assert_true(main.result_slots.get_index() < box.get_node("Row").get_index(), "부스터 칸은 다시 하기 위")
@@ -297,7 +303,7 @@ func _check_layout(main: Control, what: String) -> void:
 	var buttons: Array[Control] = []
 	for node in main.find_children("*", "Button", true, false):
 		var b: Button = node
-		if b.is_visible_in_tree() and _in_menu(b):
+		if b.is_visible_in_tree() and QA.in_menu(b):
 			buttons.append(b)
 	for b in buttons:
 		var r := b.get_global_rect()
@@ -308,19 +314,9 @@ func _check_layout(main: Control, what: String) -> void:
 				assert_false(r.grow(-1.0).intersects(other.get_global_rect().grow(-1.0)), "%s %s 와 %s 겹침" % [what, b.name, other.name])
 	for node in main.find_children("*", "Label", true, false):
 		var l: Label = node
-		if l.is_visible_in_tree() and l.autowrap_mode == TextServer.AUTOWRAP_OFF and l.text != "" and not "\n" in l.text and _in_menu(l):
+		if l.is_visible_in_tree() and l.autowrap_mode == TextServer.AUTOWRAP_OFF and l.text != "" and not "\n" in l.text and QA.in_menu(l):
 			var need := l.get_theme_font("font").get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, l.get_theme_font_size("font_size")).x
 			assert_true(need <= l.size.x + 2.0, "%s 글자 잘림 \"%s\" %.0f > %.0f" % [what, l.text, need, l.size.x])
-
-
-## 2c 화면 부품인지 (예전 HUD·시험 패널은 뺌)
-func _in_menu(node: Node) -> bool:
-	var at := node.get_parent()
-	while at:
-		if at.name in ["StartMenu", "Shop", "Missions", "GameOver"]:
-			return true
-		at = at.get_parent()
-	return false
 
 
 func test_화면_크기_PC와_휴대폰에서_버튼_높이_겹침_글자_잘림() -> void:

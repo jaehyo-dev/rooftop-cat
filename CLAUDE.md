@@ -66,6 +66,8 @@ godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
 ```
 
 - 테스트는 실패하면 종료 코드 1로 끝나. 종료 코드까지 확인해.
+- 평소(로컬)에는 모든 조합을 도는 테스트(전봇대·트램펄린 틈 조합, 구간 × 모든 단계)가 대표 조합만 돈다(약 4분). 전체 조합은 `FULL_TESTS=1 bash tests/run_tests.sh`(약 8분). GitHub Actions는 늘 `FULL_TESTS=1`로 돈다. 새 "모든 조합" 테스트는 `TestCase.pick(목록, n)`이나 `full_tests()`로 같은 방식을 따라.
+- 실행기가 테스트마다 걸린 시간과 끝에 "오래 걸린 테스트" 15개를 찍어.
 - 게임 테스트는 `godot ... -s res://tests/run_tests.gd`로 직접 부르지 말고 `tests/run_tests.sh`로 실행해. Godot는 실행기 스크립트가 파싱에 실패해도 종료 코드 0으로 끝나서, 래퍼가 "결과:" 줄이 있는지 확인해 실패로 바꿔 줘. 1)을 건너뛰면 실행기가 안내를 찍고 종료 코드 1로 끝나.
 - 게임 자동 테스트 작성법: `tests/test_이름.gd`에서 `extends TestCase`, `test_`로 시작하는 함수 안에서 `assert_eq`, `assert_true` 등을 써. 씬은 `instantiate()` 후 `add_child()`하고 `await wait_frames()`로 확인해.
 - 조작감·속도·난이도 같은 게임 플레이 수치는 `scripts/balance.gd` 한곳에 모아 둬 (색·여백 같은 화면 꾸밈 값은 각 화면 파일에 둬도 돼).

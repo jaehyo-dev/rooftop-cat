@@ -10,6 +10,23 @@ var failures: PackedStringArray = []
 var expected_errors: PackedStringArray = []
 
 
+## 모든 조합을 다 도는 테스트를 할지 (FULL_TESTS=1). 평소(로컬)에는 대표 조합만 돌려 빨리 끝내고,
+## GitHub Actions는 늘 FULL_TESTS=1로 전체를 확인한다 (.github/workflows/deploy.yml)
+static func full_tests() -> bool:
+	return OS.get_environment("FULL_TESTS") == "1"
+
+
+## every번째마다 하나씩 고른 대표 (첫·끝은 늘 포함). full_tests()면 전부
+static func pick(list: Array, every: int) -> Array:
+	if full_tests() or list.size() <= 2:
+		return list
+	var out := []
+	for i in list.size():
+		if i % every == 0 or i == list.size() - 1:
+			out.append(list[i])
+	return out
+
+
 ## 속도 단계 표의 서로 다른 속도들 (옥상·구조물 테스트가 단계마다 확인한다)
 static func stage_speeds() -> Array:
 	var speeds := []

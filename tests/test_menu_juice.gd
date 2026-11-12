@@ -97,6 +97,31 @@ func test_미션_세_장을_빨리_받아도_도장이_다_찍히고_지갑이_�
 	await _done(main)
 
 
+func test_등급이_오른_뒤_미션_화면을_열면_배지를_한_번만_쿵() -> void:
+	var main := _main(0)
+	await wait_frames(3)
+	var board: MissionBoard = main.board
+	main.open_missions()
+	await wait_frames(3)
+	assert_true(board._fx.is_empty(), "처음 열 때는 쿵 없음")
+	main.go_back()
+	await wait_frames(3)
+	var rest: Vector2 = board._face.position
+	main.save.data.rank.level += 1  # 판에서 미션을 깨 등급이 오름
+	main.open_missions()
+	await wait_frames(3)
+	assert_false(board._fx.is_empty(), "오른 뒤 열면 배지 쿵")
+	board.finish_fx()
+	assert_eq(board._face.scale, Vector2.ONE)
+	main.go_back()
+	await wait_frames(3)
+	main.open_missions()
+	await wait_frames(3)
+	assert_true(board._fx.is_empty(), "같은 등급이면 다시 쿵 안 함")
+	assert_eq(board._face.position, rest, "배지 제자리")
+	await _done(main)
+
+
 func test_흔들림은_겹쳐도_제자리로_돌아온다() -> void:
 	var box := Control.new()
 	box.position = Vector2(5, 7)

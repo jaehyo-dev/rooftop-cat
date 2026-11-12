@@ -27,7 +27,7 @@ func _ready() -> void:
 	JavaScriptBridge.eval("window.qaEnd = true")
 
 
-# --- test_ui_quality.gd에서 옮긴 것 (tests/는 웹 빌드에 안 들어감) ---
+# --- 칸 찾기·가장 긴 값 (tests/test_ui_quality.gd도 이것을 씀: 검사하는 칸 = 확대해 보는 칸) ---
 
 static func moved(xf: Transform2D, rect: Rect2) -> Rect2:
 	var box := Rect2(xf * rect.position, Vector2.ZERO)

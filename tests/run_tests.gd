@@ -55,6 +55,8 @@ func _run() -> void:
 		quit(1)
 		return
 
+	var times: Array = []  # [걸린 초, "파일 :: 함수"] (오래 걸린 테스트 목록)
+	var started := Time.get_ticks_msec()
 	for file in files:
 		_catcher.take()
 		var script: GDScript = load(file)
@@ -73,21 +75,28 @@ func _run() -> void:
 			var test: Node = script.new()
 			root.add_child(test)
 			_catcher.take()
+			var t0 := Time.get_ticks_msec()
 			await test.call(name)
+			var took := (Time.get_ticks_msec() - t0) / 1000.0
+			times.append([took, "%s :: %s" % [file.get_file(), name]])
 			for error in _catcher.take():
 				if not Array(test.expected_errors).any(func(part: String) -> bool: return error.contains(part)):
 					test.failures.append("실행 중 오류: " + error)
 			if test.failures.is_empty():
-				print("통과  %s :: %s" % [file.get_file(), name])
+				print("통과  %s :: %s  (%.1f초)" % [file.get_file(), name, took])
 				passed += 1
 			else:
-				printerr("실패  %s :: %s" % [file.get_file(), name])
+				printerr("실패  %s :: %s  (%.1f초)" % [file.get_file(), name, took])
 				for message in test.failures:
 					printerr("      - " + message)
 				failed += 1
 			test.queue_free()
 			await process_frame
 
+	times.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0])
+	print("\n오래 걸린 테스트 (전체 %.0f초, FULL_TESTS=%s):" % [(Time.get_ticks_msec() - started) / 1000.0, OS.get_environment("FULL_TESTS")])
+	for row in times.slice(0, 15):
+		print("  %6.1f초  %s" % row)
 	print("\n결과: 통과 %d, 실패 %d" % [passed, failed])
 	quit(1 if failed > 0 or passed == 0 else 0)
 

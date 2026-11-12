@@ -131,7 +131,7 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	bar.size = Vector2(NOTE.x - 48, 32)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.draw.connect(func() -> void:
-		UiKit.draw_bar(bar, Rect2(0, 6, bar.size.x - COUNT_W - 10, 20), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else Color("#f0a04b")))
+		UiKit.draw_bar(bar, Rect2(0, 6, bar.size.x - COUNT_W - 10, 20), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else ShopScreen.DOT_ON))
 	var count := UiKit.label("%s/%s" % [UiKit.comma(entry.progress), UiKit.comma(entry.target)], 26, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
 	UiKit.fit(count, COUNT_W, 26)  # 99,999/99,999도 칸 안에
 	count.position = Vector2(bar.size.x - COUNT_W, 0)

@@ -333,7 +333,10 @@ func _process(delta: float) -> void:
 		_overlay.queue_redraw()
 		return
 	if sim.game_over:
+		var shown := can_restart()
 		_over_time += delta
+		if not shown and can_restart():
+			_overlay.queue_redraw()  # 결과 카드가 뜨는 순간 한 번 더 그려 하트를 지움 (게임 끝 뒤에는 다시 그리지 않음)
 		_tap_pending = false
 		if press_started and can_restart():
 			restart()

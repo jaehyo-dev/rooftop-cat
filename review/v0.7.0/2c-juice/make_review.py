@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).parent
 LOOKS = [("old", "지금"), ("a", "A 깔끔한 종이"), ("b", "B 거의 평면")]
-GIF_MAX = 3 * 1024 * 1024
+GIF_MAX = 3_000_000  # 3MB (10진, 넉넉히 엄격하게)
 SLOW = 0.12  # tools/qa_web.gd SLOW: GIF는 느리게 찍었으니 시간을 곱해 실제 빠르기로
 
 
@@ -66,18 +66,19 @@ def gifs(src: Path) -> None:
     for folder in sorted((src / "gif").iterdir()):
         times = json.loads((folder / "times.json").read_text())
         frames = sorted(folder.glob("f*.png"))[:len(times)]
-        for width in (720, 600, 480, 400):
+        # 3MB 안에 들 때까지: 넓이를 줄이고, 그래도 크면 한 장 걸러 (건너뛴 시간은 앞 장에 더함)
+        for width, step in ((720, 1), (600, 1), (480, 1), (480, 2), (400, 2), (400, 3)):
             pics, durations = [], []
-            for i, f in enumerate(frames):
-                img = Image.open(f).convert("RGB")
+            for i in range(0, len(frames), step):
+                img = Image.open(frames[i]).convert("RGB")
                 pics.append(small(img.resize((width, img.height * width // img.width), Image.LANCZOS)))
-                gap = (times[i + 1] - times[i]) if i + 1 < len(times) else 600
-                durations.append(max(20, int(gap * SLOW)))
+                end = times[i + step] if i + step < len(times) else times[-1] + 600
+                durations.append(max(20, int((end - times[i]) * SLOW)))
             path = out / f"{folder.name}.gif"
             pics[0].save(path, save_all=True, append_images=pics[1:], duration=durations, loop=0, optimize=True)
             if path.stat().st_size <= GIF_MAX:
                 break
-        print(path.name, len(pics), "장", width, "px", round(path.stat().st_size / 1e6, 2), "MB")
+        print(path.name, len(pics), "장", width, "px", "1/%d" % step, round(path.stat().st_size / 1e6, 2), "MB")
 
 
 if __name__ == "__main__":

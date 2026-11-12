@@ -7,7 +7,7 @@ extends SceneTree
 ##   godot --path . --resolution 1280x720 -s res://review/v0.7.0/2c-fix/capture_fix.gd -- sit <폴더>   (시작 고양이 GIF 프레임 f000.png...)
 
 const PATH := "user://capture_fix.cfg"
-const Q := preload("res://tests/test_ui_quality.gd")
+const Q := preload("res://tools/qa_web.gd")  # 2c-juice: 칸 찾기 함수가 tools/qa_web.gd로 옮겨짐
 var main: Control
 var out := ""
 var size_name := ""
@@ -71,9 +71,7 @@ func _make(kind: String) -> void:
 		Missions.claim(data, false, 1)
 		data.missions.weekly[1].progress = 7400
 	elif kind == "longest":
-		var q: Node = Q.new()
-		q._fill_missions(data)
-		q.free()
+		Q.fill_longest(data)
 	main.save.save()
 	main.refresh_menus()
 
@@ -102,7 +100,7 @@ func _shot(name: String) -> void:
 	var cells := []
 	for node in main.find_children("*", "Label", true, false):
 		var l: Label = node
-		if not (l.is_visible_in_tree() and Q._in_menu(l) and l.text.strip_edges() != ""):
+		if not (l.is_visible_in_tree() and Q.in_menu(l) and l.text.strip_edges() != ""):
 			continue
 		var cell := Q.cell_of(l)
 		if cell.name == "Box" or cell.size.x * cell.size.y > 1280 * 720 * 0.4:  # 화면 전체 같은 큰 칸이면 글자 칸만

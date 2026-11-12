@@ -317,7 +317,10 @@ func test_생선_길대로_뛰면_사람_흔들림에도_필수를_다_먹고_�
 	var bonus := 0
 	for id: String in CourseData.SEGMENTS:
 		var seg: Dictionary = CourseData.SEGMENTS[id]
-		for stage in range(seg.min_stage, Balance.SPEED_STAGES.size() + 1):
+		var stages := range(seg.min_stage, Balance.SPEED_STAGES.size() + 1)
+		if not full_tests():  # 평소엔 처음·가운데·끝 단계만 (FULL_TESTS=1이면 모든 단계)
+			stages = [stages[0], stages[stages.size() / 2], stages[-1]]
+		for stage in stages:
 			var row: Array = Balance.SPEED_STAGES[stage - 1]
 			var next: float = Balance.SPEED_STAGES[mini(stage, Balance.SPEED_STAGES.size() - 1)][1]
 			# 도착 속도를 맞게 예측한 경우 (만든 단계와 달리는 단계가 다른 경우 포함)
@@ -347,7 +350,10 @@ func test_틀린_동작이면_필수를_놓친다() -> void:
 	var human := Human.new()
 	for id: String in CourseData.SEGMENTS:
 		var seg: Dictionary = CourseData.SEGMENTS[id]
-		for stage in range(seg.min_stage, Balance.SPEED_STAGES.size() + 1):
+		var stages := range(seg.min_stage, Balance.SPEED_STAGES.size() + 1)
+		if not full_tests():  # 평소엔 처음·가운데·끝 단계만 (FULL_TESTS=1이면 모든 단계)
+			stages = [stages[0], stages[stages.size() / 2], stages[-1]]
+		for stage in stages:
 			var row: Array = Balance.SPEED_STAGES[stage - 1]
 			human.setup_road(id, row[1], row[2], [row[1]])
 			if human.road_flights.size() >= 2:  # 틈 호만 있는 구간도 뛰지 않으면 떨어진다
@@ -406,7 +412,10 @@ func test_구간은_모든_단계에서_사람이_통과한다() -> void:
 	var used := {}
 	for id: String in CourseData.SEGMENTS:
 		var seg: Dictionary = CourseData.SEGMENTS[id]
-		for stage in range(seg.min_stage, Balance.SPEED_STAGES.size() + 1):
+		var stages := range(seg.min_stage, Balance.SPEED_STAGES.size() + 1)
+		if not full_tests():  # 평소엔 처음·가운데·끝 단계만 (FULL_TESTS=1이면 모든 단계)
+			stages = [stages[0], stages[stages.size() / 2], stages[-1]]
+		for stage in stages:
 			var row: Array = Balance.SPEED_STAGES[stage - 1]
 			for depth in [0.3, 0.6, 0.87]:
 				human.setup_segment(id, row[1], row[2], "plain")

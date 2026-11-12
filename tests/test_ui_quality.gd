@@ -4,6 +4,8 @@ extends TestCase
 ## 2) 가장 긴 값: 숫자·이름이 가장 길 때 글자가 칸 안에 있고 다른 글자·그림과 겹치지 않는지 (PC 1280x720·폰 844x390)
 ## 3) 그림 가장자리: 잘라 쓴 그림의 가장자리 1px에 불투명 픽셀이 없는지 (있으면 시트에서 자를 때 몸이 잘린 것)
 
+## 칸 찾기·가장 긴 값 채우기는 눈 검수 캡처(tools/qa_web.gd)와 같은 것을 씀 (검사하는 칸 = 확대해 보는 칸)
+const QA := preload("res://tools/qa_web.gd")
 const PATH := "user://test_ui_quality.cfg"
 ## 글자 검사에서 빼는 파일: 시험 패널은 배포 전에 지우는 임시 코드이고 글꼴도 기본 글꼴을 씀,
 ## course_data.gd의 구간 이름("화분·실외기 박자")은 검토용 내보내기(tests/export_segments.gd)에만 쓰고 화면에 안 나옴
@@ -136,14 +138,6 @@ static func text_width(label: Label) -> float:
 	return label.get_theme_font("font").get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.get_theme_font_size("font_size")).x
 
 
-## 미션 문구가 가장 긴 것부터 (29px 글꼴 폭)
-static func longest_missions(table: Dictionary, count: int) -> Array:
-	var ids: Array = table.keys()
-	ids.sort_custom(func(a: String, b: String) -> bool:
-		return UiKit.FONT.get_string_size(Missions.text(a), 0, -1, 29).x > UiKit.FONT.get_string_size(Missions.text(b), 0, -1, 29).x)
-	return ids.slice(0, count)
-
-
 ## 저장을 가장 긴 값으로 채움: 생선 9,999,999, 최고 9,999,999, 전설 등급, 부스터 99개, 강화 level
 func _seed_longest(level: int) -> void:
 	_clear()
@@ -166,22 +160,6 @@ func _main() -> Control:
 	return main
 
 
-## 미션 6장: 가장 긴 문구, 진행 99,999/99,999·10,000/10,000. 일일 = 받음(도장)·받기·바꾸기, 주간 = 받음·받기·바꾸기
-func _fill_missions(data: Dictionary) -> void:
-	for weekly in [false, true]:
-		var table: Dictionary = MissionTable.WEEKLY if weekly else MissionTable.DAILY
-		var list := Missions._entries(longest_missions(table, 3), table)
-		for i in 3:
-			list[i].target = 99999 if i != 1 else 10000
-			list[i].progress = list[i].target if i < 2 else list[i].target - 1
-			list[i].done = i < 2
-			list[i].claimed = i == 0  # 0 = 받음(도장), 1 = 받기 버튼
-		if weekly:
-			data.missions.weekly = list
-		else:
-			data.missions.daily = list
-
-
 ## 글자가 실제로 그려지는 자리 (글 칸 자기 좌표). 줄바꿈 없는 글은 가로·세로 맞춤까지 계산
 static func ink_local(l: Label) -> Rect2:
 	if l.autowrap_mode != TextServer.AUTOWRAP_OFF or "\n" in l.text:
@@ -201,16 +179,8 @@ static func ink_local(l: Label) -> Rect2:
 	return Rect2(x, y, w, h)
 
 
-## 사각형 rect를 xf로 옮긴 뒤 감싸는 사각형 (회전·크기까지)
-static func moved(xf: Transform2D, rect: Rect2) -> Rect2:
-	var box := Rect2(xf * rect.position, Vector2.ZERO)
-	for corner in [rect.position + Vector2(rect.size.x, 0), rect.position + Vector2(0, rect.size.y), rect.end]:
-		box = box.expand(xf * corner)
-	return box
-
-
 static func ink_rect(l: Label) -> Rect2:
-	return moved(l.get_global_transform(), ink_local(l))
+	return QA.moved(l.get_global_transform(), ink_local(l))
 
 
 ## 그림이 실제로 그려지는 자리 (그림 자기 좌표, 비율 유지 가운데 맞춤)
@@ -220,14 +190,6 @@ static func art_local(t: TextureRect) -> Rect2:
 		var drawn := tex * minf(t.size.x / tex.x, t.size.y / tex.y)
 		return Rect2((t.size - drawn) * 0.5, drawn)
 	return Rect2(Vector2.ZERO, t.size)
-
-
-## 글자가 들어가야 할 칸: 가장 가까운 조상 중 줄 세우기 상자(Container)가 아닌 것 (쪽지·패널·버튼·띠)
-static func cell_of(node: Control) -> Control:
-	var at := node.get_parent()
-	while at is Container:
-		at = at.get_parent()
-	return at as Control
 
 
 ## 칸에서 글자가 들어갈 수 있는 안쪽 (칸 좌표). 종이·버튼은 손그림 테두리 두께만큼 안쪽 (2c-fix 눈 검수: 바깥 사각형만 보면
@@ -260,15 +222,6 @@ static func word_break(l: Label) -> String:
 	return " / ".join(lines) if bad else ""
 
 
-static func _in_menu(node: Node) -> bool:
-	var at := node.get_parent()
-	while at:
-		if at.name in ["StartMenu", "Shop", "Missions", "GameOver"]:
-			return true
-		at = at.get_parent()
-	return false
-
-
 ## 보이는 메뉴 글자마다: 칸 안, 화면 안, 줄인 글자 크기 UiKit.FONT_MIN 이상, 다른 글자·그림과 안 겹침. 문제 목록을 돌려줌
 static func layout_problems(main: Control, what: String) -> PackedStringArray:
 	var out := PackedStringArray()
@@ -277,16 +230,16 @@ static func layout_problems(main: Control, what: String) -> PackedStringArray:
 	var arts: Array[TextureRect] = []
 	for node in main.find_children("*", "Label", true, false):
 		var l: Label = node
-		if l.is_visible_in_tree() and _in_menu(l) and l.text.strip_edges() != "" and l.modulate.a > 0.01:
+		if l.is_visible_in_tree() and QA.in_menu(l) and l.text.strip_edges() != "" and l.modulate.a > 0.01:
 			labels.append(l)
 	for node in main.find_children("*", "TextureRect", true, false):
 		var t: TextureRect = node
-		if t.is_visible_in_tree() and _in_menu(t) and t.texture:
+		if t.is_visible_in_tree() and QA.in_menu(t) and t.texture:
 			arts.append(t)
 	for l in labels:
 		var ink := ink_rect(l)
-		var cell := cell_of(l)
-		var in_cell := moved(cell.get_global_transform().affine_inverse() * l.get_global_transform(), ink_local(l))  # 칸 좌표 (칸이 기울어도)
+		var cell := QA.cell_of(l)
+		var in_cell := QA.moved(cell.get_global_transform().affine_inverse() * l.get_global_transform(), ink_local(l))  # 칸 좌표 (칸이 기울어도)
 		if not inner(cell).encloses(in_cell):
 			out.append("%s \"%s\" 칸(%s) 밖 %s ⊄ %s" % [what, l.text, cell.name, in_cell, cell.size])
 		if not view.encloses(ink):
@@ -308,11 +261,11 @@ static func layout_problems(main: Control, what: String) -> PackedStringArray:
 		var to_mine := l.get_global_transform().affine_inverse()
 		for other in labels:
 			if other.get_instance_id() < l.get_instance_id() \
-					and mine.intersects(moved(to_mine * other.get_global_transform(), ink_local(other)).grow(-2.0)):
+					and mine.intersects(QA.moved(to_mine * other.get_global_transform(), ink_local(other)).grow(-2.0)):
 				out.append("%s 글자 겹침 \"%s\" / \"%s\"" % [what, l.text, other.text])
 		for t in arts:
 			# 그림 위에 글자를 올리지 않는다 (핀·집게·도장·아이콘)
-			if mine.intersects(moved(to_mine * t.get_global_transform(), art_local(t)).grow(-2.0)):
+			if mine.intersects(QA.moved(to_mine * t.get_global_transform(), art_local(t)).grow(-2.0)):
 				out.append("%s 글자 \"%s\" 와 그림 %s 겹침" % [what, l.text, t.texture.resource_path.get_file()])
 	return out
 
@@ -334,7 +287,7 @@ func test_가장_긴_값으로_채워도_글자가_칸_안에_있고_겹치지_�
 		for level in [0, Balance.UPGRADE_MAX]:
 			_seed_longest(level)
 			var main := _main()
-			_fill_missions(main.save.data)
+			QA.fill_longest(main.save.data)
 			await wait_frames(30)
 			main.start_menu.refresh()
 			main.boosters_on = ["dash_start", "bell_start", "fish_bonus"]
@@ -376,7 +329,7 @@ func test_가장_긴_값으로_채워도_글자가_칸_안에_있고_겹치지_�
 			main._result.t = 999.0
 			main._count_result(0.0)
 			var done := []
-			for id in longest_missions(MissionTable.DAILY, 2) + longest_missions(MissionTable.WEEKLY, 2):
+			for id in QA.longest_missions(MissionTable.DAILY, 2) + QA.longest_missions(MissionTable.WEEKLY, 2):
 				done.append({"id": id, "fish": 99999})
 			main._extras.play({"done": done, "ranks": [{"level": 9, "fish": 99999, "boosters": ["dash_start"]},
 					{"level": 10, "fish": 99999, "boosters": ["bell_start", "fish_bonus"]}]}, main.get_node("GameOver/Card").get_global_rect())

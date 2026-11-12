@@ -106,7 +106,8 @@ func _sweep(found: Dictionary, speed: float, with_structure: bool, retap: bool, 
 		dj_delays = []
 		for k in 19:
 			dj_delays.append(0.1 + k * 0.05)
-	for off in range(-420, 110, 15):
+		dj_delays = pick(dj_delays, 3)  # 평소엔 3개마다 하나 (FULL_TESTS=1이면 19개 전부)
+	for off in pick(range(-420, 110, 15), 3):  # 평소엔 45px 간격 (양 끝 포함)
 		for hold in holds:
 			for dj in dj_delays:
 				var sim := _sim(found, speed, with_structure)

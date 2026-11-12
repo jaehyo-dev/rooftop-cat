@@ -32,8 +32,10 @@ jobs:
       - name: 리소스 가져오기
         run: godot --headless --path . --import
 
-      - name: 게임 자동 테스트
+      - name: 게임 자동 테스트 (모든 조합)
         run: bash tests/run_tests.sh
+        env:
+          FULL_TESTS: "1"
 
       - name: 도구·버전 자동 테스트
         run: python3 -m unittest discover -s tools -p "test_*.py" -v
