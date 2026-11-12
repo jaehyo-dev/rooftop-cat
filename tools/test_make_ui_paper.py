@@ -3,10 +3,13 @@ import sys
 import unittest
 from pathlib import Path
 
-import numpy as np
-
 sys.path.insert(0, str(Path(__file__).parent))
-import make_ui_paper as m  # noqa: E402
+try:
+    import numpy as np
+
+    import make_ui_paper as m
+except ImportError as error:  # numpy·Pillow는 개발 도구용이라 GitHub Actions에는 없다 (다른 도구 테스트와 같이 건너뜀)
+    raise unittest.SkipTest(f"numpy·Pillow 없음: {error}")
 
 
 class UiPaperTest(unittest.TestCase):
