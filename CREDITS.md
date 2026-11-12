@@ -48,6 +48,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/raw/ui_icons_sheet.png` → `assets/sprites/ui/icons/*.png` (16개) | 2026-11-12 | Codex 내장 이미지 생성 (아이템 시트·기준 고양이 첨부) | 강화·부스터·미션 종류·바꾸기·등급 배지·상점·별·뒤로 아이콘 | 마젠타 배경을 지우고 4x4 칸으로 잘라 냄. `cookie_clock.png`는 지금 쿠키 그림에 시계 아이콘을 작게 겹쳐 붙임 |
 | `assets/raw/ui_stamp.png` → `assets/sprites/ui/icons/stamp.png` | 2026-11-12 | Codex 내장 이미지 생성 (이 PC에서 그림이 되는지 시험한 그림) | 미션 받은 쪽지의 빨간 발바닥 도장 | 마젠타 배경을 지우고 잘라 냄 (2c-fix: 발가락까지 모두 담아 다시 자름) |
 | `assets/raw/cat_frames_sit.png` → `assets/sprites/cat_frames/sit_0·sit_1·sit_2·sit_blink·sit_up.png` | 2026-11-12 | Codex 내장 이미지 생성 (기준 시트 `assets/concept/cat_reference_sheet.png`와 `cat_base_run.png` 첨부, 요청문 `review/v0.7.0/2c-fix/prompts/cat_sit.txt`) | 시작 화면 고양이: 앉아서 꼬리 흔들기 3장, 눈 감기, 일어나기 | 마젠타 제거, 3x2 칸에서 자름, 머리 크기를 달리기 프레임에 맞춤(x0.78), 발끝·얼굴 쪽 끝 정렬 (`review/v0.7.0/2c-fix/cut_sit.py`). 첫 칸(머리 방향이 다름)은 안 씀 |
+| `sit_0·sit_1·sit_blink.png` → `assets/sprites/cat_frames/sit_body·sit_body_blink·sit_tail_0~7.png` | 2026-11-13 | 위 앉은 그림 (새로 그리지 않음) | 시작 화면 고양이: 고정된 몸 한 장 + 꼬리 8장 (v0.7.0 2c-polish) | `tools/make_sit_tail.py`가 몸과 꼬리를 나누고, 엉덩이 아래는 sit_1에서 가져오고, 꼬리를 뿌리 축으로 0~18도 돌려 사이 그림을 만듦 |
 | `assets/raw/cat_base_run.png` | 2026-11-06 | Codex 내장 이미지 생성 (참고 시트와 run 동작을 기준 그림으로 첨부) | 기준 캐릭터 달리는 옆모습 원본 (게임에 포함 안 됨) | 없음 |
 | `assets/sprites/cat_base_run.png` | 2026-11-06 | 위 원본 | 기준 그림 (3단계에서 고양이 그림의 기준) | 마젠타 배경을 마젠타 우세도(min(R, B) - G)로 지우고 1024x1024로 줄임 |
 | `assets/raw/cat_parts_sheet.png` | 2026-11-07 | Codex 내장 이미지 생성 (기준 그림과 참고 시트를 첨부) | 고양이 부품 시트 원본: 머리, 몸통(초록 목도리), 꼬리, 앞다리 2, 뒷다리 2 (게임에 포함 안 됨) | 없음 |
@@ -89,7 +90,9 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 ## 직접 만든 것
 
 - 메뉴 효과음 4종 `assets/audio/sfx/whoosh·thud·fanfare·pop_in.wav` (도장 휙, 도장 쿵, 강화 10단계 팡파르, 부스터 쏙): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 다른 메뉴 소리와 같은 -17dB, 강화 사기 소리는 게임에서 단계마다 빠르기를 반음씩 올려 냄
-- 깔끔한 메뉴 종이·버튼 그림 `assets/sprites/ui/panel·note·cork·orange·cream.png` ("거의 평면" B, 2026-11-12 사용자 확정): `tools/make_ui_paper.py`(numpy, Pillow)로 직접 그림. 외부 그림 없음
+- 깔끔한 메뉴 종이·버튼 그림 `assets/sprites/ui/panel·note·cork·orange·cream.png` ("거의 평면" B, 2026-11-12 사용자 확정): `tools/make_ui_paper.py`(numpy, Pillow)로 직접 그림. 외부 그림 없음. v0.7.0 2c-polish부터 게임은 이 그림 대신 코드로 그린 판(`scripts/ui/plate.gd`, ART_BIBLE 13 "UI 스타일" 값)을 씀
+- 메뉴 판·버튼·게이지·리본·화살표·빛 원 (v0.7.0 2c-polish): `scripts/ui/plate.gd`, `scripts/ui/ui_kit.gd`가 코드로 그림. 외부 그림 없음
+- 도장 휙·쿵 소리 다시 만듦 (v0.7.0 2c-polish): `tools/make_sfx.py` whoosh·thud (탁 + 눌러 키운 북 + 55Hz 저음 꼬리)
 - 메뉴 효과음 8종 `assets/audio/sfx/buy·booster_buy·booster_on·no_money·claim·rank_up·swap·page.wav` (강화 사기, 부스터 사기, 부스터 켜기, 생선 부족, 미션 받기, 등급 오름, 바꾸기, 화면 넘김): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 생선 소리와 같은 -17dB로 틂
 - 효과음 17종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근, 질주 슝): 2026-11-09, 뒤 5종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)

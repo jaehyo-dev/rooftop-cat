@@ -27,12 +27,15 @@ var _extras: ResultExtras
 var _back_to := "start"
 var _blockers: Array[Control] = []  # 지금 화면이 World.touch_blockers에 넣은 버튼 자리
 var _ui_sfx := {}
-var _hint := UiKit.label("", 26, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
-var _result_dot := UiKit.badge(34.0)
+var _hint := UiKit.label("", UiKit.SUB, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
+var _result_dot := UiKit.badge()
+var _shop_seen: Array = []  # 상점을 마지막으로 열었을 때 살 수 있던 강화 (새로 살 수 있게 되면 [상점]에 점)
 
 ## 메뉴 소리 (tools/make_sfx.py UI_SOUNDS). 생선 소리(-17dB)보다 튀지 않게 같은 크기로
 const UI_SOUNDS := ["buy", "booster_buy", "booster_on", "no_money", "claim", "rank_up", "swap", "page", "whoosh", "thud", "fanfare", "pop_in"]
 const UI_VOLUME_DB := -17.0
+## 이 소리만 더 크게 (dB, 2c-polish 사용자 "도장 소리가 너무 작다"): 쿵은 다른 효과음보다 한 단계 위, 휙은 쿵에 맞춰 조금
+const UI_GAIN_DB := {"thud": 5.0, "whoosh": 3.0}
 ## HUD (판 중·결과 카드에서만 보임)
 const HUD := ["DistanceLabel", "BestLabel", "FishIcon", "FishLabel", "ScoreLabel", "ComboLabel"]
 const WORLD := preload("res://scripts/world_view.gd")
@@ -64,10 +67,6 @@ const CELEBRATE_STARS := 26
 const CELEBRATE_FALL := 2.4
 const STAR_FILL := Color("#ffd166")
 const STAR_LINE := Color("#a8693a")
-## 결과 카드: 크림 판 + 갈색 테두리 + 그림자. 별은 카드 뒤로 내린다
-const CARD_PAPER := Color("#fff6e6")
-const CARD_LINE := Color(0.353, 0.275, 0.212)
-const CARD_SHADOW := Color(0.18, 0.12, 0.08, 0.35)
 
 var _best := 0
 var _combo_pop := 99.0
@@ -101,7 +100,7 @@ func _ready() -> void:
 		var player := AudioStreamPlayer.new()
 		player.name = "Ui_" + sound
 		player.stream = load("res://assets/audio/sfx/%s.wav" % sound)
-		player.volume_db = UI_VOLUME_DB
+		player.volume_db = UI_VOLUME_DB + UI_GAIN_DB.get(sound, 0.0)
 		add_child(player)
 		_ui_sfx[sound] = player
 	_build_menus()
@@ -138,7 +137,6 @@ func _ready() -> void:
 	_celebrate.draw.connect(_draw_celebrate)
 	$GameOver.add_child(_celebrate)
 	$GameOver.move_child(_celebrate, 0)  # 카드보다 먼저 그려 별이 글자를 가리지 않게
-	$GameOver/Card.draw.connect(_draw_card)
 
 
 func _process(delta: float) -> void:
@@ -236,21 +234,6 @@ func _count_result(delta: float) -> void:
 	_celebrate.queue_redraw()
 
 
-## 결과 카드: 그림자 → 둥근 크림 판 + 같은 굵기 갈색 테두리 (메뉴 종이와 같은 모양, 2c 피드백 B)
-func _draw_card() -> void:
-	var card: Control = $GameOver/Card
-	var rect := Rect2(Vector2.ZERO, card.size)
-	var flat := StyleBoxFlat.new()
-	flat.set_corner_radius_all(26)
-	flat.anti_aliasing = true
-	flat.bg_color = CARD_SHADOW
-	card.draw_style_box(flat, Rect2(rect.position + Vector2(8, 10), rect.size))
-	flat.bg_color = CARD_PAPER
-	flat.border_color = CARD_LINE
-	flat.set_border_width_all(4)
-	card.draw_style_box(flat, rect)
-
-
 ## 새 기록이면 위에서 별이 돌며 내린다 (번호로 자리·빠르기를 정해 무작위 없음)
 func _draw_celebrate() -> void:
 	if _result.is_empty() or not _result.new_best or not Juice.count_done(_result.values, _result.t):
@@ -316,17 +299,25 @@ func _build_menus() -> void:
 	# 결과 카드: 다시 하기(크게) · 부스터 칸 · 상점 · 미션, 한 줄 안내. 깬 미션 쪽지·등급 도장은 카드 둘레(ResultExtras)
 	var box: VBoxContainer = $GameOver/Card/Box
 	box.custom_minimum_size.x = 560
-	var retry: Button = box.get_node("Retry")
-	var orange := UiKit.button("", "orange", null, 52)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
-		retry.add_theme_stylebox_override(state, orange.get_theme_stylebox(state))
-	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_outline_color"]:
-		retry.add_theme_color_override(key, orange.get_theme_color(key))
-	retry.add_theme_constant_override("outline_size", 4)
-	retry.add_theme_font_size_override("font_size", 52)
-	orange.free()
-	retry.focus_mode = Control.FOCUS_NONE
-	retry.custom_minimum_size = Vector2(320, 100)
+	# 결과 카드도 메뉴와 같은 판 (UI 스타일 표), 글자 위계: 점수(큰 숫자) → 기록(본문) → 모은 생선(보조)
+	var card_box := UiKit.plate("panel")
+	card_box.content_margin_left = UiKit.PAD * 3.0
+	card_box.content_margin_right = UiKit.PAD * 3.0
+	card_box.content_margin_top = UiKit.PAD * 2.0
+	card_box.content_margin_bottom = UiKit.PAD * 2.0 + UiKit.SHADOW_Y
+	$GameOver/Card.add_theme_stylebox_override("panel", card_box)
+	box.add_theme_constant_override("separation", int(UiKit.GAP))
+	for pair in [["Score", UiKit.NUM_BIG, UiKit.BROWN], ["Stats", UiKit.BODY, UiKit.BROWN], ["Best", UiKit.BODY, UiKit.RED], ["Total", UiKit.SUB, UiKit.SUB_BROWN]]:
+		var l: Label = box.get_node(pair[0])
+		l.add_theme_font_size_override("font_size", pair[1])
+		l.add_theme_color_override("font_color", pair[2])
+		l.add_theme_constant_override("outline_size", 0)
+	box.get_node("Retry").free()
+	var retry := UiKit.button("다시 하기", "orange", null, UiKit.TITLE)
+	retry.name = "Retry"
+	retry.hot = true
+	box.add_child(retry)
+	retry.custom_minimum_size = Vector2(320, 104)
 	retry.pressed.connect(begin_run)
 	_hint.name = "Hint"
 	box.add_child(_hint)
@@ -340,15 +331,15 @@ func _build_menus() -> void:
 	var row := HBoxContainer.new()
 	row.name = "Row"
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 14)
+	row.add_theme_constant_override("separation", int(UiKit.PAD))
 	box.remove_child(retry)
 	row.add_child(retry)
-	var home := UiKit.button("메인 화면", "cream", null, 38)
+	var home := UiKit.button("메인 화면", "cream")
 	home.name = "Home"
-	home.custom_minimum_size = Vector2(200, 100)
+	home.custom_minimum_size = Vector2(200, 104)
 	home.pressed.connect(go_home)
 	row.add_child(home)
-	_result_dot.position = Vector2(home.custom_minimum_size.x - 30.0, -10)  # 받을 미션 보상 수: 오른쪽 위 (왼쪽 위는 부스터 칸에 닿음)
+	_result_dot.position = Vector2(home.custom_minimum_size.x - _result_dot.size.x * 0.75, -_result_dot.size.y * 0.3).round()  # 받을 미션 보상 수: 오른쪽 위 (왼쪽 위는 부스터 칸에 닿음)
 	home.add_child(_result_dot)
 	box.add_child(row)
 	_extras = ResultExtras.new(self)
@@ -374,6 +365,8 @@ func show_screen(next: String) -> void:
 	for node: String in HUD:
 		get_node(node).visible = next == "run"  # 결과 카드 뒤에서는 숨김 (카드에 같은 값이 있음, 2c 피드백)
 	$GameOver.visible = next == "result"
+	if next == "result" and was != "result":
+		UiKit.enter([$GameOver/Card], Vector2(0, 40))  # 카드가 아래에서 톡 올라옴
 	$VersionLabel.visible = not menu
 	if next == "start" and was != "start":
 		start_menu.slide_in()
@@ -409,6 +402,7 @@ func open_shop(tab: String = "upgrades") -> void:
 	if screen not in ["start", "result"]:
 		return
 	_back_to = screen
+	_shop_seen = ShopScreen.affordable(save)
 	shop.tab = tab
 	shop.selected = "dash" if tab == "upgrades" else "dash_start"
 	play_ui("page")
@@ -450,6 +444,11 @@ func refresh_menus() -> void:
 		start_menu.refresh()
 	result_slots.refresh()
 	UiKit.badge_text(_result_dot, Missions.pending(save.data))
+
+
+## [상점]의 빨간 점: 상점을 마지막으로 연 뒤에 새로 살 수 있게 된 강화가 있음
+func shop_has_new() -> bool:
+	return ShopScreen.affordable(save).any(func(kind: String) -> bool: return kind not in _shop_seen)
 
 
 ## pitch: 빠르기 (강화 사기는 단계마다 한 음씩 높게)

@@ -197,7 +197,7 @@ static func art_local(t: TextureRect) -> Rect2:
 const PAPER_EDGE := 8.0
 static func inner(cell: Control) -> Rect2:
 	var r := Rect2(Vector2.ZERO, cell.size)
-	if cell is NinePatchRect or cell is Button:
+	if cell is Panel or cell is Button:
 		var round_end := minf(cell.size.y * 0.25, 22.0) if cell.size.x > cell.size.y * 1.5 else PAPER_EDGE
 		return r.grow_individual(-maxf(PAPER_EDGE, round_end), -PAPER_EDGE, -maxf(PAPER_EDGE, round_end), -PAPER_EDGE)
 	return r.grow(1.0)

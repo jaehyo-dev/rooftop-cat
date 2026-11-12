@@ -27,6 +27,8 @@ const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 �
 var frame_name := "run_0"
 var _textures := {}
 var _sprite := Sprite2D.new()
+var _tail := Sprite2D.new()  # 앉았을 때만: 몸 뒤 꼬리 (CatPose.sit_tail)
+var _tails: Array[Texture2D] = []
 var _spring := Spring.new(Balance.CAT_SPRING_HZ, Balance.CAT_SPRING_DAMPING)
 var _tilt := 0.0
 var _last := {}  # 지난 프레임의 sim 타이머·상태 (줄어들었으면 그 일이 새로 일어난 것)
@@ -43,6 +45,13 @@ func _ready() -> void:
 	_sprite.position = spin_center()
 	_sprite.offset = -ANCHOR - spin_center()
 	_sprite.texture = _textures[frame_name]
+	for i in CatPose.SIT_TAILS:
+		_tails.append(load(FRAME_DIR + "sit_tail_%d.png" % i))
+	_tail.name = "Tail"
+	_tail.centered = false
+	_tail.offset = -ANCHOR
+	_tail.visible = false
+	add_child(_tail)  # 몸보다 먼저 = 뒤에 그림
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
 
@@ -76,6 +85,7 @@ func spin() -> float:
 ## 노드 위치(발끝)는 부르기 전에 world_view.gd가 정하고, 여기서는 달리기 들썩임만큼 그림을 올린다.
 func show_state(sim: RunnerSim, dt: float) -> void:
 	var pose := CatPose.pose(sim)
+	_tail.visible = false
 	frame_name = pose.frame
 	_sprite.texture = _textures[frame_name]
 	if dt <= 0.0:
@@ -107,13 +117,15 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 		modulate.a = 0.3 if int(sim.invuln_time / INVULN_BLINK) % 2 == 0 else 0.9
 
 
-## 시작 화면: 앉아서 꼬리를 흔든다 (t = 앉아 있은 시간). 다음 달리기 첫 순간에 "일어남"을 보이게 해 둔다
+## 시작 화면: 앉아서 꼬리를 흔들고 숨쉰다 (t = 앉아 있은 시간). 다음 달리기 첫 순간에 "일어남"을 보이게 해 둔다
 func show_sit(t: float) -> void:
 	frame_name = CatPose.sit_frame(t)
 	_sprite.texture = _textures[frame_name]
 	_sprite.rotation = 0.0
+	_tail.visible = true
+	_tail.texture = _tails[CatPose.sit_tail(t)]
 	rotation = 0.0
-	scale = Vector2.ONE * art_scale()
+	scale = CatPose.sit_breath(t) * art_scale()  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
 	_stand = CatPose.STAND_TIME
 

@@ -7,32 +7,27 @@ signal want_shop
 signal toggled_on(kind: String, on: bool)
 
 const KINDS := ["dash_start", "bell_start", "fish_bonus"]
-const SIZE := 100.0
+const SIZE := 104.0  # 칸 (그림자 포함)
 
 var main: Node
-var _slots := {}   # 종류 → Button
+var _slots := {}   # 종류 → UiButton
 var _counts := {}  # 종류 → Label
 
 
 func _init(main_node: Node) -> void:
 	main = main_node
 	name = "BoosterSlots"
-	add_theme_constant_override("separation", 10)
+	add_theme_constant_override("separation", int(UiKit.GAP * 1.5))
 	for kind: String in KINDS:
 		var b := UiKit.button("", "cream")
 		b.name = kind
 		b.custom_minimum_size = Vector2(SIZE, SIZE)
-		var art := UiKit.icon(UiKit.ICONS[kind], SIZE - 50.0)
-		art.set_anchors_preset(Control.PRESET_FULL_RECT)
-		art.offset_left = 20  # 위 가운데: 아래 개수 글자와 겹치지 않고 둥근 테두리 안에
-		art.offset_top = 6
-		art.offset_right = -20
-		art.offset_bottom = -44
+		var art := UiKit.icon(UiKit.ICONS[kind], 56)
+		art.position = Vector2((SIZE - 56) * 0.5, UiKit.GAP)  # 위 가운데
 		b.add_child(art)
-		var count := UiKit.label("0", 30, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)  # 휴대폰(0.54배)에서도 읽히게
-		count.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 9)  # 아래 가운데 (둥근 테두리 안)
-		count.grow_horizontal = Control.GROW_DIRECTION_BOTH
-		count.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		var count := UiKit.label("0", UiKit.SUB, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+		count.position = Vector2(UiKit.GAP, SIZE - UiKit.SHADOW_Y - 36 - UiKit.GAP * 0.5)  # 아래 가운데 (둥근 테두리 안)
+		count.size = Vector2(SIZE - UiKit.PAD, 36)
 		b.add_child(count)
 		b.pressed.connect(press.bind(kind))
 		add_child(b)
@@ -55,14 +50,15 @@ func press(kind: String) -> void:
 	refresh()
 
 
-## 개수·켜짐을 다시 그린다 (켠 칸은 주황 종이 + 진하게, 0개는 흐리게)
+## 개수·켜짐을 다시 그린다 (켠 칸은 주황 + 크림 글자, 0개는 흐리게)
 func refresh() -> void:
 	for kind: String in KINDS:
 		var n: int = main.save.booster_count(kind)
-		var b: Button = _slots[kind]
+		var b: UiButton = _slots[kind]
 		var lit: bool = main.boosters_on.has(kind) and n > 0
-		var style := "orange" if lit else "cream"
-		for state in ["normal", "hover"]:
-			b.add_theme_stylebox_override(state, UiKit._box(style))
-		_counts[kind].text = "x%d" % n
-		b.modulate = Color(1, 1, 1, 1.0 if n > 0 else 0.55)
+		b.set_fill(UiKit.ORANGE if lit else UiKit.PAPER)
+		var count: Label = _counts[kind]
+		count.text = "x%d" % n
+		count.add_theme_color_override("font_color", UiKit.CREAM if lit else UiKit.BROWN)
+		count.add_theme_constant_override("outline_size", UiKit.OUTLINE if lit else 0)
+		b.dimmed = n <= 0

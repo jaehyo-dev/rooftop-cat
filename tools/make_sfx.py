@@ -194,18 +194,21 @@ def page() -> np.ndarray:
 # --- 2c 피드백 (2026-11-12): 도장 휙·쿵, 10단계 팡파르, 부스터 쏙 ---
 
 def whoosh() -> np.ndarray:
-    """도장이 내려오는 휙: 높은 바람이 아래로 빠르게 미끄러짐 (끝에서 커졌다 뚝)"""
-    t = times(0.16)
-    wind = sum(np.sin(2 * np.pi * (f * t - 1800.0 * t * t)) for f in (1213.0, 1697.0, 2311.0)) / 3.0
-    return 0.5 * wind * (t / 0.16) ** 1.5 * np.minimum(1.0, (0.16 - t) * 200.0)
+    """도장이 내려오는 휙: 바람이 아래로 빠르게 미끄러짐 (끝에서 커졌다 쿵에 이어짐). 2c-polish: 낮은 바람 한 겹을 더해 두껍게"""
+    t = times(0.2)
+    wind = sum(np.sin(2 * np.pi * (f * t - 1500.0 * t * t)) for f in (613.0, 1213.0, 1697.0, 2311.0)) / 4.0
+    return 0.6 * wind * (t / 0.2) ** 1.5 * np.minimum(1.0, (0.2 - t) * 200.0)
 
 
 def thud() -> np.ndarray:
-    """도장 쿵: 낮게 떨어지는 북소리 + 종이를 때리는 탁 (폰 스피커에서도 들리게 배음을 섞음)"""
-    t = times(0.24)
-    low = fade(sweep(170.0, 60.0, 0.24), 14.0)
-    slap = sum(np.sin(2 * np.pi * f * t) for f in (1873.0, 2741.0, 3529.0)) / 3.0 * np.exp(-t * 90.0)
-    return 0.9 * low + 0.35 * slap
+    """도장 쿵 (2c-polish: 사용자 "도장 소리가 너무 작다"): 종이를 때리는 탁 + 배음을 눌러 키운 북(폰 스피커에서도 큼)
+    + 낮게 오래 울리는 저음 꼬리(55Hz, 0.5초). 게임은 다른 메뉴 소리보다 크게 튼다 (main.gd UI_GAIN_DB)"""
+    t = times(0.6)
+    click = np.sin(2 * np.pi * 2200.0 * t) * np.exp(-t * 260.0)
+    slap = sum(np.sin(2 * np.pi * f * t) for f in (1873.0, 2741.0, 3529.0)) / 3.0 * np.exp(-t * 70.0)
+    body = np.tanh(2.6 * at(fade(sweep(190.0, 70.0, 0.2), 12.0), 0.0, 0.6))  # 눌러서 배음이 생김 = 작은 스피커에서도 들림
+    tail = np.sin(2 * np.pi * (55.0 * t - 4.0 * t * t)) * np.exp(-t * 7.0) * np.minimum(1.0, t * 80.0)
+    return 0.55 * click + 0.4 * slap + 0.85 * body + 0.6 * tail
 
 
 def fanfare() -> np.ndarray:

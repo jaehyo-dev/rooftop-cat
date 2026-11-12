@@ -10,65 +10,66 @@ const STAT_ICONS := {"meters": "footprints", "fish": "fish", "combo": "combo", "
 		"dash": "snack", "smash": "smash", "smash_one": "smash", "double": "jump", "pole": "jump", "tramp": "tramp", "perfect": "tramp",
 		"gold": "gold", "yarn": "yarn", "can": "can", "bell": "bell", "runs": "rank_face", "daily_done": "note_check",
 		"full_day": "note_check", "shop": "basket", "pass_flock": "jump", "pass_pot": "jump", "pass_tank": "jump", "pass_ac": "jump"}
-const NOTE := Vector2(372, 226)
+const NOTE := Vector2(368, 220)  # 쪽지 (그림자 포함)
+const NOTE_GAP := 32.0
+const CORK := Rect2(16, 120, 1248, 592)
+const ROWS_Y := [136.0, 420.0]   # 머리글 위 (일일·주간), 쪽지는 그 아래 HEAD_H + GAP
+const HEAD_H := 48.0
+const PIN := Vector2(UiKit.GAP, -UiKit.PAD)  # 압정: 쪽지 왼쪽 위 모서리 (글자·머리글을 가리지 않게)
+const PIN_SIZE := 40.0
 const CONFIRM_TIME := 2.5  # 바꾸기 "정말?"이 기다리는 시간
-const COUNT_W := 150.0     # 진행 숫자 칸 넓이 (막대는 그 왼쪽)
+const COUNT_W := 144.0     # 진행 숫자 칸 넓이 (막대는 그 왼쪽)
+const WOBBLE := 0.025      # 받을 쪽지 흔들림 (라디안)
+const WOBBLE_TIME := 1.6
 
 var _rank := Control.new()
-var _rank_label := UiKit.label("", 34)
-var _headers := [UiKit.label("", 28), UiKit.label("", 28)]
+var _rank_label := UiKit.label("", UiKit.BODY)
+var _headers := [UiKit.label("", UiKit.SUB, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER), UiKit.label("", UiKit.SUB, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)]
 var _notes := []         # [weekly, slot] 순서로 6장 Control
 var _confirm := {"key": "", "t": 0.0}  # 바꾸기 확인 중인 쪽지 ("d0" 등)
 var _stamped := {}       # 이번에 받아 도장을 찍을 쪽지 key → 받은 생선
 var _seen_level := 0     # 지난번 열었을 때 등급 (오르면 열 때 배지를 쿵)
 var _face: TextureRect
+var _wobble_t := 0.0
 
 
 func _init(main_node: Node) -> void:
 	super(main_node, "Missions")
-	# 등급 리본
+	# 등급: 링 배지 + 이름 + 경험치 막대 (뒤로·지갑 사이)
 	_rank.name = "Rank"
-	_rank.position = Vector2(150, 10)
-	_rank.size = Vector2(780, 96)
+	_rank.position = Vector2(EDGE + TOP_H + UiKit.GAP * 3.0, EDGE)
+	_rank.size = Vector2(808, TOP_H)
+	_rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_rank.draw.connect(_draw_rank)
-	_rank_label.position = Vector2(112, 4)
-	_rank_label.size = Vector2(620, 44)
+	_rank_label.position = Vector2(104, 0)
+	_rank_label.size = Vector2(640, 44)
 	_rank.add_child(_rank_label)
-	_face = UiKit.icon(UiKit.ICONS.rank_face, 92)
-	_face.position = Vector2(6, 2)
-	_face.size = Vector2(92, 92)
+	_face = UiKit.icon(UiKit.ICONS.rank_face, 64)
+	_face.position = Vector2(12, 8)
 	_rank.add_child(_face)
 	box.add_child(_rank)
 	# 코르크판
-	var cork := UiKit.paper("cork")
+	var cork := UiKit.panel("cork")
 	cork.name = "Cork"
-	cork.position = Vector2(14, 108)
-	cork.size = Vector2(1252, 608)
+	cork.position = CORK.position
+	cork.size = CORK.size
 	box.add_child(cork)
-	# 머리글: 나무 테두리·코르크 무늬 위에서도 읽히게 크림색 이름표 안에 (압정보다 위, 2c-fix)
+	var x0 := CORK.position.x + (CORK.size.x - 3.0 * NOTE.x - 2.0 * NOTE_GAP) * 0.5
 	for i in 2:
-		var tag := Panel.new()
+		var tag := UiKit.panel("chip")
 		tag.name = "Header%d" % i
-		tag.position = Vector2(56, 110 + i * 300)
-		tag.size = Vector2(300, 40)
-		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var style := StyleBoxFlat.new()
-		style.bg_color = UiKit.CREAM
-		style.border_color = UiKit.BROWN
-		style.set_border_width_all(3)
-		style.set_corner_radius_all(18)
-		style.anti_aliasing = true
-		tag.add_theme_stylebox_override("panel", style)
+		tag.position = Vector2(x0 + PIN.x + PIN_SIZE + UiKit.GAP, ROWS_Y[i])  # 첫 쪽지 압정 오른쪽부터
+		tag.size = Vector2(320, HEAD_H)
 		var h: Label = _headers[i]
-		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		h.set_anchors_preset(Control.PRESET_FULL_RECT)
+		h.position = Vector2(UiKit.PAD, 1)  # 글자 모양이 위로 치우쳐 1px 내림
 		tag.add_child(h)
 		box.add_child(tag)
 	for i in 6:
 		var note := Control.new()
 		note.name = "Note%d" % i
-		note.position = Vector2(64 + (i % 3) * (NOTE.x + 22), 170 + (i / 3) * 300)
+		note.position = Vector2(x0 + (i % 3) * (NOTE.x + NOTE_GAP), ROWS_Y[i / 3] + HEAD_H + UiKit.GAP)
 		note.size = NOTE
+		note.pivot_offset = PIN + Vector2(PIN_SIZE * 0.5, PIN_SIZE * 0.5)  # 압정을 축으로 흔들림
 		box.add_child(note)
 		_notes.append(note)
 
@@ -82,22 +83,23 @@ func refresh() -> void:
 	var data: Dictionary = main.save.data
 	var r: Dictionary = data.rank
 	_rank_label.text = "%s  %d등급    %s / %s" % [CatRank.rank_name(r.level), r.level, UiKit.comma(r.xp), UiKit.comma(CatRank.next_xp(r.level))]
-	UiKit.fit(_rank_label, _rank_label.size.x, 34)
+	UiKit.fit(_rank_label, _rank_label.size.x, UiKit.BODY)
 	_rank.queue_redraw()
 	var now: Dictionary = main.clock.now()
 	_headers[0].text = "오늘의 미션   (남은 시간 %s)" % DayClock.left_text(DayClock.seconds_to_next_day(now))
 	_headers[1].text = "이번 주 미션   (남은 시간 %s)" % DayClock.left_text(DayClock.seconds_to_next_week(now))
-	for h: Label in _headers:
-		h.get_parent().size.x = UiKit.FONT.get_string_size(h.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x + 40.0  # 이름표는 글 길이에 맞춤
+	for h: Label in _headers:  # 이름표는 글 길이에 맞춤
+		h.size = Vector2(ceilf(UiKit.FONT.get_string_size(h.text, HORIZONTAL_ALIGNMENT_LEFT, -1, UiKit.SUB).x), HEAD_H - UiKit.SHADOW_Y)
+		h.get_parent().size.x = h.size.x + UiKit.PAD * 2.0
 	for i in 6:
 		_fill_note(_notes[i], i >= 3, i % 3)
 
 
 func _draw_rank() -> void:
 	var level: int = main.save.data.rank.level
-	UiKit.draw_rank_ring(_rank, Vector2(52, 48), 40.0, level)
+	UiKit.draw_rank_ring(_rank, Vector2(44, 40), 30.0, level)
 	var k := float(main.save.data.rank.xp) / CatRank.next_xp(level)
-	UiKit.draw_bar(_rank, Rect2(116, 54, 620, 26), k, Color("#e98a7a"))
+	UiKit.draw_bar(_rank, Rect2(104, 50, 640, 26), k, UiKit.ORANGE)
 
 
 ## 쪽지 한 장을 다시 만든다
@@ -105,6 +107,8 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	for child in note.get_children():
 		note.remove_child(child)
 		child.queue_free()
+	note.rotation = 0.0
+	note.set_meta("wobble", false)
 	var list: Array = main.save.data.missions.weekly if weekly else main.save.data.missions.daily
 	if slot >= list.size():
 		return
@@ -112,58 +116,66 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	var row: Dictionary = MissionTable.WEEKLY[entry.id] if weekly else MissionTable.DAILY[entry.id]
 	var reward := Missions.reward(entry.id)
 	var key := _key(weekly, slot)
-	var paper := UiKit.paper("note")
+	var paper := UiKit.panel("note")
 	paper.set_anchors_preset(Control.PRESET_FULL_RECT)
 	note.add_child(paper)
-	var pin := UiKit.icon(UiKit.PIN_RED if not weekly else UiKit.PIN_YELLOW, 34)
-	pin.position = Vector2(NOTE.x * 0.5 - 17, -18)
+	var pin := UiKit.icon(UiKit.PIN_RED if not weekly else UiKit.PIN_YELLOW, PIN_SIZE)
+	pin.position = PIN
 	note.add_child(pin)
-	var art := UiKit.icon(UiKit.ICONS[STAT_ICONS.get(row.stat, "note_check")], 58)
-	art.position = Vector2(20, 22)
-	note.add_child(art)
-	var text := UiKit.label(UiKit.wrap(Missions.text(entry.id), 29, NOTE.x - 104), 29)  # 띄어쓰기에서만 줄바꿈
-	text.position = Vector2(88, 14)
-	text.size = Vector2(NOTE.x - 104, 76)
+	var base := UiKit.icon_base(UiKit.ICONS[STAT_ICONS.get(row.stat, "note_check")], UiKit.BASE_S)
+	base.position = Vector2(UiKit.PAD, UiKit.PAD)
+	note.add_child(base)
+	var text_x := UiKit.PAD * 2.0 + UiKit.BASE_S
+	var text := UiKit.label("")
+	text.position = Vector2(text_x, 10)
+	text.size = Vector2(NOTE.x - text_x - UiKit.PAD, 76)
+	UiKit.wrap_fit(text, Missions.text(entry.id), text.size.x, 2, UiKit.BODY)  # 띄어쓰기에서만 줄바꿈, 두 줄 안
 	note.add_child(text)
 	# 진행 막대 + 숫자
 	var bar := Control.new()
-	bar.position = Vector2(24, 94)
-	bar.size = Vector2(NOTE.x - 48, 32)
+	bar.position = Vector2(UiKit.PAD, 86)
+	bar.size = Vector2(NOTE.x - UiKit.PAD * 2.0, 32)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.draw.connect(func() -> void:
-		UiKit.draw_bar(bar, Rect2(0, 6, bar.size.x - COUNT_W - 10, 20), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else ShopScreen.DOT_ON))
-	var count := UiKit.label("%s/%s" % [UiKit.comma(entry.progress), UiKit.comma(entry.target)], 26, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
-	UiKit.fit(count, COUNT_W, 26)  # 99,999/99,999도 칸 안에
+		UiKit.draw_bar(bar, Rect2(0, 3, bar.size.x - COUNT_W - UiKit.GAP, 26), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else UiKit.ORANGE))
+	var count := UiKit.label("%s/%s" % [UiKit.comma(entry.progress), UiKit.comma(entry.target)], UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
+	UiKit.fit(count, COUNT_W, UiKit.SUB)  # 99,999/99,999도 칸 안에
 	count.position = Vector2(bar.size.x - COUNT_W, 0)
 	count.size = Vector2(COUNT_W, 32)
 	bar.add_child(count)
 	note.add_child(bar)
-	# 보상
-	var gift := HBoxContainer.new()
-	gift.position = Vector2(18, NOTE.y - 100)
-	gift.size = Vector2(176, 88)
-	gift.add_theme_constant_override("separation", 4)
-	gift.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	gift.add_child(UiKit.icon(UiKit.ICONS.fish, 40))
-	gift.add_child(UiKit.label(UiKit.comma(reward.fish), 28))
-	gift.add_child(UiKit.label("+%d" % reward.xp, 22, Color("#c0605a")))  # 등급 경험치
+	# 보상: 생선 + 숫자, 아래 경험치
+	var bottom := NOTE.y - UiKit.SHADOW_Y - UiKit.GAP - UiKit.MIN_BUTTON  # 아래 줄 위 (버튼과 같은 높이)
+	var fish := UiKit.icon(UiKit.ICONS.fish, 40)
+	fish.position = Vector2(UiKit.PAD, bottom + 4)
+	note.add_child(fish)
+	var gift := UiKit.label(UiKit.comma(reward.fish), UiKit.NUM)
+	gift.position = Vector2(UiKit.PAD + 48, bottom)
+	gift.size = Vector2(120, 48)
+	UiKit.fit(gift, gift.size.x, UiKit.NUM)
 	note.add_child(gift)
+	var xp := UiKit.label("경험치 +%d" % reward.xp, UiKit.SUB, UiKit.SUB_BROWN)  # 등급 경험치
+	xp.position = Vector2(UiKit.PAD, bottom + 52)
+	xp.size = Vector2(160, 32)
+	note.add_child(xp)
+	var spot := Vector2(NOTE.x - UiKit.PAD - 152, bottom)
 	# 버튼: 받기 / 바꾸기 / (받음 = 도장)
 	if Missions.can_claim(entry):
-		var take := UiKit.button("받기", "orange", null, 38)
+		var take := UiKit.button("받기", "orange")
 		take.name = "Claim"
-		take.position = Vector2(NOTE.x - 168, NOTE.y - 100)
-		take.size = Vector2(150, UiKit.MIN_BUTTON)
+		take.hot = true
+		take.position = spot
+		take.size = Vector2(152, UiKit.MIN_BUTTON)
 		take.pressed.connect(claim.bind(weekly, slot))
 		note.add_child(take)
+		note.set_meta("wobble", true)  # 받을 쪽지는 살짝 흔들림
 	elif entry.done:
 		var stamp := UiKit.icon(UiKit.ICONS.stamp, 96)
 		stamp.name = "Stamp"
-		stamp.position = Vector2(NOTE.x - 132, NOTE.y - 100)  # 진행 숫자 아래 (겹치지 않게)
-		stamp.size = Vector2(96, 96)
+		stamp.position = Vector2(NOTE.x - UiKit.PAD - 112, bottom)
 		stamp.pivot_offset = stamp.size * 0.5  # 가운데를 축으로 기울임
 		stamp.rotation = -0.2
-		stamp.modulate = Color(1, 1, 1, 0.9)
+		stamp.modulate.a = 0.9
 		note.add_child(stamp)
 		if _stamped.has(key):
 			var got: int = _stamped[key]
@@ -173,15 +185,11 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		var price := Missions.swap_price(main.save.data, weekly)
 		var asking: bool = _confirm.key == key
 		# 값을 먼저 보여 주고, 한 번 누르면 "정말?" (진행이 사라지므로)
-		var swap := UiKit.button("정말?" if asking else UiKit.comma(price), "orange" if asking else "cream", UiKit.ICONS.swap, 28)
+		var swap := UiKit.button("정말?" if asking else UiKit.comma(price), "orange" if asking else "cream", UiKit.ICONS.swap, UiKit.SUB)
 		swap.name = "Swap"
-		swap.add_theme_constant_override("icon_max_width", 34)
-		for state in ["normal", "hover", "pressed", "hover_pressed"]:
-			var style: StyleBoxTexture = swap.get_theme_stylebox(state)
-			style.content_margin_left = 14.0
-			style.content_margin_right = 14.0
-		swap.position = Vector2(NOTE.x - 168, NOTE.y - 100)
-		swap.size = Vector2(150, UiKit.MIN_BUTTON)
+		swap.add_theme_constant_override("icon_max_width", 36)
+		swap.position = spot
+		swap.size = Vector2(152, UiKit.MIN_BUTTON)
 		swap.pressed.connect(swap_pressed.bind(weekly, slot))
 		note.add_child(swap)
 
@@ -206,7 +214,7 @@ func claim(weekly: bool, slot: int) -> void:
 func _stamp_hit(note: Control, stamp: Control, got: int) -> void:
 	thump(to_box(stamp, stamp.size * 0.5))
 	main.play_ui("claim")
-	fly_to_wallet(note.position + Vector2(90, NOTE.y - 54), got)
+	fly_to_wallet(note.position + Vector2(UiKit.PAD + 20, NOTE.y - 64), got)
 
 
 ## 열 때 지난번보다 등급이 올랐으면 리본 배지를 쿵 (판에서 미션을 깨 오른 등급)
@@ -246,12 +254,15 @@ func swap_pressed(weekly: bool, slot: int) -> void:
 	refresh()
 	# 쪽지가 뒤집히듯 (가로로 접혔다 펴짐)
 	var note: Control = _notes[slot + (3 if weekly else 0)]
-	note.pivot_offset = NOTE * 0.5
 	note.scale = Vector2(0.05, 1.0)
 	note.create_tween().tween_property(note, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
 func _process(delta: float) -> void:
+	_wobble_t = fmod(_wobble_t + delta, WOBBLE_TIME)
+	for note: Control in _notes:
+		if note.get_meta("wobble", false):
+			note.rotation = WOBBLE * sin(TAU * _wobble_t / WOBBLE_TIME + note.position.x * 0.01)
 	if _confirm.key != "":
 		_confirm.t += delta
 		if _confirm.t > CONFIRM_TIME:

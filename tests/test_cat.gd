@@ -152,14 +152,9 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝
 func test_달리기_프레임은_몸_중심이_흔들리지_않는다() -> void:
 	# 꼬리 쪽(왼쪽 30%)을 뺀 불투명 픽셀의 가로 무게중심이 프레임마다 거의 같아야 화면이 떨리지 않는다.
 	# 앉은 그림은 꼬리만 달라 무게중심 대신 오른쪽 끝(얼굴·가슴)을 맞춤 (review/v0.7.0/2c-fix/cut_sit.py): 모두 같은 오른쪽 끝
-	var sit_right := -1
-	for frame in CatPose.SIT_FRAMES + ["sit_blink"]:
-		var right: int = load(CatView.FRAME_DIR + frame + ".png").get_image().get_used_rect().end.x
-		sit_right = right if sit_right < 0 else sit_right
-		assert_true(absi(right - sit_right) <= 2, "%s 오른쪽 끝 %d (sit_2 %d)" % [frame, right, sit_right])
 	for frame in CatPose.ALL_FRAMES:
-		if frame in CatPose.SIT_FRAMES and frame != "sit_0" or frame == "sit_blink":
-			continue
+		if frame.begins_with("sit_body"):
+			continue  # 앉은 몸은 한 장이라 떨릴 수 없음 (test_앉은_고양이는_바닥이_0px도_움직이지_않는다)
 		var image: Image = load(CatView.FRAME_DIR + frame + ".png").get_image()
 		var used := image.get_used_rect()
 		var left := used.position.x + used.size.x * 0.3
@@ -288,22 +283,58 @@ func test_공중제비_회전축은_몸_가운데() -> void:
 
 
 func test_시작_화면은_앉아서_꼬리를_천천히_흔들고_가끔_눈을_깜빡인다() -> void:
-	var frames := []
+	var tails := []
 	var blinks := 0
 	var t := 0.0
-	while t < CatPose.SIT_STEP * 4.0 * CatPose.SIT_BLINK_EVERY:
-		var f := CatPose.sit_frame(t)
-		assert_true(f.begins_with("sit_") and f != "sit_up", "앉은 그림 %s" % f)
-		if frames.is_empty() or frames[-1] != f:
-			frames.append(f)
-		blinks += int(f == "sit_blink")
+	while t < CatPose.SIT_WAG:
+		var tail := CatPose.sit_tail(t)
+		if tails.is_empty() or tails[-1] != tail:
+			tails.append(tail)
 		t += 0.01
-	assert_eq(frames.slice(0, 4), ["sit_2", "sit_0", "sit_1", "sit_0"], "꼬리 아래 → 가운데 → 위 → 가운데")
-	assert_eq(frames.count("sit_blink"), 1, "세 바퀴에 한 번 깜빡")
-	assert_true(blinks * 0.01 <= CatPose.SIT_BLINK_TIME + 0.011, "깜빡임은 짧게")
-	# 눈 감은 그림은 꼬리 가운데 그림(sit_0) 사이에만 (꼬리가 튀지 않게)
-	var i: int = frames.find("sit_blink")
-	assert_eq([frames[i - 1], frames[i + 1]], ["sit_0", "sit_0"])
+	assert_eq(tails, [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0], "꼬리 8장을 한 칸씩 오감 (건너뛰지 않음)")
+	var blink_frames := 0
+	t = 0.0
+	while t < CatPose.SIT_BLINK_EVERY * 3.0:
+		blink_frames += int(CatPose.sit_frame(t) == "sit_body_blink")
+		blinks += int(CatPose.sit_frame(t) == "sit_body_blink" and CatPose.sit_frame(t - 0.01) == "sit_body")
+		t += 0.01
+	assert_eq(blinks, 3, "간격마다 한 번 깜빡")
+	assert_true(blink_frames * 0.01 <= 3.0 * (CatPose.SIT_BLINK_TIME + 0.011), "깜빡임은 짧게")
+
+
+func test_앉은_고양이는_바닥이_0px도_움직이지_않는다() -> void:
+	# 몸 그림(눈 뜸·감음)의 아랫줄 모양이 같고, 꼬리는 바닥선 아래로 내려가지 않는다 (사용자 피드백: 위아래로 흔들림)
+	var body: Image = load(CatView.FRAME_DIR + "sit_body.png").get_image()
+	var blink: Image = load(CatView.FRAME_DIR + "sit_body_blink.png").get_image()
+	var ground := body.get_used_rect().end.y
+	assert_eq(blink.get_used_rect().end.y, ground)
+	var checked := 0
+	for x in range(0, body.get_width(), 2):  # 바닥에 닿는 열(엉덩이·앞발)마다 가장 아래 불투명 픽셀이 같다 (위치 차이 0px)
+		if _bottom(body, x) >= ground - 12:
+			assert_eq(_bottom(blink, x), _bottom(body, x), "열 %d" % x)
+			checked += 1
+	assert_true(checked > 40, "바닥 닿는 열 %d" % checked)
+	for i in CatPose.SIT_TAILS:
+		var tail: Image = load(CatView.FRAME_DIR + "sit_tail_%d.png" % i).get_image()
+		assert_true(tail.get_used_rect().end.y <= ground, "꼬리 %d 바닥 아래로 안 감" % i)
+	# 숨쉬기는 노드 원점(발끝)을 기준으로 곱해 바닥이 그대로
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames()
+	for t in [0.0, 0.5, 1.0, 1.5]:
+		cat.position = Vector2(100, 200)
+		cat.show_sit(t)
+		var sprite: Sprite2D = cat.get_node("Sprite")
+		assert_true((sprite.global_transform * (CatView.ANCHOR + sprite.offset)).distance_to(cat.global_position) < 0.01, "발끝 %s" % t)
+		assert_true(cat.get_node("Tail").visible, "앉으면 꼬리")
+	cat.queue_free()
+
+
+static func _bottom(img: Image, x: int) -> int:
+	for y in range(img.get_height() - 1, -1, -1):
+		if img.get_pixel(x, y).a > 0.08:
+			return y
+	return -1
 
 
 func test_시작을_누르면_일어나는_그림을_잠깐_보이고_달린다() -> void:
@@ -312,10 +343,10 @@ func test_시작을_누르면_일어나는_그림을_잠깐_보이고_달린다(
 	await wait_frames()
 	var sim := _sim_on_roofs([{"left": 0.0, "right": 4000.0, "top": 0.0}])
 	cat.show_sit(0.0)
-	assert_eq(cat.frame_name, "sit_2")
+	assert_eq(cat.frame_name, "sit_body")
 	cat.show_state(sim, 0.0)  # 시작 화면은 dt 0으로 자리만 맞춤: 일어나지 않음
 	cat.show_sit(0.5)
-	assert_eq(cat.frame_name, "sit_0")
+	assert_eq(cat.frame_name, "sit_body")
 	sim.step(DT, false)
 	cat.show_state(sim, DT)
 	assert_eq(cat.frame_name, "sit_up", "시작 첫 순간")
