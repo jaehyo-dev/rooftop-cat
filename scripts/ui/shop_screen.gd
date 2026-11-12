@@ -22,6 +22,8 @@ const WORLD := preload("res://scripts/world_view.gd")  # 생선 그림 4단계 (
 const ROW_H := 90.0
 const DESC_W := 470.0  # 설명 글 폭 (패널 손그림 테두리 안)
 const DOT_R := 9.0
+const DOT_ON := Color("#f0a04b")         # 채운 단계 점
+const DOT_ON_PICKED := Color("#9a4a1c")  # 고른 줄(주황 버튼) 위에서는 주황 점이 안 보여 진하게 (2c-juice 눈 검수)
 
 var tab := "upgrades"
 var selected := "dash"
@@ -33,7 +35,7 @@ var _art := UiKit.icon(null, 180)
 var _title := UiKit.label("", 48, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _desc := UiKit.label("", 30, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _now := UiKit.label("", 38, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-var _next := UiKit.label("", 38, UiKit.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
+var _next := UiKit.label("", 38, Color("#4b7a36"), HORIZONTAL_ALIGNMENT_CENTER)  # 크림 위에서 읽히게 막대 초록보다 진하게
 var _buy := UiKit.button("", "orange", UiKit.ICONS.fish, 46)
 var _pop_dot := {"kind": "", "t": 99.0}  # 방금 채운 단계 점 (톡 튀기)
 var _hold := {}    # 생선이 날아오는 동안 단계 점을 산 전 단계로 그림 (종류 → 단계)
@@ -176,7 +178,7 @@ func _draw_dots(dots: Control, kind: String) -> void:
 		if _pop_dot.kind == kind and i == lv - 1:
 			r *= 1.0 + 0.8 * maxf(0.0, 1.0 - _pop_dot.t / 0.35)
 		dots.draw_circle(at, r + 2.0, UiKit.BROWN)
-		dots.draw_circle(at, r, Color("#f0a04b") if i < lv else UiKit.CREAM)
+		dots.draw_circle(at, r, (DOT_ON_PICKED if kind == selected else DOT_ON) if i < lv else UiKit.CREAM)
 
 
 func _process(delta: float) -> void:

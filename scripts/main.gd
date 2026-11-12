@@ -204,7 +204,7 @@ func _on_game_over(meters: int) -> void:
 			"new_best": run.new_best, "t": 0.0, "extras": false}
 	boosters_on = []  # 결과 카드의 부스터 칸은 늘 꺼진 채로 (실수로 계속 쓰지 않게, PLAN 1번)
 	# 한 줄 안내: v0.7.0 처음 켬(점수 기준이 바뀜) → 첫 판(상점 안내)
-	_hint.text = "점수 계산이 바뀌어 최고 점수를 새로 시작해요" if save.score_reset else ("상점에서 강화를 살 수 있어요" if save.data.stats.runs == 1 else "")
+	_hint.text = "점수 계산이 바뀌어 최고 점수를 새로 시작해요" if save.score_reset else ("메인 화면의 상점에서 강화를 살 수 있어요" if save.data.stats.runs == 1 else "")
 	save.score_reset = false
 	_extras.clear()
 	_count_result(0.0)
@@ -242,6 +242,17 @@ func _count_result(delta: float) -> void:
 func _draw_card() -> void:
 	var card: Control = $GameOver/Card
 	var rect := Rect2(Vector2.ZERO, card.size)
+	if UiKit.look != "old":  # 깔끔한 종이 (2c 피드백): 번짐·빗금 없이 크림 판 + 같은 굵기 갈색 테두리 + 그림자
+		var flat := StyleBoxFlat.new()
+		flat.set_corner_radius_all(26)
+		flat.anti_aliasing = true
+		flat.bg_color = CARD_SHADOW
+		card.draw_style_box(flat, Rect2(rect.position + Vector2(8, 10), rect.size))
+		flat.bg_color = CARD_PAPER
+		flat.border_color = CARD_LINE
+		flat.set_border_width_all(4)
+		card.draw_style_box(flat, rect)
+		return
 	var paper := Juice.wobbly_rect(rect, 1, CARD_WOBBLE)
 	var shadow := PackedVector2Array()
 	for p in paper:
@@ -355,7 +366,7 @@ func _build_menus() -> void:
 	home.custom_minimum_size = Vector2(200, 100)
 	home.pressed.connect(go_home)
 	row.add_child(home)
-	_result_dot.position = Vector2(-8, -10)  # 받을 미션 보상 수
+	_result_dot.position = Vector2(home.custom_minimum_size.x - 30.0, -10)  # 받을 미션 보상 수: 오른쪽 위 (왼쪽 위는 부스터 칸에 닿음)
 	home.add_child(_result_dot)
 	box.add_child(row)
 	_extras = ResultExtras.new(self)

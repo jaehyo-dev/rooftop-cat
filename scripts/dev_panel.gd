@@ -23,9 +23,46 @@ static func attach(main: Node) -> void:
 	var host := str(JavaScriptBridge.eval("location.hostname"))
 	if host.ends_with("github.io"):
 		return
+	# 눈 검수 캡처: tools/는 보통 웹 빌드에서 빠지므로 검수용 빌드(review/v0.7.0/2c-juice/export_qa.sh)에서만 있음
+	if not _qa and ResourceLoader.exists(QA) and "qa=" in str(JavaScriptBridge.eval("location.search")):
+		_qa = true
+		main.get_tree().root.add_child.call_deferred(load(QA).new())
 	var panel := DevPanel.new()
 	panel._main = main
 	main.add_child(panel)
+	_add_look_toggle(main)
+
+
+## 임시 (PLAN 18 "임시", 사용자가 고르면 지움): 메뉴 그림 A(깔끔한 종이) ↔ B(거의 평면) 바꾸기. 위 가운데에서 오른쪽으로 조금
+## (상점 탭과 지갑 사이 빈 곳), 모든 화면에서 보임.
+## 누르면 장면을 다시 불러 모든 메뉴를 새 그림으로 만들고, 상점·미션에 있었으면 다시 연다
+static var _reopen := ""
+static var _qa := false
+const QA := "res://tools/qa_web.gd"
+
+
+static func _add_look_toggle(main: Node) -> void:
+	var b := Button.new()
+	b.name = "LookToggle"
+	b.text = "UI " + UiKit.look.to_upper()
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 26)
+	b.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, 6)
+	b.custom_minimum_size = Vector2(110, 50)
+	b.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	b.offset_left += 200.0
+	b.offset_right += 200.0
+	b.pressed.connect(func() -> void:
+		UiKit.look = "b" if UiKit.look == "a" else "a"
+		_reopen = main.screen
+		main.get_tree().reload_current_scene())
+	main.add_child(b)
+	main.get_node("World").touch_blockers.append(b)
+	if _reopen == "shop":
+		main.open_shop.call_deferred("upgrades")
+	elif _reopen == "missions":
+		main.open_missions.call_deferred()
+	_reopen = ""
 
 
 func _ready() -> void:

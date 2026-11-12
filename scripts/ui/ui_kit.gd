@@ -13,14 +13,41 @@ const MIN_BUTTON := 88.0
 const FONT_MIN := 18  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서도 읽히게)
 const FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
 
-## 종이 그림과 9칸 나누기 여백 (그림 픽셀, 가장자리 손그림 테두리가 늘어나지 않게)
+## 종이 그림과 9칸 나누기 여백 (그림 픽셀, 가장자리 테두리가 늘어나지 않게).
+## "old" = 2c 색연필 시트(Codex), "a"·"b" = tools/make_ui_paper.py 깔끔한 종이(a 옅은 결 / b 평면, 2c 피드백)
 const PAPER := {
-	"panel": [preload("res://assets/sprites/ui/panel.png"), 34],
-	"note": [preload("res://assets/sprites/ui/note.png"), 40],
-	"cork": [preload("res://assets/sprites/ui/cork.png"), 44],
-	"orange": [preload("res://assets/sprites/ui/button_orange.png"), 40],
-	"cream": [preload("res://assets/sprites/ui/button_cream.png"), 40],
+	"old": {
+		"panel": [preload("res://assets/sprites/ui/panel.png"), 34],
+		"note": [preload("res://assets/sprites/ui/note.png"), 40],
+		"cork": [preload("res://assets/sprites/ui/cork.png"), 44],
+		"orange": [preload("res://assets/sprites/ui/button_orange.png"), 40],
+		"cream": [preload("res://assets/sprites/ui/button_cream.png"), 40],
+	},
+	"a": {
+		"panel": [preload("res://assets/sprites/ui/clean_a/panel.png"), 40],
+		"note": [preload("res://assets/sprites/ui/clean_a/note.png"), 30],
+		"cork": [preload("res://assets/sprites/ui/clean_a/cork.png"), 48],
+		"orange": [preload("res://assets/sprites/ui/clean_a/orange.png"), 40],
+		"cream": [preload("res://assets/sprites/ui/clean_a/cream.png"), 40],
+	},
+	"b": {
+		"panel": [preload("res://assets/sprites/ui/clean_b/panel.png"), 40],
+		"note": [preload("res://assets/sprites/ui/clean_b/note.png"), 30],
+		"cork": [preload("res://assets/sprites/ui/clean_b/cork.png"), 48],
+		"orange": [preload("res://assets/sprites/ui/clean_b/orange.png"), 40],
+		"cream": [preload("res://assets/sprites/ui/clean_b/cream.png"), 40],
+	},
 }
+## 임시 (PLAN 18 "임시"): 메뉴 그림 고르기. 사용자가 A·B 중 하나를 고르면 이 변수와 PAPER의 다른 묶음, LookToggle을 지운다
+static var look := "a"
+
+
+## 결이 있는 깔끔한 종이(a의 판·쪽지·코르크)는 결이 늘어나 번져 보이지 않게 바둑판처럼 이어 붙임 (그림은 가운데 칸 크기로 결이
+## 되풀이되게 그려 이음매가 없음, tools/make_ui_paper.py). 버튼은 위아래 밝기 차이가 있어 늘임
+static func _stretch(kind: String) -> int:
+	return NinePatchRect.AXIS_STRETCH_MODE_TILE if look == "a" and kind in ["panel", "note", "cork"] else NinePatchRect.AXIS_STRETCH_MODE_STRETCH
+
+
 const PIN_RED := preload("res://assets/sprites/ui/pin_red.png")
 const PIN_YELLOW := preload("res://assets/sprites/ui/pin_yellow.png")
 const CLIP := preload("res://assets/sprites/ui/clip.png")
@@ -66,8 +93,10 @@ const STAMP_TIME := 0.2  # 휙 내려오는 시간 (그 뒤 0.16초 눌렸다 �
 ## 종이 패널 (9칸 늘림)
 static func paper(kind: String = "panel") -> NinePatchRect:
 	var rect := NinePatchRect.new()
-	rect.texture = PAPER[kind][0]
-	var m: int = PAPER[kind][1]
+	rect.texture = PAPER[look][kind][0]
+	var m: int = PAPER[look][kind][1]
+	rect.axis_stretch_horizontal = _stretch(kind)
+	rect.axis_stretch_vertical = _stretch(kind)
 	rect.patch_margin_left = m
 	rect.patch_margin_top = m
 	rect.patch_margin_right = m
@@ -78,8 +107,10 @@ static func paper(kind: String = "panel") -> NinePatchRect:
 
 static func _box(kind: String, tint: Color = Color.WHITE) -> StyleBoxTexture:
 	var box := StyleBoxTexture.new()
-	box.texture = PAPER[kind][0]
-	box.set_texture_margin_all(PAPER[kind][1])
+	box.texture = PAPER[look][kind][0]
+	box.set_texture_margin_all(PAPER[look][kind][1])
+	box.axis_stretch_horizontal = _stretch(kind)
+	box.axis_stretch_vertical = _stretch(kind)
 	box.set_content_margin_all(14.0)
 	box.content_margin_left = 26.0
 	box.content_margin_right = 26.0

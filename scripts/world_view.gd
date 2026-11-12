@@ -1108,8 +1108,8 @@ func _draw_overlay() -> void:
 		_draw_edge(DANGER_COLOR, DANGER_ALPHA + DANGER_PULSE * absf(sin(PI * sim.elapsed)))
 	if _dash_mood > 0.0:
 		_draw_edge(DASH_EDGE_COLOR, _dash_mood * (DASH_EDGE_ALPHA + DASH_EDGE_PULSE * absf(sin(TAU * sim.elapsed))))  # 금빛이 은은하게 일렁임
-	if waiting:
-		return  # 시작 화면: 하트·상태 표시 없이 옥상과 고양이만
+	if waiting or can_restart():
+		return  # 시작 화면: 하트·상태 표시 없이 옥상과 고양이만. 결과 카드 뒤에서도 하트 숨김 (판 HUD, 2c 피드백)
 	_draw_hearts()
 	if not sim.game_over:
 		_draw_speed_lines()

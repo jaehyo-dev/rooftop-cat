@@ -88,6 +88,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 
 ## 직접 만든 것
 
+- 메뉴 효과음 4종 `assets/audio/sfx/whoosh·thud·fanfare·pop_in.wav` (도장 휙, 도장 쿵, 강화 10단계 팡파르, 부스터 쏙): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 다른 메뉴 소리와 같은 -17dB, 강화 사기 소리는 게임에서 단계마다 빠르기를 반음씩 올려 냄
+- 깔끔한 메뉴 종이·버튼 그림 `assets/sprites/ui/clean_a/`, `clean_b/` (판·쪽지·코르크판·주황·크림 버튼, a = 옅은 결, b = 평면): 2026-11-12, `tools/make_ui_paper.py`(numpy, Pillow)로 직접 그림 (결은 시드 고정 난수). 외부 그림 없음
 - 메뉴 효과음 8종 `assets/audio/sfx/buy·booster_buy·booster_on·no_money·claim·rank_up·swap·page.wav` (강화 사기, 부스터 사기, 부스터 켜기, 생선 부족, 미션 받기, 등급 오름, 바꾸기, 화면 넘김): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 생선 소리와 같은 -17dB로 틂
 - 효과음 17종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근, 질주 슝): 2026-11-09, 뒤 5종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
