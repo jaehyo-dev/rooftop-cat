@@ -50,6 +50,7 @@ func test_ART_BIBLE_표와_UiKit_상수가_같다() -> void:
 			assert_true((value as Color).is_equal_approx(Color(row[1])), "%s: 표 %s, 코드 %s" % [name, row[1], (value as Color).to_html()])
 		else:
 			assert_true(is_equal_approx(float(value), float(row[1])), "%s: 표 %s, 코드 %s" % [name, row[1], value])
+	assert_eq(int((UiKit.FONT as FontVariation).spacing_glyph), UiKit.LETTER, "메뉴 글꼴 글자 사이 = 표")
 	# 반대로: 표에 적힌 모양 상수가 빠지지 않게 (색·둥글기·글자·받침)
 	var listed := rows.map(func(r: Array) -> String: return r[0])
 	for name in ["PANEL", "PAPER", "ORANGE", "ORANGE_LIGHT", "ORANGE_DARK", "GREEN", "RED", "BROWN", "R_CHIP", "R_BUTTON", "R_PANEL", "R_PILL",

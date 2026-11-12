@@ -93,7 +93,7 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	assert_true(meters >= 42, "거리 점수 %d m" % meters)
 	assert_true(main.get_node("GameOver").visible, "게임 끝 화면")
 	var score: int = world.sim.score()
-	assert_false(main.get_node("GameOver/Card/Box/Score").text.contains("점수  %s" % UiKit.comma(score)) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
+	assert_false(main.get_node("GameOver/Card/Box/Score").text == UiKit.comma(score) and score > 0, "숫자는 처음부터 다 보이지 않고 차오름")
 	assert_eq(SaveData.open(PATH).best_distance(), meters, "최고 거리 저장")
 	assert_eq(SaveData.open(PATH).best_score(), score, "최고 점수 저장")
 	assert_eq(main.get_node("BestLabel").text, "BEST %s" % UiKit.comma(score))
@@ -108,10 +108,10 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 
 	# 숫자가 다 차오르면 실제 값과 새 기록
 	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout
-	var result: String = main.get_node("GameOver/Card/Box/Stats").text
-	assert_true(result.contains("%s m" % UiKit.comma(meters)), "이번 거리")
-	assert_true(result.contains("먹은 생선") and result.contains("최고 콤보"), result)
-	assert_eq(main.get_node("GameOver/Card/Box/Score").text, "점수  %s" % UiKit.comma(score), "맨 위 점수")
+	assert_eq(main.get_node("GameOver/Card/Box/Stats/Distance/Value").text, "%sm" % UiKit.comma(meters), "이번 거리")
+	assert_eq(main.get_node("GameOver/Card/Box/Stats/Fish/Value").text, UiKit.comma(world.sim.fish), "먹은 생선")
+	assert_eq(main.get_node("GameOver/Card/Box/ScoreHead").text, "점수")
+	assert_eq(main.get_node("GameOver/Card/Box/Score").text, UiKit.comma(score), "맨 위 점수")
 	assert_eq(main.get_node("GameOver/Card/Box/Best").text, "새 기록!", "첫 기록은 새 기록")
 	assert_eq(main.get_node("GameOver").get_child(0).name, &"Celebrate", "축하 별은 카드 뒤 (먼저 그림)")
 	var card: Control = main.get_node("GameOver/Card")
@@ -204,8 +204,8 @@ func test_생선_수와_상자를_보여_주고_게임_끝에_생선을_저장�
 	assert_true(sim.game_over)
 	assert_false(main.get_node("BoxIcon").visible, "상자 표시 꺼짐")
 	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout  # 결과 숫자가 다 차오를 때까지
-	assert_true(main.get_node("GameOver/Card/Box/Stats").text.contains("먹은 생선  %s" % UiKit.comma(sim.fish)), main.get_node("GameOver/Card/Box/Stats").text)
-	assert_eq(main.get_node("GameOver/Card/Box/Total").text, "모은 생선 %s" % UiKit.comma(10 + sim.fish), "모은 생선은 작게 따로")
+	assert_eq(main.get_node("GameOver/Card/Box/Stats/Fish/Value").text, UiKit.comma(sim.fish), "먹은 생선")
+	assert_eq(main.get_node("GameOver/Card/Box/Wallet/Total").text, "가진 생선 %s" % UiKit.comma(10 + sim.fish), "가진 생선은 작게 따로")
 	assert_true(main.get_node("ScoreLabel").text == str(sim.score()), "오른쪽 위 점수")
 	assert_eq(SaveData.open(PATH).fish(), 10 + sim.fish, "모은 생선 저장")
 	main.queue_free()

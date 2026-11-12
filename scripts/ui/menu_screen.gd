@@ -1,7 +1,7 @@
 class_name MenuScreen
 extends Control
 ## 상점·미션 화면의 공통 틀: 멈춘 게임 화면 위 크림 가림막, 가운데 1280x720 상자(휴대폰 1558 넓이에서도 가운데),
-## 왼쪽 위 [뒤로], 오른쪽 위 지갑(빨래집게로 꽂은 알약 칩, 생선이 날아와 닿으면 숫자가 차오름).
+## 왼쪽 위 [뒤로], 오른쪽 위 지갑(알약 칩, 생선이 날아와 닿으면 숫자가 차오름).
 ## 열 때 요소가 차례로 살짝 올라오며 나타나고(UiKit.enter), 닫을 때 흐려지며 사라진다.
 
 signal back
@@ -11,7 +11,7 @@ const OPEN_TIME := 0.25
 const EDGE := 24.0         # 화면 가장자리 여백 (GAP x 3)
 const TOP_H := 96.0        # 위 줄(뒤로·탭·지갑) 높이, 그림자 포함
 const WALLET_W := 288.0
-const WALLET_RIGHT := 56.0  # 지갑 오른쪽 집게 자리
+const WALLET_RIGHT := 24.0  # 지갑 숫자 오른쪽 여백 (둥근 끝)
 
 var main: Node
 var box := Control.new()
@@ -44,6 +44,7 @@ func _init(main_node: Node, screen_name: String) -> void:
 	box.offset_top = -BOX.y * 0.5
 	box.offset_bottom = BOX.y * 0.5
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 줄여 그린 아이콘이 계단지지 않게 (자식이 물려받음)
 	add_child(box)
 	var back_button := UiKit.button("", "cream", UiKit.ICONS.back)
 	back_button.name = "Back"
@@ -66,9 +67,6 @@ func _init(main_node: Node, screen_name: String) -> void:
 	_wallet_label.position = Vector2(UiKit.GAP * 2.0 + UiKit.BASE_S, 0)
 	_wallet_label.size = Vector2(WALLET_W - _wallet_label.position.x - WALLET_RIGHT, TOP_H - UiKit.SHADOW_Y)
 	wallet.add_child(_wallet_label)
-	var clip := UiKit.icon(UiKit.CLIP, 56)
-	clip.position = Vector2(wallet.size.x - 64, -UiKit.PAD)
-	wallet.add_child(clip)
 	box.add_child(wallet)
 
 

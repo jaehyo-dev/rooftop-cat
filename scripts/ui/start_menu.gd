@@ -15,14 +15,16 @@ const CARD_TOP := 128.0   # 카드 위 (정보 띠 아래)
 const BAND_H := 88.0      # 정보 띠 높이 (그림자 포함)
 const BAND := 256.0       # 최고 기록·지갑 띠 넓이
 const RANK_BAND := 328.0  # 등급 띠 넓이
-const ROLL_TIME := 0.6    # 정보 띠 숫자가 굴러가며 차오르는 시간
+const ROLL_TIME := 0.6
+const XP_W := 80.0        # 등급 띠 경험치 숫자 칸    # 정보 띠 숫자가 굴러가며 차오르는 시간
 
 var main: Node
 var boosters: BoosterSlots
 var card := Control.new()
-var _best := UiKit.label("0", UiKit.NUM, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
-var _wallet := UiKit.label("0", UiKit.NUM, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
+var _best := UiKit.label("0", UiKit.NUM)
+var _wallet := UiKit.label("0", UiKit.NUM)
 var _rank_name := UiKit.label("", UiKit.SUB)
+var _rank_xp := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
 var _rank_bar := Control.new()
 var _mission_dot := UiKit.badge()
 var _shop_dot := UiKit.badge(28.0)  # 새로 살 수 있는 강화 (숫자 없는 점)
@@ -36,6 +38,7 @@ func _init(main_node: Node) -> void:
 	name = "StartMenu"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 줄여 그린 아이콘이 계단지지 않게
 
 
 func _ready() -> void:
@@ -44,8 +47,8 @@ func _ready() -> void:
 	refresh()
 
 
-## 정보 띠: 알약 칩 + 왼쪽 둥근 받침 위 아이콘, 오른쪽에 값
-func _band(art: Texture2D, value: Control, width: float, x: float) -> Control:
+## 정보 띠: 알약 칩 + 왼쪽 둥근 받침 위 아이콘, 오른쪽에 작은 이름표(caption) + 값 (2c-polish 아트 검토: 기록이 화폐처럼 보임)
+func _band(art: Texture2D, value: Control, width: float, x: float, caption: String = "") -> Control:
 	var band := Control.new()
 	band.position = Vector2(x, 0)
 	band.size = Vector2(width, BAND_H)
@@ -56,8 +59,16 @@ func _band(art: Texture2D, value: Control, width: float, x: float) -> Control:
 	var base := UiKit.icon_base(art, UiKit.BASE_S)
 	base.position = Vector2(UiKit.GAP, (BAND_H - UiKit.SHADOW_Y - UiKit.BASE_S) * 0.5).round()
 	band.add_child(base)
-	value.position = Vector2(UiKit.GAP * 2.0 + UiKit.BASE_S, 0)
-	value.size = Vector2(width - value.position.x - UiKit.PAD * 1.5, BAND_H - UiKit.SHADOW_Y)
+	var text_x := UiKit.GAP * 2.0 + UiKit.BASE_S
+	value.position = Vector2(text_x, 0)
+	value.size = Vector2(width - text_x - UiKit.PAD * 1.5, BAND_H - UiKit.SHADOW_Y)
+	if caption != "":
+		var head := UiKit.label(caption, UiKit.SUB, UiKit.SUB_BROWN)
+		head.position = Vector2(text_x, 2)
+		head.size = Vector2(value.size.x, 28)
+		band.add_child(head)
+		value.position.y = 32
+		value.size.y = 44
 	band.add_child(value)
 	return band
 
@@ -66,8 +77,8 @@ func _build_bands() -> void:
 	_bands.name = "Bands"
 	_bands.position = Vector2(EDGE, EDGE)
 	_bands.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bands.add_child(_band(UiKit.ICONS.star, _best, BAND, 0.0))
-	_bands.add_child(_band(UiKit.ICONS.fish, _wallet, BAND, BAND + UiKit.PAD))
+	_bands.add_child(_band(UiKit.ICONS.star, _best, BAND, 0.0, "최고 점수"))
+	_bands.add_child(_band(UiKit.ICONS.fish, _wallet, BAND, BAND + UiKit.PAD, "가진 생선"))
 	# 등급: 이름 + 경험치 막대 (세로 가운데)
 	var rank := Control.new()
 	rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -75,8 +86,11 @@ func _build_bands() -> void:
 	_rank_name.position = Vector2(0, UiKit.GAP)
 	_rank_name.size = Vector2(inner_w, 32)
 	rank.add_child(_rank_name)
+	_rank_xp.position = Vector2(inner_w - XP_W, 38)  # 막대 오른쪽에 경험치 숫자
+	_rank_xp.size = Vector2(XP_W, 32)
+	rank.add_child(_rank_xp)
 	_rank_bar.position = Vector2(0, 46)
-	_rank_bar.size = Vector2(inner_w, 22)
+	_rank_bar.size = Vector2(inner_w - XP_W - UiKit.GAP, 22)
 	rank.add_child(_rank_bar)
 	_rank_bar.draw.connect(func() -> void:
 		var r: Dictionary = main.save.data.rank
@@ -101,13 +115,28 @@ func _build_card() -> void:
 	box.add_theme_constant_override("separation", int(UiKit.PAD))
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	card.add_child(box)
-	box.add_child(UiKit.label("지붕 위의 고냥이", UiKit.TITLE, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER))
+	var title := Control.new()  # 게임 이름은 리본 위에 (2c-polish 아트 검토: 보통 글씨 한 줄뿐)
+	title.name = "Title"
+	title.custom_minimum_size = Vector2(0, 72)
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title.draw.connect(func() -> void:
+		var w := title.size.x - UiKit.PAD * 3.0
+		UiKit.draw_ribbon(title, Rect2((title.size.x - w) * 0.5, 0, w, 64)))
+	var title_text := UiKit.on_orange(UiKit.label("지붕 위의 고냥이", UiKit.TITLE, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+	title_text.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title_text.offset_bottom = -8
+	UiKit.fit(title_text, CARD_W - UiKit.PAD * 3.0 - UiKit.PAD * 4.0, UiKit.TITLE)  # 리본 띠 안
+	title.add_child(title_text)
+	box.add_child(title)
 	var go := UiKit.button("시작", "orange", null, UiKit.TITLE)
 	go.name = "Start"
 	go.hot = true  # 가만히 있어도 빛이 지나감 (누를 곳)
 	go.custom_minimum_size = Vector2(0, 112)
 	go.pressed.connect(func() -> void: start.emit())
 	box.add_child(go)
+	var slots_head := UiKit.label("부스터 켜고 시작", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	slots_head.name = "SlotsHead"
+	box.add_child(slots_head)
 	boosters = BoosterSlots.new(main)
 	boosters.alignment = BoxContainer.ALIGNMENT_CENTER
 	boosters.want_shop.connect(func() -> void: open_shop.emit("boosters"))
@@ -139,7 +168,9 @@ func refresh() -> void:
 	_roll(_wallet, save.fish())
 	var r: Dictionary = save.data.rank
 	_rank_name.text = "%s %d등급" % [CatRank.rank_name(r.level), r.level]
-	UiKit.fit(_rank_name, RANK_BAND - UiKit.GAP * 2.0 - UiKit.BASE_S - UiKit.PAD * 1.5, UiKit.SUB)
+	_rank_xp.text = "%s/%s" % [UiKit.comma(r.xp), UiKit.comma(CatRank.next_xp(r.level))]
+	UiKit.fit(_rank_xp, XP_W, UiKit.SUB)
+	UiKit.fit(_rank_name, _rank_name.size.x, UiKit.SUB)
 	_rank_bar.queue_redraw()
 	UiKit.badge_text(_mission_dot, Missions.pending(save.data))
 	_shop_dot.visible = main.shop_has_new()

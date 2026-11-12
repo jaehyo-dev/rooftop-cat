@@ -13,7 +13,7 @@ var gloss_color := UiKit.GLOSS
 var inner_fill := Color.TRANSPARENT  # 테두리 안쪽 inner_inset 만큼 들어간 판 색 (코르크판)
 var inner_inset := 0.0
 var press := 0.0   # 0..1 눌림
-var lift := 0.0    # 0..1 고름 (떠오름)
+var lift := 0.0    # 0..1 고름 (떠오름 + 갈색 테두리 안쪽에 주황 고리: 테두리가 굵고 진해 보이게)
 var shine := -1.0  # 0..1 지나가는 빛 자리 (음수 = 없음)
 var side := UiKit.PAD  # 왼쪽·오른쪽 안쪽 여백 (아이콘+글자 묶음을 가운데로 둘 때 UiButton이 바꿈)
 
@@ -69,6 +69,8 @@ func _draw(canvas: RID, rect: Rect2) -> void:
 		base.size.y -= UiKit.SHADOW_Y
 		_rounded(canvas, Rect2(base.position + Vector2(0, UiKit.SHADOW_Y), base.size), UiKit.SHADOW, r)
 	_rounded(canvas, body, fill, r, UiKit.LINE, border)
+	if lift > 0.0:
+		_rounded(canvas, body.grow(-UiKit.LINE), Color.TRANSPARENT, maxf(0.0, r - UiKit.LINE), UiKit.LINE, Color(UiKit.ORANGE_DARK, lift))
 	if inner_inset > 0.0:
 		var inside := body.grow(-inner_inset)
 		_rounded(canvas, inside, inner_fill, maxf(4.0, r - inner_inset), UiKit.LINE * 0.5, border)

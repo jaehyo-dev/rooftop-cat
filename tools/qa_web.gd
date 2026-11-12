@@ -261,17 +261,28 @@ func _shots() -> void:
 
 # --- GIF ---
 
-func _rec(name: String, on: bool) -> void:
-	Engine.time_scale = SLOW if on else 1.0
+func _rec(name: String, on: bool, speed: float = SLOW) -> void:
+	Engine.time_scale = speed if on else 1.0
 	JavaScriptBridge.eval("window.qaRec = '%s'" % (name if on else ""))
 	await _wait(0.1)
 
 
 func _gifs() -> void:
-	# 강화 사기 (보통 단계 3 → 4 → 5)
+	# 시작 화면 고양이 10초 (실제 빠르기: 꼬리 8장·숨쉬기·깜빡임, 바닥이 흔들리지 않는지)
 	await _make("normal")
+	await _wait(1.0)
+	await _rec("cat_idle", true, 1.0)
+	await _wait(10.0)
+	await _rec("", false)
+	# 상점: 줄 고르기 (고름이 0.12초에 옮겨 감, 꼬리)
 	main.open_shop("upgrades")
-	await _wait(0.5)
+	await _wait(0.6)
+	await _rec("shop_pick", true)
+	for kind in ["yarn", "combo", "fish", "dash"]:
+		main.shop.pick(kind)
+		await _wait(0.5)
+	await _rec("", false)
+	# 강화 사기 (보통 단계 3 → 4 → 5)
 	await _rec("buy_upgrade", true)
 	main.shop.buy()
 	await _wait(0.9)
@@ -279,6 +290,7 @@ func _gifs() -> void:
 	await _wait(1.2)
 	await _rec("", false)
 	main.go_back()
+	await _wait(0.4)
 	# 강화 10단계 (9 → 10, 생선 점수: 그림도 바뀜)
 	await _make("rich")
 	main.open_shop("upgrades")

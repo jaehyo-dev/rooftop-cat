@@ -23,6 +23,7 @@ const GLOSS := Color("#ffffff8c")       # 윗면 빛 (흰색 55%)
 const SHINE := Color("#ffffff73")       # 지나가는 빛 (흰색 45%)
 const INK := Color("#b83833d9")         # 도장 잉크 (85%)
 const VEIL := Color("#fff3dc99")        # 상점·미션 뒤 가림막 (판 크림 60%)
+const DIM_BACK := Color("#5a301873")    # 결과 카드 뒤 어둡게 (따뜻한 갈색 45%)
 const CREAM := PAPER                    # 주황 위 글자 색
 # --- 모양 ---
 const R_CHIP := 12.0     # 작은 칩·쪽지·게이지 칸
@@ -35,6 +36,7 @@ const PRESS_Y := 4.0     # 누르면 몸이 4px 내려감
 const PRESS_DARKEN := 0.08  # 누르면 8% 어두워짐
 const LIFT_Y := 3.0      # 고른 줄은 3px 떠오름 (그림자가 그만큼 깊어 보임)
 const DIM_ALPHA := 0.5   # 불가·모자람: 50% 흐림
+const DONE_ALPHA := 0.7  # 받은 미션 쪽지: 70% (도장만 진하게)
 const STATE_TIME := 0.12 # 상태 전환 시간 (초)
 const SHINE_EVERY := 2.6 # 지나가는 빛 간격 (초)
 const SHINE_TIME := 0.55 # 빛이 한 번 지나가는 시간 (초)
@@ -43,18 +45,20 @@ const PAD := 16.0        # 판·버튼 안쪽 여백 (GAP x 2)
 # --- 글자 (Gaegu Bold) ---
 const TITLE := 48        # 제목 (갈색)
 const BODY := 34         # 본문 (갈색)
-const SUB := 26          # 보조 (연한 갈색)
+const SUB := 30          # 보조 (연한 갈색). 폰(0.54배)에서 약 16px
 const NUM := 40          # 숫자 (갈색, 지갑·기록·가격)
 const NUM_BIG := 72      # 큰 숫자 (결과 카드 점수 하나)
 const OUTLINE := 6       # 주황·리본 위 크림 글자의 갈색 테두리
+const TEXT_SHADOW_Y := 3 # 주황·리본 위 글자 아래 갈색 그림자 (작은 화면에서도 또렷하게)
 # --- 아이콘 받침 (둥근 크림 받침 + 갈색 링) ---
 const BASE_S := 72.0
 const BASE_L := 152.0
 const BASE_ART := 0.74   # 받침 안 그림 크기 비율
 
 const MIN_BUTTON := 88.0  # 버튼은 화면 높이의 12% 이상
-const FONT_MIN := 18  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서도 읽히게)
-const FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
+const FONT_MIN := 22  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서 약 12px)
+const LETTER := -4    # 글자 사이 (Gaegu는 글자 사이가 넓어 한국어가 낱말로 안 묶여 보임, 2c-polish 아트 검토)
+const FONT := preload("res://scripts/ui/menu_font.tres")  # Gaegu Bold + 글자 사이 LETTER
 
 const PIN_RED := preload("res://assets/sprites/ui/pin_red.png")
 const PIN_YELLOW := preload("res://assets/sprites/ui/pin_yellow.png")
@@ -124,7 +128,7 @@ static func plate(kind: String) -> Plate:
 		"cork":
 			box.fill = WOOD
 			box.inner_fill = CORK
-			box.inner_inset = PAD
+			box.inner_inset = GAP * 1.5
 		"trough":
 			box.fill = TROUGH
 			box.radius = R_PILL
@@ -156,6 +160,9 @@ static func tone_text(b: Button, tone: String) -> void:
 		b.add_theme_color_override(state, color)
 	b.add_theme_color_override("font_outline_color", BROWN)
 	b.add_theme_constant_override("outline_size", OUTLINE if tone == "orange" else 0)
+	b.add_theme_color_override("font_shadow_color", BROWN if tone == "orange" else Color.TRANSPARENT)
+	b.add_theme_constant_override("shadow_offset_x", 0)
+	b.add_theme_constant_override("shadow_offset_y", TEXT_SHADOW_Y)
 
 
 static func label(text: String, font_size: int = BODY, color: Color = BROWN, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -176,6 +183,9 @@ static func label(text: String, font_size: int = BODY, color: Color = BROWN, ali
 static func on_orange(l: Label) -> Label:
 	l.add_theme_color_override("font_color", CREAM)
 	l.add_theme_constant_override("outline_size", OUTLINE)
+	l.add_theme_color_override("font_shadow_color", BROWN)
+	l.add_theme_constant_override("shadow_offset_x", 0)
+	l.add_theme_constant_override("shadow_offset_y", TEXT_SHADOW_Y)
 	return l
 
 
@@ -189,19 +199,34 @@ static func fit(l: Label, width: float, base: int) -> void:
 
 ## 띄어쓰기에서만 줄을 바꾼 글 (width 안, 글자 크기 size). Godot 자동 줄바꿈은 한글을 글자 사이에서도 끊어
 ## "길어져 / 요."처럼 끝 글자가 혼자 남으므로 화면 글은 이걸로 나눈다 (2c-fix). 원래 있던 줄바꿈은 그대로
+## 2c-polish: 줄 수는 그대로 두고 폭을 좁혀 줄 길이를 고르게 (마지막 줄에 한 낱말만 남지 않게)
 static func wrap(text: String, size: int, width: float) -> String:
 	var out := PackedStringArray()
 	for para in text.split("\n"):
-		var line := ""
-		for word in para.split(" ", false):
-			var trial := word if line == "" else line + " " + word
-			if line != "" and FONT.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
-				out.append(line)
-				line = word
-			else:
-				line = trial
-		out.append(line)
+		var lines := _greedy(para, size, width)
+		var w := width
+		while lines.size() > 1 and w > width * 0.5:
+			var narrower := _greedy(para, size, w - GAP)
+			if narrower.size() > lines.size():
+				break
+			lines = narrower
+			w -= GAP
+		out.append_array(lines)
 	return "\n".join(out)
+
+
+static func _greedy(para: String, size: int, width: float) -> PackedStringArray:
+	var out := PackedStringArray()
+	var line := ""
+	for word in para.split(" ", false):
+		var trial := word if line == "" else line + " " + word
+		if line != "" and FONT.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+			out.append(line)
+			line = word
+		else:
+			line = trial
+	out.append(line)
+	return out
 
 
 ## 여러 줄 글: 띄어쓰기에서 나눠 lines줄 안에 들도록 글자 크기를 base에서 FONT_MIN까지 줄인다 (가장 긴 미션 문구)

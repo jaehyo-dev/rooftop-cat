@@ -8,9 +8,9 @@ extends RefCounted
 
 const DAILY := {
 	# 한 판 기록형
-	"d_dist_1": {"kind": "record", "topic": "dist", "stat": "meters", "target": 300, "tier": 1, "text": "한 판에 %s m 달리기"},
-	"d_dist_2": {"kind": "record", "topic": "dist", "stat": "meters", "target": 500, "tier": 2, "text": "한 판에 %s m 달리기"},
-	"d_dist_3": {"kind": "record", "topic": "dist", "stat": "meters", "target": 800, "tier": 3, "text": "한 판에 %s m 달리기"},
+	"d_dist_1": {"kind": "record", "topic": "dist", "stat": "meters", "target": 300, "tier": 1, "text": "한 판에 %sm 달리기"},
+	"d_dist_2": {"kind": "record", "topic": "dist", "stat": "meters", "target": 500, "tier": 2, "text": "한 판에 %sm 달리기"},
+	"d_dist_3": {"kind": "record", "topic": "dist", "stat": "meters", "target": 800, "tier": 3, "text": "한 판에 %sm 달리기"},
 	"d_fish_r1": {"kind": "record", "topic": "fish", "stat": "fish", "target": 400, "tier": 1, "text": "한 판에 생선 %s마리"},
 	"d_fish_r2": {"kind": "record", "topic": "fish", "stat": "fish", "target": 700, "tier": 2, "text": "한 판에 생선 %s마리"},
 	"d_combo_1": {"kind": "record", "topic": "combo", "stat": "combo", "target": 100, "tier": 1, "text": "한 판에 콤보 %s"},
@@ -22,7 +22,7 @@ const DAILY := {
 	# 누적형
 	"d_fish_c1": {"kind": "sum", "topic": "fish", "stat": "fish", "target": 1000, "tier": 1, "text": "생선 %s마리 모으기"},
 	"d_fish_c2": {"kind": "sum", "topic": "fish", "stat": "fish", "target": 1500, "tier": 2, "text": "생선 %s마리 모으기"},
-	"d_dist_c": {"kind": "sum", "topic": "dist", "stat": "meters", "target": 1000, "tier": 1, "text": "%s m 달리기"},
+	"d_dist_c": {"kind": "sum", "topic": "dist", "stat": "meters", "target": 1000, "tier": 1, "text": "%sm 달리기"},
 	"d_runs": {"kind": "sum", "topic": "runs", "stat": "runs", "target": 2, "tier": 1, "text": "%s판 하기"},
 	"d_gold": {"kind": "sum", "topic": "item", "stat": "gold", "target": 2, "tier": 2, "text": "황금 생선 %s개 먹기"},
 	"d_yarn": {"kind": "sum", "topic": "item", "stat": "yarn", "target": 3, "tier": 1, "text": "털실 %s번 먹기"},
@@ -50,7 +50,7 @@ const WEEKLY := {
 	"w_alldays": {"kind": "daily", "topic": "daily", "stat": "full_day", "target": 4, "tier": 3, "text": "일일 미션 3개를 다 깬 날 %s일"},
 	"w_fish_10k": {"kind": "sum", "topic": "fish", "stat": "fish", "target": 10000, "tier": 1, "text": "이번 주 생선 %s마리"},
 	"w_fish_20k": {"kind": "sum", "topic": "fish", "stat": "fish", "target": 20000, "tier": 2, "text": "이번 주 생선 %s마리"},
-	"w_dist": {"kind": "sum", "topic": "dist", "stat": "meters", "target": 10000, "tier": 1, "text": "이번 주 %s m 달리기"},
+	"w_dist": {"kind": "sum", "topic": "dist", "stat": "meters", "target": 10000, "tier": 1, "text": "이번 주 %sm 달리기"},
 	"w_runs": {"kind": "sum", "topic": "runs", "stat": "runs", "target": 8, "tier": 1, "text": "%s판 하기"},
 	"w_double": {"kind": "sum", "topic": "jump", "stat": "double", "target": 100, "tier": 2, "text": "더블점프 %s번"},
 	"w_perfect": {"kind": "sum", "topic": "tramp", "stat": "perfect", "target": 10, "tier": 2, "text": "트램펄린 퍼펙트 %s번"},

@@ -27,7 +27,7 @@ var _extras: ResultExtras
 var _back_to := "start"
 var _blockers: Array[Control] = []  # 지금 화면이 World.touch_blockers에 넣은 버튼 자리
 var _ui_sfx := {}
-var _hint := UiKit.label("", UiKit.SUB, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
+var _hint := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)  # 안내는 갈색 (빨강은 새 기록에만)
 var _result_dot := UiKit.badge()
 var _shop_seen: Array = []  # 상점을 마지막으로 열었을 때 살 수 있던 강화 (새로 살 수 있게 되면 [상점]에 점)
 
@@ -201,6 +201,7 @@ func _on_game_over(meters: int) -> void:
 	boosters_on = []  # 결과 카드의 부스터 칸은 늘 꺼진 채로 (실수로 계속 쓰지 않게, PLAN 1번)
 	# 한 줄 안내: v0.7.0 처음 켬(점수 기준이 바뀜) → 첫 판(상점 안내)
 	_hint.text = "점수 계산이 바뀌어 최고 점수를 새로 시작해요" if save.score_reset else ("메인 화면의 상점에서 강화를 살 수 있어요" if save.data.stats.runs == 1 else "")
+	_hint.visible = _hint.text != ""  # 안내가 없으면 줄을 차지하지 않게
 	save.score_reset = false
 	_extras.clear()
 	_count_result(0.0)
@@ -217,11 +218,16 @@ func _count_result(delta: float) -> void:
 	var last := ""
 	if done:
 		last = "새 기록!" if _result.new_best else "최고 점수  %s" % UiKit.comma(_best)
-	$GameOver/Card/Box/Score.text = "점수  %s" % UiKit.comma(shown[3])  # 다른 화면처럼 천 단위 쉼표 (2c-fix)
-	$GameOver/Card/Box/Stats.text = "거리  %s m\n먹은 생선  %s%s\n최고 콤보  %s" % [UiKit.comma(shown[0]), UiKit.comma(shown[1]), "  +50%" if _result.bonus else "", UiKit.comma(shown[2])]
+	$GameOver/Card/Box/Score.text = UiKit.comma(shown[3])  # 다른 화면처럼 천 단위 쉼표 (2c-fix). "점수"는 위 작은 이름표
+	# 기록 표: 이름은 왼쪽, 값은 오른쪽 (2c-polish 아트 검토: 가운데 맞춤이라 들쭉날쭉)
+	for pair in [["Distance", "%sm" % UiKit.comma(shown[0])], ["Fish", UiKit.comma(shown[1])], ["Combo", UiKit.comma(shown[2])]]:
+		(get_node("GameOver/Card/Box/Stats/%s/Value" % pair[0]) as Label).text = pair[1]
+	$GameOver/Card/Box/Stats/Fish/Bonus.visible = _result.bonus
 	$GameOver/Card/Box/Best.text = last if done else " "  # 빈 줄로 자리를 잡아 카드 크기가 변하지 않게
+	$GameOver/Card/Box/Best.add_theme_color_override("font_color", UiKit.RED if done and _result.new_best else UiKit.SUB_BROWN)  # 빨강은 새 기록에만
+	$GameOver/Card/Box/Best.add_theme_font_size_override("font_size", UiKit.BODY if _result.new_best else UiKit.SUB)  # 새 기록은 본문 크기 빨강
 	# 다 차면 실제 지갑 (미션 받기·사기로 바뀐 값까지)
-	$GameOver/Card/Box/Total.text = "모은 생선 %s" % UiKit.comma(save.fish() if done else _result.wallet + ceili(shown[1] * (Balance.FISH_BONUS_MULT if _result.bonus else 1.0)))
+	$GameOver/Card/Box/Wallet/Total.text = "가진 생선 %s" % UiKit.comma(save.fish() if done else _result.wallet + ceili(shown[1] * (Balance.FISH_BONUS_MULT if _result.bonus else 1.0)))
 	var label: Label = $GameOver/Card/Box/Score
 	label.pivot_offset = label.size * 0.5
 	if done and not was_done and _result.new_best:
@@ -298,26 +304,91 @@ func _build_menus() -> void:
 	start_menu.visible = false
 	# 결과 카드: 다시 하기(크게) · 부스터 칸 · 상점 · 미션, 한 줄 안내. 깬 미션 쪽지·등급 도장은 카드 둘레(ResultExtras)
 	var box: VBoxContainer = $GameOver/Card/Box
-	box.custom_minimum_size.x = 560
+	box.custom_minimum_size.x = 520
 	# 결과 카드도 메뉴와 같은 판 (UI 스타일 표), 글자 위계: 점수(큰 숫자) → 기록(본문) → 모은 생선(보조)
 	var card_box := UiKit.plate("panel")
 	card_box.content_margin_left = UiKit.PAD * 3.0
 	card_box.content_margin_right = UiKit.PAD * 3.0
-	card_box.content_margin_top = UiKit.PAD * 2.0
+	card_box.content_margin_top = UiKit.PAD * 3.0  # 위 테두리에 걸친 리본 아래
 	card_box.content_margin_bottom = UiKit.PAD * 2.0 + UiKit.SHADOW_Y
 	$GameOver/Card.add_theme_stylebox_override("panel", card_box)
-	box.add_theme_constant_override("separation", int(UiKit.GAP))
-	for pair in [["Score", UiKit.NUM_BIG, UiKit.BROWN], ["Stats", UiKit.BODY, UiKit.BROWN], ["Best", UiKit.BODY, UiKit.RED], ["Total", UiKit.SUB, UiKit.SUB_BROWN]]:
+	box.add_theme_constant_override("separation", int(UiKit.GAP * 0.5))
+	$GameOver.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 줄여 그린 아이콘이 계단지지 않게
+	$GameOver.color = UiKit.DIM_BACK
+	for pair in [["Score", UiKit.NUM_BIG, UiKit.BROWN], ["Best", UiKit.TITLE, UiKit.RED]]:
 		var l: Label = box.get_node(pair[0])
 		l.add_theme_font_size_override("font_size", pair[1])
 		l.add_theme_color_override("font_color", pair[2])
 		l.add_theme_constant_override("outline_size", 0)
+	var head := UiKit.label("점수", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	head.name = "ScoreHead"
+	box.add_child(head)
+	box.move_child(head, 0)
+	var ribbon := Control.new()  # 카드 제목 리본 "이번 판" (다른 화면처럼 제목이 리본 위에)
+	ribbon.name = "Ribbon"
+	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ribbon.draw.connect(func() -> void: UiKit.draw_ribbon(ribbon, Rect2(ribbon.size.x * 0.5 - 140, 0, 280, 56)))
+	var ribbon_text := UiKit.on_orange(UiKit.label("이번 판", UiKit.TITLE, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+	ribbon_text.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ribbon_text.offset_bottom = -8
+	ribbon.add_child(ribbon_text)
+	$GameOver.add_child(ribbon)  # 카드 위 테두리에 걸침 (카드 높이를 쓰지 않게 카드 밖에 두고 자리만 맞춤)
+	var card: Control = $GameOver/Card
+	var place := func() -> void: ribbon.position = (card.position + Vector2(card.size.x * 0.5 - 200, -36)).round()
+	card.item_rect_changed.connect(place)
+	ribbon.size = Vector2(400, 64)
+	var line_under := ColorRect.new()  # 기록 표 아래 얇은 구분선
+	line_under.name = "Divider"
+	line_under.color = UiKit.TROUGH
+	line_under.custom_minimum_size = Vector2(0, UiKit.LINE * 0.5)
+	line_under.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 기록 표 (이름 왼쪽, 값 오른쪽): 예전 여러 줄 글자 Stats를 표로 바꿈
+	box.get_node("Stats").free()
+	var stats := VBoxContainer.new()
+	stats.name = "Stats"
+	stats.add_theme_constant_override("separation", 0)
+	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for pair in [["Distance", "거리"], ["Fish", "먹은 생선"], ["Combo", "최고 콤보"]]:
+		var line := HBoxContainer.new()
+		line.name = pair[0]
+		line.add_theme_constant_override("separation", int(UiKit.GAP))
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var key := UiKit.label(pair[1], UiKit.BODY, UiKit.SUB_BROWN)
+		key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(key)
+		if pair[0] == "Fish":  # 생선 +50% 부스터: 값 옆 작은 초록 알약
+			var bonus := UiKit.label("+50%", UiKit.SUB, UiKit.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
+			bonus.name = "Bonus"
+			line.add_child(bonus)
+		var value := UiKit.label("0", UiKit.BODY, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
+		value.name = "Value"
+		line.add_child(value)
+		stats.add_child(line)
+	box.add_child(stats)
+	box.move_child(stats, box.get_node("Score").get_index() + 1)
+	box.add_child(line_under)
+	box.move_child(line_under, stats.get_index() + 1)
+	# 가진 생선: 생선 그림 + 숫자 (이번 판 "먹은 생선"과 헷갈리지 않게 이름도 바꿈)
+	var total: Label = box.get_node("Total")
+	box.remove_child(total)
+	var wallet_row := HBoxContainer.new()
+	wallet_row.name = "Wallet"
+	wallet_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	wallet_row.add_theme_constant_override("separation", int(UiKit.GAP))
+	wallet_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wallet_row.add_child(UiKit.icon(UiKit.ICONS.fish, 36))
+	total.add_theme_font_size_override("font_size", UiKit.SUB)
+	total.add_theme_color_override("font_color", UiKit.SUB_BROWN)
+	total.add_theme_constant_override("outline_size", 0)
+	wallet_row.add_child(total)
+	box.add_child(wallet_row)
+	box.move_child(wallet_row, box.get_node("Best").get_index() + 1)
 	box.get_node("Retry").free()
 	var retry := UiKit.button("다시 하기", "orange", null, UiKit.TITLE)
 	retry.name = "Retry"
 	retry.hot = true
 	box.add_child(retry)
-	retry.custom_minimum_size = Vector2(320, 104)
+	retry.custom_minimum_size = Vector2(320, 96)
 	retry.pressed.connect(begin_run)
 	_hint.name = "Hint"
 	box.add_child(_hint)
@@ -328,6 +399,10 @@ func _build_menus() -> void:
 	result_slots.want_shop.connect(open_shop.bind("boosters"))
 	box.add_child(result_slots)
 	box.move_child(result_slots, retry.get_index())
+	var slots_head := UiKit.label("다음 판 부스터", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	slots_head.name = "SlotsHead"
+	box.add_child(slots_head)
+	box.move_child(slots_head, result_slots.get_index())
 	var row := HBoxContainer.new()
 	row.name = "Row"
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -336,7 +411,7 @@ func _build_menus() -> void:
 	row.add_child(retry)
 	var home := UiKit.button("메인 화면", "cream")
 	home.name = "Home"
-	home.custom_minimum_size = Vector2(200, 104)
+	home.custom_minimum_size = Vector2(200, 96)
 	home.pressed.connect(go_home)
 	row.add_child(home)
 	_result_dot.position = Vector2(home.custom_minimum_size.x - _result_dot.size.x * 0.75, -_result_dot.size.y * 0.3).round()  # 받을 미션 보상 수: 오른쪽 위 (왼쪽 위는 부스터 칸에 닿음)
@@ -367,7 +442,7 @@ func show_screen(next: String) -> void:
 	$GameOver.visible = next == "result"
 	if next == "result" and was != "result":
 		UiKit.enter([$GameOver/Card], Vector2(0, 40))  # 카드가 아래에서 톡 올라옴
-	$VersionLabel.visible = not menu
+	$VersionLabel.visible = not menu and next != "result"  # 결과 카드에서는 축하 별과 겹치지 않게 숨김
 	if next == "start" and was != "start":
 		start_menu.slide_in()
 	elif next != "start" and start_menu.visible and was == "start" and next == "run":

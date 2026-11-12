@@ -4,7 +4,7 @@ extends Control
 ## 등급이 오르면 카드 오른쪽에 배지가 도장처럼 쾅 찍힌다(보너스 생선·부스터 글자와 함께).
 ## 쪽지·배지는 버튼이 아니라 눌러도 지금처럼 "빈 곳 = 다시 하기"다.
 
-const NOTE := Vector2(336, 136)
+const NOTE := Vector2(296, 136)
 const MAX_NOTES := 3
 const NOTE_GAP := 0.35   # 쪽지가 붙는 사이 (초)
 const BOOSTER_NAMES := {"dash_start": "질주로 출발", "bell_start": "방울", "fish_bonus": "생선 +50%"}
@@ -26,7 +26,7 @@ func _init(main_node: Node) -> void:
 	add_child(_notes)
 	_rank.name = "RankUp"
 	_rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_rank.size = Vector2(250, 350)
+	_rank.size = Vector2(256, 400)
 	_rank.draw.connect(func() -> void: UiKit.draw_rank_ring(_rank, Vector2(125, 92), 78.0, _rank_level))
 	add_child(_rank)
 
@@ -45,7 +45,7 @@ func clear() -> void:
 func play(result: Dictionary, card: Rect2) -> void:
 	clear()
 	var done: Array = result.get("done", [])
-	_notes.position = Vector2(maxf(16.0, card.position.x - NOTE.x - 36.0), card.position.y + 110.0)  # 왼쪽 위 거리·BEST 글자 아래
+	_notes.position = Vector2(maxf(UiKit.PAD, card.position.x - NOTE.x - UiKit.PAD * 1.5), card.position.y + 110.0)  # 왼쪽 위 거리·BEST 글자 아래
 	var shown := done.slice(0, MAX_NOTES)
 	for i in shown.size():
 		var note := _note(shown[i], i, done.size() - MAX_NOTES if i == MAX_NOTES - 1 and done.size() > MAX_NOTES else 0)
@@ -67,17 +67,23 @@ func _note(done: Dictionary, index: int, more: int) -> Control:
 	pin.position = MissionBoard.PIN
 	note.add_child(pin)
 	var stat: String = Missions.info(done.id).stat
-	var art := UiKit.icon(UiKit.ICONS[MissionBoard.STAT_ICONS.get(stat, "note_check")], 48)
-	art.position = Vector2(UiKit.PAD, UiKit.PAD * 2.0)
+	var art := UiKit.icon_base(UiKit.ICONS[MissionBoard.STAT_ICONS.get(stat, "note_check")], UiKit.BASE_S)  # 받침 크기 고정 (아이콘 크기가 제각각이지 않게)
+	art.position = Vector2(UiKit.PAD, UiKit.PAD + 4)
 	note.add_child(art)
 	var text := UiKit.label("", UiKit.SUB)
-	text.position = Vector2(UiKit.PAD * 2.0 + 48, UiKit.PAD)  # 위 가운데 핀 아래
+	text.position = Vector2(UiKit.PAD * 2.0 + UiKit.BASE_S, UiKit.PAD)
 	text.size = Vector2(NOTE.x - text.position.x - UiKit.PAD, 64)
 	UiKit.wrap_fit(text, Missions.text(done.id), text.size.x, 2, UiKit.SUB)  # 띄어쓰기에서만 줄바꿈
 	note.add_child(text)
-	var reward := UiKit.label("미션 완료!  생선 %s%s" % [UiKit.comma(done.fish), "  외 %d개" % more if more > 0 else ""], UiKit.SUB, UiKit.RED)
-	reward.position = Vector2(UiKit.PAD, NOTE.y - UiKit.SHADOW_Y - 40)
-	reward.size = Vector2(NOTE.x - UiKit.PAD * 2.0, 32)
+	var reward := UiKit.label("생선 +%s" % UiKit.comma(done.fish), UiKit.SUB, UiKit.GREEN)
+	if more > 0:  # 더 깬 미션 수는 받침 아래 따로 (한 줄에 다 넣으면 너무 작아짐)
+		var rest := UiKit.label("외 %d개" % more, UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+		rest.position = Vector2(UiKit.GAP, NOTE.y - UiKit.SHADOW_Y - 44)
+		rest.size = Vector2(UiKit.BASE_S + UiKit.PAD, 32)
+		UiKit.fit(rest, rest.size.x, UiKit.SUB)
+		note.add_child(rest)
+	reward.position = Vector2(UiKit.PAD * 2.0 + UiKit.BASE_S, NOTE.y - UiKit.SHADOW_Y - 44)
+	reward.size = Vector2(NOTE.x - reward.position.x - UiKit.PAD, 32)
 	UiKit.fit(reward, reward.size.x, UiKit.SUB)
 	note.add_child(reward)
 	return note
@@ -119,13 +125,19 @@ func _show_rank(ranks: Array, card: Rect2, delay: float) -> void:
 	paper.size = Vector2(_rank.size.x, _rank.size.y - 158)
 	_rank.add_child(paper)
 	var inner_w := paper.size.x - UiKit.PAD * 2.0
-	var title := UiKit.label("등급이 올랐어요!", UiKit.SUB, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := UiKit.label("등급이 올랐어요!", UiKit.SUB, UiKit.ORANGE_DARK, HORIZONTAL_ALIGNMENT_CENTER)
 	UiKit.fit(title, inner_w, UiKit.SUB)
 	var name_label := UiKit.label(CatRank.rank_name(last.level), UiKit.BODY, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 	UiKit.fit(name_label, inner_w, UiKit.BODY)
 	var names := boosters.map(func(k: String) -> String: return BOOSTER_NAMES.get(k, k))
-	var bonus := UiKit.label(UiKit.wrap("생선 +%s%s" % [UiKit.comma(fish), "\n+ " + ", ".join(names) if not names.is_empty() else ""], UiKit.SUB, inner_w), UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-	for row: Array in [[title, 10.0, 38.0], [name_label, 46.0, 42.0], [bonus, 88.0, 92.0]]:
+	# 보상: "생선 +2,000" 한 줄, 부스터는 줄마다 "이름 1개" (+가 두 번 겹치지 않게)
+	var gifts := ["생선 +%s" % UiKit.comma(fish)]
+	for n: String in names:
+		gifts.append("%s 1개" % n)
+	var bonus := UiKit.label("\n".join(gifts), UiKit.SUB, UiKit.SUB_BROWN)  # 왼쪽 맞춤 목록
+	var lines := gifts.size()
+	paper.size.y = 104.0 + lines * 36.0 + UiKit.PAD  # 카드 높이를 보상 줄 수에 맞춤
+	for row: Array in [[title, 10.0, 38.0], [name_label, 46.0, 42.0], [bonus, 92.0, lines * 36.0]]:
 		var l: Label = row[0]
 		l.position = Vector2(UiKit.PAD, row[1])
 		l.size = Vector2(inner_w, row[2])

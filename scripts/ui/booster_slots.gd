@@ -7,7 +7,8 @@ signal want_shop
 signal toggled_on(kind: String, on: bool)
 
 const KINDS := ["dash_start", "bell_start", "fish_bonus"]
-const SIZE := 104.0  # 칸 (그림자 포함)
+const SIZE := 96.0  # 칸 (그림자 포함)
+const ART := 48.0
 
 var main: Node
 var _slots := {}   # 종류 → UiButton
@@ -22,13 +23,23 @@ func _init(main_node: Node) -> void:
 		var b := UiKit.button("", "cream")
 		b.name = kind
 		b.custom_minimum_size = Vector2(SIZE, SIZE)
-		var art := UiKit.icon(UiKit.ICONS[kind], 56)
-		art.position = Vector2((SIZE - 56) * 0.5, UiKit.GAP)  # 위 가운데
+		var art := UiKit.icon(UiKit.ICONS[kind], ART)
+		art.position = Vector2((SIZE - ART) * 0.5, UiKit.GAP)  # 위 가운데
 		b.add_child(art)
 		var count := UiKit.label("0", UiKit.SUB, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-		count.position = Vector2(UiKit.GAP, SIZE - UiKit.SHADOW_Y - 36 - UiKit.GAP * 0.5)  # 아래 가운데 (둥근 테두리 안)
-		count.size = Vector2(SIZE - UiKit.PAD, 36)
+		count.position = Vector2(UiKit.GAP, UiKit.GAP + ART)  # 그림 바로 아래 (둥근 테두리 안)
+		count.size = Vector2(SIZE - UiKit.PAD, SIZE - UiKit.SHADOW_Y - UiKit.GAP * 2.0 - ART)
 		b.add_child(count)
+		var check := Control.new()  # 켠 칸: 오른쪽 위 초록 동그라미 체크
+		check.name = "Check"
+		check.size = Vector2(32, 32)
+		check.position = Vector2(SIZE - 26, -8)
+		check.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		check.draw.connect(func() -> void:
+			UiKit.draw_disc(check, check.size * 0.5, 16.0, UiKit.GREEN, UiKit.PAPER)
+			check.draw_polyline(PackedVector2Array([Vector2(9, 16), Vector2(14, 21), Vector2(23, 11)]), UiKit.PAPER, UiKit.LINE, true))
+		b.add_child(check)
+		b.set_meta("art", art)
 		b.pressed.connect(press.bind(kind))
 		add_child(b)
 		_slots[kind] = b
@@ -58,7 +69,8 @@ func refresh() -> void:
 		var lit: bool = main.boosters_on.has(kind) and n > 0
 		b.set_fill(UiKit.ORANGE if lit else UiKit.PAPER)
 		var count: Label = _counts[kind]
-		count.text = "x%d" % n
-		count.add_theme_color_override("font_color", UiKit.CREAM if lit else UiKit.BROWN)
+		count.text = "x%d" % n if n > 0 else "사기"  # 0개 = 눌러서 상점으로
+		count.add_theme_color_override("font_color", UiKit.CREAM if lit else (UiKit.BROWN if n > 0 else UiKit.GREEN))
 		count.add_theme_constant_override("outline_size", UiKit.OUTLINE if lit else 0)
-		b.dimmed = n <= 0
+		(b.get_meta("art") as Control).modulate.a = 1.0 if n > 0 else UiKit.DIM_ALPHA  # 그림만 흐리게 (칸은 누를 수 있음)
+		b.get_node("Check").visible = lit

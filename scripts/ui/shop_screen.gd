@@ -34,6 +34,8 @@ const DETAIL := Rect2(672, 128, 584, 568)
 const DESC_W := 520.0               # 설명 글 폭
 const CARD := Vector2(216, 96)
 const BUY := Vector2(400, 96)
+const BUY_Y := 456.0
+const HINT := "부스터는 시작 화면이나 결과 카드의 부스터 칸을 눌러 켜요. 켠 부스터는 다음 판이 시작될 때 하나씩 써요."
 const PULSE_TIME := 1.4             # 다음 칸 깜빡임 한 번 (초)
 
 var tab := "upgrades"
@@ -57,14 +59,16 @@ var _next_card := UiKit.panel("note")
 var _max_card := UiKit.panel("note")
 var _now_head := UiKit.label("지금", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _next_head := UiKit.label("다음", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-var _max_head := UiKit.label("최대 단계", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+var _max_head := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _now := UiKit.label("", UiKit.NUM, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _next := UiKit.label("", UiKit.NUM, UiKit.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
 var _max_value := UiKit.label("", UiKit.NUM, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _buy := UiKit.button("", "orange", UiKit.ICONS.fish, UiKit.NUM)
 var _max_ribbon := Control.new()
+var _max_text := UiKit.label("", UiKit.BODY, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _lack := UiKit.label("", UiKit.SUB, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
 var _detail := UiKit.panel("panel")
+var _hint := UiKit.panel("note")  # 부스터 탭: 줄 3개 아래 빈 곳에 쓰는 법 쪽지 (2c-polish 아트 검토: 아래 절반이 비어 미완성처럼 보임)
 var _pop_cell := {"kind": "", "t": 99.0}  # 방금 채운 칸 (톡 튀기)
 var _hold := {}    # 생선이 날아오는 동안 게이지를 산 전 단계로 그림 (종류 → 단계)
 var _pulse := 0.0
@@ -87,6 +91,18 @@ func _init(main_node: Node) -> void:
 	_list.size = Vector2(ROW.x, 6 * ROW.y + 5 * ROW_GAP)
 	_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(_list)
+	_hint.name = "BoosterHint"
+	_hint.position = LIST + Vector2(0, 3 * (ROW.y + ROW_GAP) + UiKit.PAD)
+	_hint.size = Vector2(ROW.x, 160)  # 글 세 줄에 맞춤
+	var hint_art := UiKit.icon_base(UiKit.ICONS.note_check, UiKit.BASE_S)
+	hint_art.position = Vector2(UiKit.PAD, UiKit.PAD)
+	_hint.add_child(hint_art)
+	var hint_text := UiKit.label(UiKit.wrap(HINT, UiKit.BODY, ROW.x - UiKit.BASE_S - UiKit.PAD * 4.0), UiKit.BODY, UiKit.SUB_BROWN)
+	hint_text.position = Vector2(UiKit.BASE_S + UiKit.PAD * 2.0, UiKit.PAD)
+	hint_text.size = Vector2(ROW.x - UiKit.BASE_S - UiKit.PAD * 4.0, _hint.size.y - UiKit.PAD * 2.0 - UiKit.SHADOW_Y)
+	hint_text.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_hint.add_child(hint_text)
+	box.add_child(_hint)
 	_build_detail()
 
 
@@ -125,7 +141,7 @@ func _build_detail() -> void:
 	_detail.add_child(_desc)
 	# 지금 → 다음 카드
 	_cards.name = "Cards"
-	_cards.position = Vector2(0, 320)
+	_cards.position = Vector2(0, 316)
 	_cards.size = Vector2(DETAIL.size.x, CARD.y)
 	_cards.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_cards.draw.connect(func() -> void:
@@ -141,21 +157,28 @@ func _build_detail() -> void:
 		_max_card.add_child(star)
 	# 사기 버튼 / MAX 리본 / 모자란 수
 	_buy.name = "Buy"
-	_buy.position = Vector2(mid - BUY.x * 0.5, 432)
+	_buy.position = Vector2(mid - BUY.x * 0.5, BUY_Y)
 	_buy.size = BUY
 	_buy.add_theme_constant_override("icon_max_width", 64)
 	_buy.pressed.connect(buy)
 	_detail.add_child(_buy)
-	_max_ribbon.name = "MaxRibbon"
-	_max_ribbon.position = Vector2(mid - 120, 440)
-	_max_ribbon.size = Vector2(240, 72)
-	_max_ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_max_ribbon.draw.connect(func() -> void: UiKit.draw_ribbon(_max_ribbon, Rect2(Vector2.ZERO, _max_ribbon.size)))
-	var max_text := UiKit.on_orange(UiKit.label("MAX", UiKit.TITLE, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
-	max_text.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_max_ribbon.add_child(max_text)
+	_max_ribbon.name = "MaxPlate"  # 최대: 사기 버튼 자리에 같은 크기의 누를 수 없는 홈 색 판 (별 + 글)
+	_max_ribbon.position = _buy.position
+	_max_ribbon.size = BUY
+	var max_plate := UiKit.panel("chip")
+	(max_plate.get_theme_stylebox("panel") as Plate).fill = UiKit.TROUGH
+	(max_plate.get_theme_stylebox("panel") as Plate).radius = UiKit.R_BUTTON
+	max_plate.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_max_ribbon.add_child(max_plate)
+	for side: float in [-1.0, 1.0]:
+		var star := UiKit.icon(UiKit.ICONS.star, 48)
+		star.position = Vector2(BUY.x * 0.5 + side * (BUY.x * 0.5 - 48) - 24, (BUY.y - UiKit.SHADOW_Y - 48) * 0.5)
+		_max_ribbon.add_child(star)
+	_max_text.position = Vector2(80, 0)
+	_max_text.size = Vector2(BUY.x - 160, BUY.y - UiKit.SHADOW_Y)
+	_max_ribbon.add_child(_max_text)
 	_detail.add_child(_max_ribbon)
-	_lack.position = Vector2(mid - DESC_W * 0.5, 528)
+	_lack.position = Vector2(mid - DESC_W * 0.5, BUY_Y - 36)  # 사기 버튼 바로 위
 	_lack.size = Vector2(DESC_W, 32)
 	_detail.add_child(_lack)
 
@@ -193,6 +216,7 @@ func refresh() -> void:
 		UiKit.tone_text(_tabs[t], "orange" if t == tab else "cream")
 	_fill_list()
 	_show_detail()
+	_hint.visible = tab == "boosters"
 
 
 func show_tab(t: String) -> void:
@@ -275,25 +299,24 @@ func _fill_list() -> void:
 		tag.position = Vector2(tag_x, (body_h - TAG.y) * 0.5).round()
 		tag.size = TAG
 		var fish := UiKit.icon(UiKit.ICONS.fish, 36)
+		fish.name = "Fish"
 		fish.position = Vector2(UiKit.PAD, (TAG.y - 36) * 0.5)
 		tag.add_child(fish)
-		var price := UiKit.label("", UiKit.BODY, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
+		var price := UiKit.label("", UiKit.BODY)
 		price.name = "Price"
 		price.position = Vector2(UiKit.PAD + 36 + UiKit.GAP * 0.5, 0)
 		price.size = Vector2(TAG.x - price.position.x - UiKit.PAD - 4, TAG.y)
 		tag.add_child(price)
 		b.add_child(tag)
-		var max_tag := UiKit.panel("chip", false)  # 최대: 가격표 자리에 주황 알약 (별 + MAX)
+		var max_tag := UiKit.panel("chip", false)  # 최대: 가격표 자리에 누를 수 없는 홈 색 알약 (별 + MAX)
 		max_tag.name = "Max"
-		(max_tag.get_theme_stylebox("panel") as Plate).fill = UiKit.ORANGE
-		(max_tag.get_theme_stylebox("panel") as Plate).gloss = 1.0
-		(max_tag.get_theme_stylebox("panel") as Plate).gloss_color = UiKit.ORANGE_LIGHT
+		(max_tag.get_theme_stylebox("panel") as Plate).fill = UiKit.TROUGH
 		max_tag.position = tag.position
 		max_tag.size = TAG
 		var star := UiKit.icon(UiKit.ICONS.star, 36)
 		star.position = Vector2(UiKit.PAD, (TAG.y - 36) * 0.5)
 		max_tag.add_child(star)
-		var max_text := UiKit.on_orange(UiKit.label("MAX", UiKit.BODY, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+		var max_text := UiKit.label("MAX", UiKit.BODY, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 		max_text.position = Vector2(UiKit.PAD + 36, 0)
 		max_text.size = Vector2(TAG.x - max_text.position.x - UiKit.PAD, TAG.y)
 		max_tag.add_child(max_text)
@@ -314,8 +337,14 @@ func _update_row(kind: String) -> void:
 	b.get_node("Max").visible = price < 0
 	var label: Label = tag.get_node("Price")
 	label.text = UiKit.comma(maxi(price, 0))
-	UiKit.fit(label, label.size.x, UiKit.BODY)
-	tag.modulate.a = 1.0 if price <= main.save.fish() else UiKit.DIM_ALPHA
+	UiKit.fit(label, TAG.x - UiKit.PAD * 2.0 - 40, UiKit.BODY)
+	# 생선 + 숫자를 한 묶음으로 가운데 (짧은 값에서 가운데가 휑하지 않게)
+	var text_w := ceilf(UiKit.FONT.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, label.get_theme_font_size("font_size")).x)
+	var x0 := roundf((TAG.x - (36 + 4 + text_w)) * 0.5)
+	(tag.get_node("Fish") as Control).position.x = x0
+	label.position.x = x0 + 40
+	label.size.x = text_w + 2
+	label.add_theme_color_override("font_color", UiKit.BROWN if price <= main.save.fish() else UiKit.RED)  # 모자라면 숫자만 빨강
 	if tab == "upgrades":
 		(b.get_node("Lv/Text") as Label).text = "Lv.%d" % _hold.get(kind, main.save.upgrade_level(kind))
 		_gauges[kind].queue_redraw()
@@ -403,12 +432,16 @@ func _show_detail() -> void:
 		_now.text = value_text(selected, lv)
 		_next.text = value_text(selected, lv + 1) if price >= 0 else ""
 		_max_value.text = value_text(selected, lv)
+		_max_head.text = "최대 단계"
+		_max_text.text = "최대 단계예요"
 	else:
 		var n: int = main.save.booster_count(selected)
 		_lv_label.text = "x%d" % n
 		_now.text = "%d개" % n
 		_next.text = "%d개" % (n + 1)
 		_max_value.text = "%d개" % n
+		_max_head.text = "최대 보유"  # 부스터는 단계가 아니라 개수
+		_max_text.text = "가득 찼어요"
 	for l: Label in [_now, _next, _max_value]:
 		UiKit.fit(l, l.size.x, UiKit.NUM)
 	var top := price < 0
@@ -419,9 +452,12 @@ func _show_detail() -> void:
 	_buy.visible = not top
 	_buy.disabled = top  # 최대면 눌리지 않음 (MAX 리본이 대신 보임)
 	_max_ribbon.visible = top
+	UiKit.fit(_max_text, _max_text.size.x, UiKit.BODY)
 	_buy.text = UiKit.comma(maxi(price, 0))
 	var short: int = price - main.save.fish()
-	_buy.dimmed = short > 0  # 모자라면 흐리게 (눌러 보면 뿌뿌)
+	# 모자라면 투명하게 흐리는 대신 홈 색 판 + 갈색 글자 (흐리면 고장 난 것처럼 보임, 아트 검토 2차). 눌러 보면 뿌뿌
+	_buy.set_fill(UiKit.TROUGH if short > 0 else UiKit.ORANGE)
+	UiKit.tone_text(_buy, "cream" if short > 0 else "orange")
 	_buy.hot = not top and short <= 0
 	_lack.text = "생선 %s마리 모자라요" % UiKit.comma(short) if not top and short > 0 else ""
 

@@ -2,12 +2,11 @@ class_name UiButton
 extends Button
 ## 메뉴 버튼 (v0.7.0 2c-polish): Plate 하나로 네 상태를 그린다. 상태가 바뀌면 UiKit.STATE_TIME 동안 부드럽게 옮겨 간다.
 ## - 기본 / 누름(몸이 PRESS_Y 내려가고 조금 어두워짐, 글자·안의 그림도 같이) / 불가(흐림) / 강조(hot: 몇 초마다 빛이 지나감)
-## - picked: 목록에서 고른 줄 (주황 테두리 + 떠오름). dimmed: 누를 수는 있지만 흐리게 (생선이 모자란 사기 버튼)
+## - picked: 목록에서 고른 줄 (갈색 테두리 안 주황 고리 + 떠오름)
 
 var plate := Plate.new()
 var hot := false
 var picked := false
-var dimmed := false
 var _press := 0.0
 var _pick := 0.0
 var _dim := 0.0
@@ -46,7 +45,7 @@ func set_fill(fill: Color) -> void:
 ## 바로 목표 상태로 (처음 그릴 때 0.12초 전환이 보이지 않게)
 func settle() -> void:
 	_pick = 1.0 if picked else 0.0
-	_dim = 1.0 if (disabled or dimmed) else 0.0
+	_dim = 1.0 if disabled else 0.0
 	_apply()
 
 
@@ -56,7 +55,7 @@ func _process(delta: float) -> void:
 	var step := delta / UiKit.STATE_TIME
 	var press := move_toward(_press, 1.0 if mode in [DRAW_PRESSED, DRAW_HOVER_PRESSED] else 0.0, step)
 	var pick := move_toward(_pick, 1.0 if picked else 0.0, step)
-	var dim := move_toward(_dim, 1.0 if (disabled or dimmed) else 0.0, step)
+	var dim := move_toward(_dim, 1.0 if disabled else 0.0, step)
 	var hover := move_toward(_hover, 1.0 if mode == DRAW_HOVER else 0.0, step)
 	var fill_k := move_toward(_fill_k, 1.0, step)
 	var shine := -1.0
@@ -77,7 +76,7 @@ func _process(delta: float) -> void:
 func _apply() -> void:
 	plate.set_press(_press)
 	plate.lift = _pick
-	plate.border = UiKit.BROWN.lerp(UiKit.ORANGE_DARK, _pick)
+	plate.border = UiKit.BROWN
 	plate.fill = _shown_fill().darkened(UiKit.PRESS_DARKEN * _press).lightened(0.04 * _hover)
 	modulate.a = lerpf(1.0, UiKit.DIM_ALPHA, _dim)
 	var shift := roundf(_press * UiKit.PRESS_Y - _pick * UiKit.LIFT_Y)
