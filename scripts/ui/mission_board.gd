@@ -12,10 +12,11 @@ const STAT_ICONS := {"meters": "footprints", "fish": "fish", "combo": "combo", "
 		"full_day": "note_check", "shop": "basket", "pass_flock": "jump", "pass_pot": "jump", "pass_tank": "jump", "pass_ac": "jump"}
 const NOTE := Vector2(372, 226)
 const CONFIRM_TIME := 2.5  # 바꾸기 "정말?"이 기다리는 시간
+const COUNT_W := 150.0     # 진행 숫자 칸 넓이 (막대는 그 왼쪽)
 
 var _rank := Control.new()
 var _rank_label := UiKit.label("", 34)
-var _headers := [UiKit.label("", 30), UiKit.label("", 30)]
+var _headers := [UiKit.label("", 28), UiKit.label("", 28)]
 var _notes := []         # [weekly, slot] 순서로 6장 Control
 var _confirm := {"key": "", "t": 0.0}  # 바꾸기 확인 중인 쪽지 ("d0" 등)
 var _stamped := {}       # 이번에 받아 도장을 찍을 쪽지 key
@@ -42,11 +43,25 @@ func _init(main_node: Node) -> void:
 	cork.position = Vector2(14, 108)
 	cork.size = Vector2(1252, 608)
 	box.add_child(cork)
+	# 머리글: 나무 테두리·코르크 무늬 위에서도 읽히게 크림색 이름표 안에 (압정보다 위, 2c-fix)
 	for i in 2:
+		var tag := Panel.new()
+		tag.name = "Header%d" % i
+		tag.position = Vector2(56, 110 + i * 300)
+		tag.size = Vector2(300, 40)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := StyleBoxFlat.new()
+		style.bg_color = UiKit.CREAM
+		style.border_color = UiKit.BROWN
+		style.set_border_width_all(3)
+		style.set_corner_radius_all(18)
+		style.anti_aliasing = true
+		tag.add_theme_stylebox_override("panel", style)
 		var h: Label = _headers[i]
-		h.position = Vector2(64, 114 + i * 300)  # 압정(쪽지 위 18px)보다 위
-		h.size = Vector2(1150, 36)
-		box.add_child(h)
+		h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		h.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tag.add_child(h)
+		box.add_child(tag)
 	for i in 6:
 		var note := Control.new()
 		note.name = "Note%d" % i
@@ -63,11 +78,14 @@ func _key(weekly: bool, slot: int) -> String:
 func refresh() -> void:
 	var data: Dictionary = main.save.data
 	var r: Dictionary = data.rank
-	_rank_label.text = "%s · %d등급   %d / %d" % [CatRank.rank_name(r.level), r.level, r.xp, CatRank.next_xp(r.level)]
+	_rank_label.text = "%s  %d등급    %s / %s" % [CatRank.rank_name(r.level), r.level, UiKit.comma(r.xp), UiKit.comma(CatRank.next_xp(r.level))]
+	UiKit.fit(_rank_label, _rank_label.size.x, 34)
 	_rank.queue_redraw()
 	var now: Dictionary = main.clock.now()
-	_headers[0].text = "오늘의 미션 · 남은 시간 %s" % DayClock.left_text(DayClock.seconds_to_next_day(now))
-	_headers[1].text = "이번 주 미션 · 남은 시간 %s" % DayClock.left_text(DayClock.seconds_to_next_week(now))
+	_headers[0].text = "오늘의 미션   (남은 시간 %s)" % DayClock.left_text(DayClock.seconds_to_next_day(now))
+	_headers[1].text = "이번 주 미션   (남은 시간 %s)" % DayClock.left_text(DayClock.seconds_to_next_week(now))
+	for h: Label in _headers:
+		h.get_parent().size.x = UiKit.FONT.get_string_size(h.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 28).x + 40.0  # 이름표는 글 길이에 맞춤
 	for i in 6:
 		_fill_note(_notes[i], i >= 3, i % 3)
 
@@ -100,21 +118,21 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	var art := UiKit.icon(UiKit.ICONS[STAT_ICONS.get(row.stat, "note_check")], 58)
 	art.position = Vector2(20, 22)
 	note.add_child(art)
-	var text := UiKit.label(Missions.text(entry.id), 29)
+	var text := UiKit.label(UiKit.wrap(Missions.text(entry.id), 29, NOTE.x - 104), 29)  # 띄어쓰기에서만 줄바꿈
 	text.position = Vector2(88, 14)
 	text.size = Vector2(NOTE.x - 104, 76)
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD  # 띄어쓰기에서만 줄바꿈 (낱자에서 끊지 않게)
 	note.add_child(text)
 	# 진행 막대 + 숫자
 	var bar := Control.new()
 	bar.position = Vector2(24, 94)
-	bar.size = Vector2(NOTE.x - 48, 30)
+	bar.size = Vector2(NOTE.x - 48, 32)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.draw.connect(func() -> void:
-		UiKit.draw_bar(bar, Rect2(0, 6, bar.size.x - 120, 20), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else Color("#f0a04b")))
+		UiKit.draw_bar(bar, Rect2(0, 6, bar.size.x - COUNT_W - 10, 20), float(entry.progress) / entry.target, UiKit.GREEN if entry.done else Color("#f0a04b")))
 	var count := UiKit.label("%s/%s" % [UiKit.comma(entry.progress), UiKit.comma(entry.target)], 26, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
-	count.position = Vector2(bar.size.x - 112, -4)
-	count.size = Vector2(112, 36)
+	UiKit.fit(count, COUNT_W, 26)  # 99,999/99,999도 칸 안에
+	count.position = Vector2(bar.size.x - COUNT_W, 0)
+	count.size = Vector2(COUNT_W, 32)
 	bar.add_child(count)
 	note.add_child(bar)
 	# 보상
@@ -136,10 +154,11 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		take.pressed.connect(claim.bind(weekly, slot))
 		note.add_child(take)
 	elif entry.done:
-		var stamp := UiKit.icon(UiKit.ICONS.stamp, 104)
+		var stamp := UiKit.icon(UiKit.ICONS.stamp, 96)
 		stamp.name = "Stamp"
-		stamp.position = Vector2(NOTE.x - 140, NOTE.y - 118)
-		stamp.size = Vector2(104, 104)
+		stamp.position = Vector2(NOTE.x - 132, NOTE.y - 100)  # 진행 숫자 아래 (겹치지 않게)
+		stamp.size = Vector2(96, 96)
+		stamp.pivot_offset = stamp.size * 0.5  # 가운데를 축으로 기울임
 		stamp.rotation = -0.2
 		stamp.modulate = Color(1, 1, 1, 0.9)
 		note.add_child(stamp)

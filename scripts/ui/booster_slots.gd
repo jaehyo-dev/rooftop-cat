@@ -7,7 +7,7 @@ signal want_shop
 signal toggled_on(kind: String, on: bool)
 
 const KINDS := ["dash_start", "bell_start", "fish_bonus"]
-const SIZE := 92.0
+const SIZE := 100.0
 
 var main: Node
 var _slots := {}   # 종류 → Button
@@ -22,12 +22,16 @@ func _init(main_node: Node) -> void:
 		var b := UiKit.button("", "cream")
 		b.name = kind
 		b.custom_minimum_size = Vector2(SIZE, SIZE)
-		var art := UiKit.icon(UiKit.ICONS[kind], SIZE - 26.0)
-		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 13)
+		var art := UiKit.icon(UiKit.ICONS[kind], SIZE - 50.0)
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.offset_left = 20  # 위 가운데: 아래 개수 글자와 겹치지 않고 둥근 테두리 안에
+		art.offset_top = 6
+		art.offset_right = -20
+		art.offset_bottom = -44
 		b.add_child(art)
-		var count := UiKit.label("0", 28, UiKit.BROWN, HORIZONTAL_ALIGNMENT_RIGHT)
-		count.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 4)
-		count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		var count := UiKit.label("0", 30, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)  # 휴대폰(0.54배)에서도 읽히게
+		count.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, 9)  # 아래 가운데 (둥근 테두리 안)
+		count.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		count.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		b.add_child(count)
 		b.pressed.connect(press.bind(kind))

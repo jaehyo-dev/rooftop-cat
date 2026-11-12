@@ -380,3 +380,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 ```
 색연필 손그림 느낌의 작은 빨간 발바닥 도장 아이콘 하나를 그려줘. 마젠타(#FF00FF) 단색 배경, 글자 없음, 1024x1024. 내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마
 ```
+
+## v0.7.0 2c-fix 시작 화면 앉은 고양이 (2026-11-12, 맥 Codex)
+- 계획: 1장(3x2 시트: 앉음, 꼬리 3자세, 눈 감기, 일어나기). 모습이 다르면 1번 더 → 1번에 됨(첫 칸만 머리 방향이 달라 안 씀).
+- 명령: `codex exec --sandbox read-only "$(cat review/v0.7.0/2c-fix/prompts/cat_sit.txt)" --image assets/concept/cat_reference_sheet.png assets/sprites/cat_base_run.png < /dev/null` → `assets/raw/cat_frames_sit.png`
+- 자르기: `python3 review/v0.7.0/2c-fix/cut_sit.py`. 요청문 전문은 `review/v0.7.0/2c-fix/prompts/cat_sit.txt`.

@@ -125,4 +125,5 @@ if __name__ == "__main__":
         clean_file(UI / "icons/cookie_clock.png")
         print("assets/sprites/ui/icons/cookie_clock.png", canvas.size)
     elif what == "stamp":
-        cut_named(ROOT / "assets/raw/ui_stamp.png", ["stamp"], UI / "icons", 256)
+        # 발바닥 + 떨어진 발가락 4개를 모두 담아 자름 (2c-fix: 가장 큰 덩어리 상자로 자르면 발가락이 잘렸음)
+        cut_grid(ROOT / "assets/raw/ui_stamp.png", ["stamp"], 1, UI / "icons", 256)

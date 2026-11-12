@@ -10,6 +10,10 @@ signal open_missions
 
 const CARD_W := 400.0
 const SLIDE_TIME := 0.32
+const BAND := 250.0       # 최고 기록·지갑 띠 넓이
+const RANK_BAND := 320.0  # 등급 띠 넓이
+const BAND_RIGHT := 26  # 띠 오른쪽 둥근 손그림 테두리 자리
+const BAND_TEXT := 18 + 60 + 10 + BAND_RIGHT  # 띠 안 글자 칸 = 넓이 - 이만큼 (왼쪽 여백·아이콘·사이·오른쪽 여백)
 
 var main: Node
 var boosters: BoosterSlots
@@ -41,6 +45,7 @@ func _band(art: Texture2D, value: Control, width: float) -> Control:
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
 	row.offset_left = 18
+	row.offset_right = -BAND_RIGHT
 	row.add_theme_constant_override("separation", 10)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(UiKit.icon(art, 60))
@@ -55,10 +60,11 @@ func _build_bands() -> void:
 	_bands.position = Vector2(24, 18)
 	_bands.add_theme_constant_override("separation", 16)
 	_bands.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bands.add_child(_band(UiKit.ICONS.star, _best, 250))
-	_bands.add_child(_band(UiKit.ICONS.fish, _wallet, 250))
+	_bands.add_child(_band(UiKit.ICONS.star, _best, BAND))
+	_bands.add_child(_band(UiKit.ICONS.fish, _wallet, BAND))
 	# 등급: 배지 + 이름 + 경험치 막대
 	var rank := VBoxContainer.new()
+	rank.alignment = BoxContainer.ALIGNMENT_CENTER  # 이름이 띠 위 테두리에 붙지 않게 가운데로
 	rank.add_theme_constant_override("separation", 0)
 	rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rank.add_child(_rank_name)
@@ -67,7 +73,7 @@ func _build_bands() -> void:
 		var r: Dictionary = main.save.data.rank
 		UiKit.draw_bar(_rank_bar, Rect2(Vector2(4, 4), _rank_bar.size - Vector2(8, 8)), float(r.xp) / CatRank.next_xp(r.level), UiKit.GREEN))
 	rank.add_child(_rank_bar)
-	_bands.add_child(_band(UiKit.ICONS.rank_face, rank, 300))
+	_bands.add_child(_band(UiKit.ICONS.rank_face, rank, RANK_BAND))
 	add_child(_bands)
 
 
@@ -120,6 +126,9 @@ func refresh() -> void:
 	_wallet.text = UiKit.comma(save.fish())
 	var r: Dictionary = save.data.rank
 	_rank_name.text = "%s %d등급" % [CatRank.rank_name(r.level), r.level]
+	UiKit.fit(_best, BAND - BAND_TEXT, 40)
+	UiKit.fit(_wallet, BAND - BAND_TEXT, 40)
+	UiKit.fit(_rank_name, RANK_BAND - BAND_TEXT, 26)
 	_rank_bar.queue_redraw()
 	UiKit.badge_text(_mission_dot, Missions.pending(save.data))
 	boosters.refresh()

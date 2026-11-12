@@ -221,12 +221,12 @@ func _count_result(delta: float) -> void:
 	var done := Juice.count_done(_result.values, _result.t)
 	var last := ""
 	if done:
-		last = "새 기록!" if _result.new_best else "최고 점수  %d" % _best
-	$GameOver/Card/Box/Score.text = "점수  %d" % shown[3]
-	$GameOver/Card/Box/Stats.text = "거리  %d m\n먹은 생선  %d%s\n최고 콤보  %d" % [shown[0], shown[1], "  +50%" if _result.bonus else "", shown[2]]
+		last = "새 기록!" if _result.new_best else "최고 점수  %s" % UiKit.comma(_best)
+	$GameOver/Card/Box/Score.text = "점수  %s" % UiKit.comma(shown[3])  # 다른 화면처럼 천 단위 쉼표 (2c-fix)
+	$GameOver/Card/Box/Stats.text = "거리  %s m\n먹은 생선  %s%s\n최고 콤보  %s" % [UiKit.comma(shown[0]), UiKit.comma(shown[1]), "  +50%" if _result.bonus else "", UiKit.comma(shown[2])]
 	$GameOver/Card/Box/Best.text = last if done else " "  # 빈 줄로 자리를 잡아 카드 크기가 변하지 않게
 	# 다 차면 실제 지갑 (미션 받기·사기로 바뀐 값까지)
-	$GameOver/Card/Box/Total.text = "모은 생선 %d" % (save.fish() if done else _result.wallet + ceili(shown[1] * (Balance.FISH_BONUS_MULT if _result.bonus else 1.0)))
+	$GameOver/Card/Box/Total.text = "모은 생선 %s" % UiKit.comma(save.fish() if done else _result.wallet + ceili(shown[1] * (Balance.FISH_BONUS_MULT if _result.bonus else 1.0)))
 	var label: Label = $GameOver/Card/Box/Score
 	label.pivot_offset = label.size * 0.5
 	if done and not was_done and _result.new_best:

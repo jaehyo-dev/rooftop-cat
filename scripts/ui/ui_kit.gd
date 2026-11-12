@@ -9,6 +9,7 @@ const CREAM := Color(1, 0.97, 0.9)
 const RED := Color(0.878, 0.251, 0.184)
 const GREEN := Color(0.45, 0.62, 0.36)
 const MIN_BUTTON := 88.0
+const FONT_MIN := 18  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서도 읽히게)
 const FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
 
 ## 종이 그림과 9칸 나누기 여백 (그림 픽셀, 가장자리 손그림 테두리가 늘어나지 않게)
@@ -125,6 +126,31 @@ static func label(text: String, font_size: int = 32, color: Color = BROWN, align
 	return l
 
 
+## 한 줄 글자가 width 안에 들어가게 글자 크기를 base에서 FONT_MIN까지 줄인다 (긴 숫자·이름)
+static func fit(l: Label, width: float, base: int) -> void:
+	var size := base
+	while size > FONT_MIN and FONT.get_string_size(l.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+		size -= 1
+	l.add_theme_font_size_override("font_size", size)
+
+
+## 띄어쓰기에서만 줄을 바꾼 글 (width 안, 글자 크기 size). Godot 자동 줄바꿈은 한글을 글자 사이에서도 끊어
+## "길어져 / 요."처럼 끝 글자가 혼자 남으므로 화면 글은 이걸로 나눈다 (2c-fix). 원래 있던 줄바꿈은 그대로
+static func wrap(text: String, size: int, width: float) -> String:
+	var out := PackedStringArray()
+	for para in text.split("\n"):
+		var line := ""
+		for word in para.split(" ", false):
+			var trial := word if line == "" else line + " " + word
+			if line != "" and FONT.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+				out.append(line)
+				line = word
+			else:
+				line = trial
+		out.append(line)
+	return "\n".join(out)
+
+
 static func icon(texture: Texture2D, size: float) -> TextureRect:
 	var t := TextureRect.new()
 	t.texture = texture
@@ -137,7 +163,7 @@ static func icon(texture: Texture2D, size: float) -> TextureRect:
 
 
 ## 빨간 동그라미 숫자 (받을 미션 보상 수). 글자는 badge_text로 바꿈
-static func badge(diameter: float = 38.0) -> Control:
+static func badge(diameter: float = 46.0) -> Control:  # 휴대폰에서도 숫자가 보이게 (2c-fix: 38은 폰에서 숫자가 안 보임)
 	var dot := Control.new()
 	dot.name = "Dot"
 	dot.size = Vector2(diameter, diameter)

@@ -11,7 +11,7 @@ const UPGRADE_INFO := {
 	"combo": ["콤보 가속", "콤보 배수가 더 적은 생선으로 올라가요.", "combo"],
 	"gold": ["황금 생선", "황금 생선 한 마리 점수가 올라가요.", "gold"],
 	"cookie": ["하트 쿠키", "하트를 채워 주는 쿠키가 더 자주 나와요.", "cookie_clock"],
-	"fish": ["생선 점수", "생선 한 마리 점수가 올라요.\n3·6·10단계에 생선이 바뀌어요!", "fish"],
+	"fish": ["생선 점수", "생선 한 마리 점수가 올라요.\n3, 6, 10단계에 생선이 바뀌어요!", "fish"],
 }
 const BOOSTER_INFO := {
 	"dash_start": ["질주로 출발", "시작하자마자 질주로 앞부분을 슝 지나가요.", "dash_start"],
@@ -20,6 +20,7 @@ const BOOSTER_INFO := {
 }
 const WORLD := preload("res://scripts/world_view.gd")  # 생선 그림 4단계 (FISH_LOOKS)
 const ROW_H := 90.0
+const DESC_W := 470.0  # 설명 글 폭 (패널 손그림 테두리 안)
 const DOT_R := 9.0
 
 var tab := "upgrades"
@@ -68,15 +69,15 @@ func _init(main_node: Node) -> void:
 	_art.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(_art)
 	col.add_child(_title)
-	_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_desc.custom_minimum_size = Vector2(480, 80)
+	_desc.custom_minimum_size = Vector2(DESC_W, 80)
 	col.add_child(_desc)
 	var change := HBoxContainer.new()
 	change.alignment = BoxContainer.ALIGNMENT_CENTER
 	change.add_theme_constant_override("separation", 12)
-	for l: Label in [_now, UiKit.label("→", 40), _next]:
-		l.custom_minimum_size.x = 60
-		change.add_child(l)
+	var arrow := UiKit.icon(UiKit.ICONS.back, 52)  # 글꼴에 "→"가 없어 색연필 화살표 그림을 뒤집어 씀
+	arrow.flip_h = true
+	for c: Control in [_now, arrow, _next]:
+		change.add_child(c)
 	_now.custom_minimum_size.x = 190
 	_next.custom_minimum_size.x = 190
 	col.add_child(change)
@@ -125,6 +126,7 @@ func _fill_list() -> void:
 		var row := HBoxContainer.new()
 		row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 		row.offset_left = 26 + (14 if kind == selected else 0)  # 고른 줄은 튀어나온 듯 오른쪽으로
+		row.offset_right = -26  # 오른쪽 손그림 테두리 안
 		row.add_theme_constant_override("separation", 14)
 		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(UiKit.icon(_icon(kind), 66))
@@ -183,7 +185,7 @@ func _show_detail() -> void:
 	var info: Array = _info()[selected]
 	_art.texture = _icon(selected)
 	_title.text = info[0]
-	_desc.text = info[1]
+	_desc.text = UiKit.wrap(info[1], 30, DESC_W)
 	var price: int
 	if tab == "upgrades":
 		var lv: int = main.save.upgrade_level(selected)

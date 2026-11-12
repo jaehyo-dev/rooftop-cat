@@ -30,6 +30,7 @@ var _sprite := Sprite2D.new()
 var _spring := Spring.new(Balance.CAT_SPRING_HZ, Balance.CAT_SPRING_DAMPING)
 var _tilt := 0.0
 var _last := {}  # 지난 프레임의 sim 타이머·상태 (줄어들었으면 그 일이 새로 일어난 것)
+var _stand := 0.0  # 앉아 있다 달리기 시작한 뒤 "일어남" 그림을 보일 남은 시간
 
 
 func _ready() -> void:
@@ -85,6 +86,10 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 		_spring.step(pose.scale, dt)
 		_tilt = lerpf(_tilt, pose.tilt, 1.0 - exp(-TILT_SMOOTH * dt))
 	_remember(sim)
+	if _stand > 0.0 and dt > 0.0:
+		_stand -= dt
+		frame_name = "sit_up"  # 앉아 있다가 일어나며 달리기로
+		_sprite.texture = _textures[frame_name]
 	# 발끝(원점)을 기준으로 늘이고 줄이고 기울여서 옥상에 붙어 있게 한다 (스프링이 넘쳐도 뒤집히지 않게 하한)
 	scale = _spring.value.max(Vector2(0.5, 0.5)) * art_scale()
 	rotation_degrees = _tilt + stagger(sim.time_since_hit)
@@ -100,6 +105,17 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 		modulate.a = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
 	elif sim.invuln_time > 0.0:
 		modulate.a = 0.3 if int(sim.invuln_time / INVULN_BLINK) % 2 == 0 else 0.9
+
+
+## 시작 화면: 앉아서 꼬리를 흔든다 (t = 앉아 있은 시간). 다음 달리기 첫 순간에 "일어남"을 보이게 해 둔다
+func show_sit(t: float) -> void:
+	frame_name = CatPose.sit_frame(t)
+	_sprite.texture = _textures[frame_name]
+	_sprite.rotation = 0.0
+	rotation = 0.0
+	scale = Vector2.ONE * art_scale()
+	modulate = Color.WHITE
+	_stand = CatPose.STAND_TIME
 
 
 ## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다

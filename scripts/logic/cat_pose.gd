@@ -12,8 +12,23 @@ const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.04, 0.97), Vector2(1.02, 0.99
 const FLIP_FRAMES := ["flip_tuck", "flip_curl", "flip_ball", "flip_open"]
 const FLIP_FROM_DEG := [0.0, 25.0, 60.0, 300.0]
 const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail",
-		"flip_tuck", "flip_curl", "flip_ball", "flip_open"]
+		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "sit_0", "sit_1", "sit_2", "sit_blink", "sit_up"]
+## 시작 화면: 앉아서 천천히 꼬리 흔들기 (꼬리 아래 → 가운데 → 위 → 가운데), 가끔 눈 깜빡임 (2c-fix)
+const SIT_FRAMES := ["sit_2", "sit_0", "sit_1", "sit_0"]
+const SIT_STEP := 0.4        # 꼬리 그림 하나 시간 (초)
+const SIT_BLINK_EVERY := 3   # 꼬리 몇 바퀴마다 한 번 깜빡 (눈 감은 그림은 꼬리 가운데 그림과 같아 그 칸에서만)
+const SIT_BLINK_TIME := 0.16
+const STAND_TIME := 0.15     # [시작]을 누르면 이만큼 "일어남" 그림을 보이고 달리기로
 const NO_FLIP := 99.0
+
+
+## 시작 화면에서 t초 동안 앉아 있을 때의 그림
+static func sit_frame(t: float) -> String:
+	var step := int(maxf(t, 0.0) / SIT_STEP)
+	var lap := step / SIT_FRAMES.size()
+	if step % SIT_FRAMES.size() == 1 and lap % SIT_BLINK_EVERY == SIT_BLINK_EVERY - 1 and absf(fmod(t, SIT_STEP) - SIT_STEP * 0.5) < SIT_BLINK_TIME * 0.5:  # 그 칸 한가운데
+		return "sit_blink"
+	return SIT_FRAMES[step % SIT_FRAMES.size()]
 
 
 ## sim의 상태로 자세를 정한다. 돌려주는 값: frame(그림 이름), scale(몸 전체 목표 배율), tilt(기울기),

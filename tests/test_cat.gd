@@ -150,8 +150,16 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝
 
 
 func test_달리기_프레임은_몸_중심이_흔들리지_않는다() -> void:
-	# 꼬리 쪽(왼쪽 30%)을 뺀 불투명 픽셀의 가로 무게중심이 프레임마다 거의 같아야 화면이 떨리지 않는다
+	# 꼬리 쪽(왼쪽 30%)을 뺀 불투명 픽셀의 가로 무게중심이 프레임마다 거의 같아야 화면이 떨리지 않는다.
+	# 앉은 그림은 꼬리만 달라 무게중심 대신 오른쪽 끝(얼굴·가슴)을 맞춤 (review/v0.7.0/2c-fix/cut_sit.py): 모두 같은 오른쪽 끝
+	var sit_right := -1
+	for frame in CatPose.SIT_FRAMES + ["sit_blink"]:
+		var right: int = load(CatView.FRAME_DIR + frame + ".png").get_image().get_used_rect().end.x
+		sit_right = right if sit_right < 0 else sit_right
+		assert_true(absi(right - sit_right) <= 2, "%s 오른쪽 끝 %d (sit_2 %d)" % [frame, right, sit_right])
 	for frame in CatPose.ALL_FRAMES:
+		if frame in CatPose.SIT_FRAMES and frame != "sit_0" or frame == "sit_blink":
+			continue
 		var image: Image = load(CatView.FRAME_DIR + frame + ".png").get_image()
 		var used := image.get_used_rect()
 		var left := used.position.x + used.size.x * 0.3
@@ -276,4 +284,43 @@ func test_공중제비_회전축은_몸_가운데() -> void:
 	assert_eq(sprite.position + sprite.offset, -CatView.ANCHOR)
 	# 축은 발끝 위 몸 높이의 절반 (게임 픽셀)
 	assert_true(absf(sprite.position.y * CatView.art_scale() + Balance.CAT_BODY_SIZE.y * 0.5) < 0.01)
+	cat.queue_free()
+
+
+func test_시작_화면은_앉아서_꼬리를_천천히_흔들고_가끔_눈을_깜빡인다() -> void:
+	var frames := []
+	var blinks := 0
+	var t := 0.0
+	while t < CatPose.SIT_STEP * 4.0 * CatPose.SIT_BLINK_EVERY:
+		var f := CatPose.sit_frame(t)
+		assert_true(f.begins_with("sit_") and f != "sit_up", "앉은 그림 %s" % f)
+		if frames.is_empty() or frames[-1] != f:
+			frames.append(f)
+		blinks += int(f == "sit_blink")
+		t += 0.01
+	assert_eq(frames.slice(0, 4), ["sit_2", "sit_0", "sit_1", "sit_0"], "꼬리 아래 → 가운데 → 위 → 가운데")
+	assert_eq(frames.count("sit_blink"), 1, "세 바퀴에 한 번 깜빡")
+	assert_true(blinks * 0.01 <= CatPose.SIT_BLINK_TIME + 0.011, "깜빡임은 짧게")
+	# 눈 감은 그림은 꼬리 가운데 그림(sit_0) 사이에만 (꼬리가 튀지 않게)
+	var i: int = frames.find("sit_blink")
+	assert_eq([frames[i - 1], frames[i + 1]], ["sit_0", "sit_0"])
+
+
+func test_시작을_누르면_일어나는_그림을_잠깐_보이고_달린다() -> void:
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames()
+	var sim := _sim_on_roofs([{"left": 0.0, "right": 4000.0, "top": 0.0}])
+	cat.show_sit(0.0)
+	assert_eq(cat.frame_name, "sit_2")
+	cat.show_state(sim, 0.0)  # 시작 화면은 dt 0으로 자리만 맞춤: 일어나지 않음
+	cat.show_sit(0.5)
+	assert_eq(cat.frame_name, "sit_0")
+	sim.step(DT, false)
+	cat.show_state(sim, DT)
+	assert_eq(cat.frame_name, "sit_up", "시작 첫 순간")
+	for n in int(CatPose.STAND_TIME / DT) + 2:
+		sim.step(DT, false)
+		cat.show_state(sim, DT)
+	assert_true(cat.frame_name.begins_with("run_"), "그다음 달리기 %s" % cat.frame_name)
 	cat.queue_free()

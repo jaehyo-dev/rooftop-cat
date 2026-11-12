@@ -4,7 +4,7 @@ extends Control
 ## 등급이 오르면 카드 오른쪽에 배지가 도장처럼 쾅 찍힌다(보너스 생선·부스터 글자와 함께).
 ## 쪽지·배지는 버튼이 아니라 눌러도 지금처럼 "빈 곳 = 다시 하기"다.
 
-const NOTE := Vector2(330, 118)
+const NOTE := Vector2(330, 128)
 const MAX_NOTES := 3
 const NOTE_GAP := 0.35   # 쪽지가 붙는 사이 (초)
 const BOOSTER_NAMES := {"dash_start": "질주로 출발", "bell_start": "방울", "fish_bonus": "생선 +50%"}
@@ -26,7 +26,7 @@ func _init(main_node: Node) -> void:
 	add_child(_notes)
 	_rank.name = "RankUp"
 	_rank.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_rank.size = Vector2(250, 300)
+	_rank.size = Vector2(250, 350)
 	_rank.draw.connect(func() -> void: UiKit.draw_rank_ring(_rank, Vector2(125, 92), 78.0, _rank_level))
 	add_child(_rank)
 
@@ -70,14 +70,14 @@ func _note(done: Dictionary, index: int, more: int) -> Control:
 	var art := UiKit.icon(UiKit.ICONS[MissionBoard.STAT_ICONS.get(stat, "note_check")], 46)
 	art.position = Vector2(14, 20)
 	note.add_child(art)
-	var text := UiKit.label(Missions.text(done.id), 24)
-	text.position = Vector2(66, 8)
-	text.size = Vector2(NOTE.x - 78, 66)
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	var text := UiKit.label(UiKit.wrap(Missions.text(done.id), 24, NOTE.x - 78), 24)  # 띄어쓰기에서만 줄바꿈
+	text.position = Vector2(66, 18)  # 위 가운데 핀 아래
+	text.size = Vector2(NOTE.x - 78, 62)
 	note.add_child(text)
 	var reward := UiKit.label("미션 완료!  생선 %s%s" % [UiKit.comma(done.fish), "  외 %d개" % more if more > 0 else ""], 24, UiKit.RED)
 	reward.position = Vector2(20, NOTE.y - 44)
 	reward.size = Vector2(NOTE.x - 30, 34)
+	UiKit.fit(reward, reward.size.x, 24)
 	note.add_child(reward)
 	return note
 
@@ -112,20 +112,23 @@ func _show_rank(ranks: Array, card: Rect2, delay: float) -> void:
 	face.position = Vector2(50, 10)
 	face.size = Vector2(150, 150)
 	_rank.add_child(face)
-	var title := UiKit.label("등급이 올랐어요!", 32, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
-	title.position = Vector2(0, 168)
-	title.size = Vector2(250, 40)
-	_rank.add_child(title)
-	var name_label := UiKit.label(CatRank.rank_name(last.level), 36, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-	name_label.position = Vector2(0, 206)
-	name_label.size = Vector2(250, 44)
-	_rank.add_child(name_label)
+	# 글자는 종이 위에 (배경의 생선·건물 위에서도 읽히게, 2c-fix)
+	var paper := UiKit.paper("note")
+	paper.position = Vector2(0, 158)
+	paper.size = Vector2(_rank.size.x, _rank.size.y - 158)
+	_rank.add_child(paper)
+	var inner_w := paper.size.x - 28.0
+	var title := UiKit.label("등급이 올랐어요!", 30, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
+	UiKit.fit(title, inner_w, 30)
+	var name_label := UiKit.label(CatRank.rank_name(last.level), 34, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	UiKit.fit(name_label, inner_w, 34)
 	var names := boosters.map(func(k: String) -> String: return BOOSTER_NAMES.get(k, k))
-	var bonus := UiKit.label("생선 +%s%s" % [UiKit.comma(fish), "\n+ " + ", ".join(names) if not names.is_empty() else ""], 24, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-	bonus.position = Vector2(0, 248)
-	bonus.size = Vector2(250, 60)
-	bonus.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_rank.add_child(bonus)
+	var bonus := UiKit.label(UiKit.wrap("생선 +%s%s" % [UiKit.comma(fish), "\n+ " + ", ".join(names) if not names.is_empty() else ""], 24, inner_w), 24, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
+	for row: Array in [[title, 10.0, 38.0], [name_label, 46.0, 42.0], [bonus, 88.0, 92.0]]:
+		var l: Label = row[0]
+		l.position = Vector2(14, row[1])
+		l.size = Vector2(inner_w, row[2])
+		paper.add_child(l)
 	_rank.visible = false
 	var tween := _rank.create_tween()
 	tween.tween_interval(delay)

@@ -222,6 +222,7 @@ var make_perks: Callable
 var touch_blockers: Array[Control] = []
 ## 시작 화면: 판이 멈춘 채 그려지고, 빈 곳 누름은 start_pressed가 된다 (prepare가 켜고 restart가 끔)
 var waiting := false
+var _sit_time := 0.0  # 시작 화면에서 앉아 있은 시간 (꼬리 흔들기)
 ## 상점·미션 화면: 입력을 모두 무시한다 (결과 카드 뒤의 판이 다시 시작되지 않게, 스페이스 포함)
 var input_off := false:
 	set(value):
@@ -327,6 +328,7 @@ func _process(delta: float) -> void:
 		_tap_pending = false
 		if waiting and press_started and not input_off:
 			start_pressed.emit()
+		_sit_time += delta
 		_place_cat(0.0)
 		_overlay.queue_redraw()
 		return
@@ -562,7 +564,10 @@ func _place_cat(delta: float) -> void:
 	var lift := tramp_cat_lift(sim)
 	_cat_lift = lift if delta <= 0.0 else lerpf(_cat_lift, lift, 1.0 - exp(-CAT_LIFT_RATE * delta))
 	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK - _cat_lift)
-	cat.show_state(sim, delta)
+	if waiting:
+		cat.show_sit(_sit_time)  # 시작 화면: 앉아서 꼬리 흔들기
+	else:
+		cat.show_state(sim, delta)
 
 
 ## 시작 화면: 강화 없이 판을 만들어 멈춰 둔다 (부스터를 줄이지 않음). [시작]은 같은 시드로 restart해 옥상이 그대로다

@@ -14,7 +14,7 @@ const server = createServer(async (req, res) => {
 });
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const url = `http://127.0.0.1:${server.address().port}/`;
-const browser = await chromium.launch();  // 기본 headless (창 없음)
+const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});  // 기본 headless (창 없음). CHROME = 이미 받은 브라우저 경로(버전이 다를 때)
 let code = 0;
 try {
   for (const [name, vp, mobile] of [["pc_1280x720", { width: 1280, height: 720 }, false], ["phone_844x390", { width: 844, height: 390 }, true]]) {

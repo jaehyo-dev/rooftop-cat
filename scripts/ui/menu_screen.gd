@@ -8,6 +8,7 @@ signal back
 
 const BOX := Vector2(1280, 720)
 const OPEN_TIME := 0.25
+const WALLET_RIGHT := 64.0  # 지갑 오른쪽 집게 자리
 
 var main: Node
 var box := Control.new()
@@ -44,21 +45,22 @@ func _init(main_node: Node, screen_name: String) -> void:
 	back_button.pressed.connect(func() -> void: back.emit())
 	box.add_child(back_button)
 	wallet.name = "Wallet"
-	wallet.position = Vector2(BOX.x - 290, 14)
-	wallet.size = Vector2(270, 88)
+	wallet.position = Vector2(BOX.x - 310, 14)
+	wallet.size = Vector2(290, 88)
 	var tag := UiKit.paper("cream")
 	tag.set_anchors_preset(Control.PRESET_FULL_RECT)
 	wallet.add_child(tag)
 	var row := HBoxContainer.new()
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 10)
 	row.offset_left = 22
+	row.offset_right = -WALLET_RIGHT  # 오른쪽 위 집게 자리는 비움
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(UiKit.icon(UiKit.ICONS.fish, 64))
 	_wallet_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_wallet_label)
 	wallet.add_child(row)
 	var clip := UiKit.icon(UiKit.CLIP, 56)
-	clip.position = Vector2(206, -8)
+	clip.position = Vector2(wallet.size.x - 60, -14)
 	wallet.add_child(clip)
 	box.add_child(wallet)
 
@@ -103,7 +105,12 @@ func refresh() -> void:
 ## 지갑 숫자를 바로 바꾼다 (사기처럼 줄어들 때)
 func set_wallet(fish: int) -> void:
 	_shown_fish = fish
+	_show_wallet(fish)
+
+
+func _show_wallet(fish: int) -> void:
 	_wallet_label.text = UiKit.comma(fish)
+	UiKit.fit(_wallet_label, wallet.size.x - 22 - 64 - 4 - WALLET_RIGHT, 40)
 
 
 ## 받은 생선이 from(상자 좌표)에서 지갑으로 날아가며 숫자가 차오름. 끝나면 실제 지갑 값
@@ -113,5 +120,5 @@ func fly_to_wallet(from: Vector2, amount: int) -> void:
 	var target: int = main.save.fish()
 	UiKit.fly(box, from, wallet.position + Vector2(50, 44), count, func(i: int) -> void:
 		_shown_fish = target if i == count - 1 else _shown_fish + step
-		_wallet_label.text = UiKit.comma(int(_shown_fish))
+		_show_wallet(int(_shown_fish))
 		UiKit.pop(wallet, 0.08))
