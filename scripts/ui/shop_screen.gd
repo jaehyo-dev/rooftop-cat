@@ -36,6 +36,8 @@ var _now := UiKit.label("", 38, UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 var _next := UiKit.label("", 38, UiKit.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
 var _buy := UiKit.button("", "orange", UiKit.ICONS.fish, 46)
 var _pop_dot := {"kind": "", "t": 99.0}  # 방금 채운 단계 점 (톡 튀기)
+var _hold := {}    # 생선이 날아오는 동안 단계 점을 산 전 단계로 그림 (종류 → 단계)
+var _counts := {}  # 부스터 종류 → 가진 개수 글자
 
 
 func _init(main_node: Node) -> void:
@@ -97,6 +99,7 @@ func refresh() -> void:
 
 
 func show_tab(t: String) -> void:
+	finish_fx()
 	if t != tab:
 		main.play_ui("page")
 	tab = t
@@ -114,11 +117,13 @@ func _fill_list() -> void:
 		_list.remove_child(child)
 	_rows.clear()
 	_dots.clear()
+	_counts.clear()
 	for kind: String in _info():
 		var b := UiKit.button("", "orange" if kind == selected else "cream")
 		b.name = kind
 		b.custom_minimum_size = Vector2(0, ROW_H)
 		b.pressed.connect(func() -> void:
+			finish_fx()
 			if selected != kind:
 				main.play_ui("booster_on")
 			selected = kind
@@ -145,6 +150,7 @@ func _fill_list() -> void:
 			owned.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			owned.custom_minimum_size.x = 60
 			row.add_child(owned)
+			_counts[kind] = owned
 		b.add_child(row)
 		_list.add_child(b)
 		_rows[kind] = b
@@ -162,10 +168,10 @@ static func _fish_look(level: int) -> int:
 
 ## 단계 점 10개 (채운 점 = 산 단계). 방금 산 점은 커졌다 돌아옴
 func _draw_dots(dots: Control, kind: String) -> void:
-	var lv: int = main.save.upgrade_level(kind)
+	var lv: int = _hold.get(kind, main.save.upgrade_level(kind))
 	var y := dots.size.y * 0.5
 	for i in Balance.UPGRADE_MAX:
-		var at := Vector2(DOT_R + 4.0 + i * (DOT_R * 2.0 + 6.0), y)
+		var at := dot_at(dots, i)
 		var r := DOT_R
 		if _pop_dot.kind == kind and i == lv - 1:
 			r *= 1.0 + 0.8 * maxf(0.0, 1.0 - _pop_dot.t / 0.35)
@@ -178,6 +184,11 @@ func _process(delta: float) -> void:
 		_pop_dot.t += delta
 		if _dots.has(_pop_dot.kind):
 			_dots[_pop_dot.kind].queue_redraw()
+
+
+## 단계 점 i번 자리 (점 Control 좌표)
+static func dot_at(dots: Control, i: int) -> Vector2:
+	return Vector2(DOT_R + 4.0 + i * (DOT_R * 2.0 + 6.0), dots.size.y * 0.5)
 
 
 ## 오른쪽 패널: 고른 것의 설명, 지금 → 다음, 사기 버튼 (최대·돈 부족 표시)
@@ -224,22 +235,58 @@ static func value_text(kind: String, level: int) -> String:
 	return "%d점" % roundi(v)
 
 
-## 사기 (돈이 모자라면 뿌뿌 + 버튼 흔들림, 최대면 아무것도 안 함)
+## 사기 (돈이 모자라면 뿌뿌 + 버튼 흔들림, 최대면 아무것도 안 함). 연출 (2c 피드백):
+## 강화 = 버튼 찌그러짐 → 지갑 생선 3마리가 새 단계 점으로 날아감 → 점이 톡 채워지며 별 + "지금" 값 튐 (소리는 단계마다 한 음씩 높게, 10단계는 팡파르·별 더)
+## 부스터 = 부스터 그림이 목록의 개수 칸으로 쏙 → "+1" + 개수 튐
 func buy() -> void:
-	var result: String = main.save.buy_upgrade(selected) if tab == "upgrades" else main.save.buy_booster(selected)
+	finish_fx()
+	var kind := selected
+	var upgrade := tab == "upgrades"
+	var result: String = main.save.buy_upgrade(kind) if upgrade else main.save.buy_booster(kind)
 	if result == "money":
 		main.play_ui("no_money")
 		_shake(_buy)
 		return
 	if result != "":
 		return
-	main.play_ui("buy" if tab == "upgrades" else "booster_buy")
+	main.play_ui("booster_on")
+	track(UiKit.squash(_buy))
 	set_wallet(main.save.fish())
 	UiKit.pop(wallet, 0.08)
-	_pop_dot = {"kind": selected, "t": 0.0}
+	if upgrade:
+		var lv: int = main.save.upgrade_level(kind)
+		_hold[kind] = lv - 1
+		var spot := to_box(_dots[kind], dot_at(_dots[kind], lv - 1))
+		track(UiKit.fly(box, wallet_spot(), spot, 3, func(i: int) -> void:
+			if i == 2:
+				_upgrade_landed(kind, lv, spot), UiKit.ICONS.fish, 40.0, 0.36))
+	else:
+		var owned: Label = _counts[kind]
+		var spot := to_box(owned, owned.size * 0.5)
+		track(UiKit.fly(box, to_box(_art, _art.size * 0.5), spot, 1, func(_i: int) -> void: _booster_landed(kind, spot),
+				_icon(kind), 96.0, 0.4))
+
+
+func _upgrade_landed(kind: String, level: int, spot: Vector2) -> void:
+	_hold.erase(kind)
+	_pop_dot = {"kind": kind, "t": 0.0}
 	refresh()
+	var top := level >= Balance.UPGRADE_MAX
+	main.play_ui("fanfare" if top else "buy", 1.0 if top else pow(2.0, (level - 1) / 12.0))  # 한 단계 = 반음
+	track(UiKit.burst(box, spot, 14 if top else 5, "star", 150.0 if top else 56.0))
+	if top:
+		track(UiKit.burst(box, to_box(_art, _art.size * 0.5), 12, "star", 200.0))
+	UiKit.pop(_now, 0.45 if top else 0.3)
+	UiKit.pop(_art, 0.3 if top else 0.15)
+
+
+func _booster_landed(kind: String, spot: Vector2) -> void:
+	refresh()
+	main.play_ui("pop_in")
+	track(UiKit.float_text(box, spot + Vector2(0, -36), "+1"))
+	if _counts.has(kind):
+		UiKit.pop(_counts[kind], 0.5)
 	UiKit.pop(_now, 0.3)
-	UiKit.pop(_art, 0.15)
 
 
 func _shake(control: Control) -> void:

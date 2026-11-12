@@ -16,6 +16,7 @@ var wallet := Control.new()
 var _wallet_label := UiKit.label("0", 40)
 var _shown_fish := 0.0  # 지갑에 보이는 수 (날아온 생선만큼 차오름)
 var _closing: Tween    # 닫는 중 (그 사이 다시 열면 멈춤)
+var _fx: Array = []    # 지금 도는 연출 (다음 누름 때 UiKit.finish로 바로 끝냄)
 
 
 func _init(main_node: Node, screen_name: String) -> void:
@@ -26,7 +27,11 @@ func _init(main_node: Node, screen_name: String) -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var veil := ColorRect.new()
 	veil.color = Color(1, 0.96, 0.9, 0.55)
-	veil.set_anchors_preset(Control.PRESET_FULL_RECT)
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for side in [SIDE_LEFT, SIDE_TOP]:  # 화면이 흔들려도 가장자리가 비지 않게 넉넉히
+		veil.set_offset(side, -20.0)
+	for side in [SIDE_RIGHT, SIDE_BOTTOM]:
+		veil.set_offset(side, 20.0)
 	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(veil)
 	box.name = "Box"
@@ -83,6 +88,7 @@ func open() -> void:
 
 
 func close() -> void:
+	finish_fx()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE  # 사라지는 동안 뒤 화면 터치를 막지 않게
 	_set_buttons(Control.MOUSE_FILTER_IGNORE)
 	_closing = create_tween()
@@ -118,7 +124,42 @@ func fly_to_wallet(from: Vector2, amount: int) -> void:
 	var count := clampi(amount / 100, 4, 10)
 	var step := float(amount) / count
 	var target: int = main.save.fish()
-	UiKit.fly(box, from, wallet.position + Vector2(50, 44), count, func(i: int) -> void:
+	track(UiKit.fly(box, from, wallet_spot(), count, func(i: int) -> void:
 		_shown_fish = target if i == count - 1 else _shown_fish + step
 		_show_wallet(int(_shown_fish))
-		UiKit.pop(wallet, 0.08))
+		UiKit.pop(wallet, 0.08)))
+
+
+## 지갑 생선 자리 (상자 좌표)
+func wallet_spot() -> Vector2:
+	return wallet.position + Vector2(50, 44)
+
+
+## control 안의 점을 상자 좌표로
+func to_box(control: Control, local: Vector2) -> Vector2:
+	return box.get_global_transform().affine_inverse() * control.get_global_transform() * local
+
+
+## 연출 기억 (Tween 하나 또는 여러 개)
+func track(what: Variant) -> void:
+	if what is Array:
+		_fx.append_array(what)
+	else:
+		_fx.append(what)
+
+
+## 앞 연출을 끝 모습으로 (누를 때마다 먼저 부름: 연출 중에도 바로 다음 누름을 받음)
+func finish_fx() -> void:
+	for i in 4:  # 끝나며 다음 연출을 거는 것(도장 → 생선)까지
+		if _fx.is_empty():
+			return
+		var list := _fx.duplicate()
+		_fx.clear()
+		UiKit.finish(list)
+
+
+## 쿵: 소리 + 화면 흔들림 + at(상자 좌표)에 잉크 방울
+func thump(at: Vector2) -> void:
+	main.play_ui("thud")
+	track(UiKit.shake(self))
+	track(UiKit.burst(box, at, 9, "ink", 64.0))

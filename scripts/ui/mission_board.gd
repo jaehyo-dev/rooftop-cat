@@ -19,7 +19,9 @@ var _rank_label := UiKit.label("", 34)
 var _headers := [UiKit.label("", 28), UiKit.label("", 28)]
 var _notes := []         # [weekly, slot] 순서로 6장 Control
 var _confirm := {"key": "", "t": 0.0}  # 바꾸기 확인 중인 쪽지 ("d0" 등)
-var _stamped := {}       # 이번에 받아 도장을 찍을 쪽지 key
+var _stamped := {}       # 이번에 받아 도장을 찍을 쪽지 key → 받은 생선
+var _seen_level := 0     # 지난번 열었을 때 등급 (오르면 열 때 배지를 쿵)
+var _face: TextureRect
 
 
 func _init(main_node: Node) -> void:
@@ -32,10 +34,10 @@ func _init(main_node: Node) -> void:
 	_rank_label.position = Vector2(112, 4)
 	_rank_label.size = Vector2(620, 44)
 	_rank.add_child(_rank_label)
-	var face := UiKit.icon(UiKit.ICONS.rank_face, 92)
-	face.position = Vector2(6, 2)
-	face.size = Vector2(92, 92)
-	_rank.add_child(face)
+	_face = UiKit.icon(UiKit.ICONS.rank_face, 92)
+	_face.position = Vector2(6, 2)
+	_face.size = Vector2(92, 92)
+	_rank.add_child(_face)
 	box.add_child(_rank)
 	# 코르크판
 	var cork := UiKit.paper("cork")
@@ -76,6 +78,7 @@ func _key(weekly: bool, slot: int) -> String:
 
 
 func refresh() -> void:
+	finish_fx()  # 쪽지를 다시 만들기 전에 도장·생선 연출을 끝냄 (도장이 사라져 지갑이 덜 찬 채 남지 않게)
 	var data: Dictionary = main.save.data
 	var r: Dictionary = data.rank
 	_rank_label.text = "%s  %d등급    %s / %s" % [CatRank.rank_name(r.level), r.level, UiKit.comma(r.xp), UiKit.comma(CatRank.next_xp(r.level))]
@@ -163,8 +166,9 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		stamp.modulate = Color(1, 1, 1, 0.9)
 		note.add_child(stamp)
 		if _stamped.has(key):
+			var got: int = _stamped[key]
 			_stamped.erase(key)
-			UiKit.stamp(stamp)
+			track(UiKit.stamp(stamp, -0.2, _stamp_hit.bind(note, stamp, got)))
 	elif Missions.can_swap(main.save.data, weekly, slot):
 		var price := Missions.swap_price(main.save.data, weekly)
 		var asking: bool = _confirm.key == key
@@ -182,24 +186,45 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		note.add_child(swap)
 
 
-## 받기: 생선이 지갑으로 날아가고 도장이 쾅
+## 받기 (2c 피드백): 도장이 위에서 휙 내려와 쿵 찍힘(화면 흔들림·잉크) → 생선이 지갑으로 날아가 숫자가 차오름.
+## 여러 장을 빨리 받으면 앞 연출을 끝 모습으로 넘기고 바로 다음 쿵
 func claim(weekly: bool, slot: int) -> void:
+	finish_fx()
 	var before: int = main.save.fish()
 	var got := Missions.claim(main.save.data, weekly, slot)
 	if got <= 0:
 		return
 	main.save.save()
-	main.play_ui("claim")
+	main.play_ui("whoosh")
 	set_wallet(before)  # 날아온 생선만큼 여기서부터 차오름
 	var note: Control = _notes[slot + (3 if weekly else 0)]
-	fly_to_wallet(note.position + Vector2(90, NOTE.y - 54), got)
-	_stamped[_key(weekly, slot)] = true
+	_stamped[_key(weekly, slot)] = got
 	_fill_note(note, weekly, slot)
 	main.refresh_menus()
 
 
+func _stamp_hit(note: Control, stamp: Control, got: int) -> void:
+	thump(to_box(stamp, stamp.size * 0.5))
+	main.play_ui("claim")
+	fly_to_wallet(note.position + Vector2(90, NOTE.y - 54), got)
+
+
+## 열 때 지난번보다 등급이 올랐으면 리본 배지를 쿵 (판에서 미션을 깨 오른 등급)
+func open() -> void:
+	super.open()
+	var level: int = main.save.data.rank.level
+	if _seen_level > 0 and level > _seen_level:
+		main.play_ui("whoosh")
+		track(UiKit.stamp(_face, 0.0, func() -> void:
+			thump(to_box(_face, _face.size * 0.5))
+			main.play_ui("rank_up")
+			track(UiKit.burst(box, to_box(_face, _face.size * 0.5), 10, "star", 110.0))))
+	_seen_level = level
+
+
 ## 바꾸기: 첫 번째는 "정말?"으로 묻고, CONFIRM_TIME 안에 한 번 더 누르면 생선을 내고 바꾼다
 func swap_pressed(weekly: bool, slot: int) -> void:
+	finish_fx()
 	var key := _key(weekly, slot)
 	if _confirm.key != key:
 		_confirm = {"key": key, "t": 0.0}

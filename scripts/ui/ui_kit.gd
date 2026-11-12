@@ -8,6 +8,7 @@ const BROWN := Color(0.353, 0.275, 0.212)
 const CREAM := Color(1, 0.97, 0.9)
 const RED := Color(0.878, 0.251, 0.184)
 const GREEN := Color(0.45, 0.62, 0.36)
+const INK := Color(0.72, 0.22, 0.2, 0.85)  # 도장 잉크 (발바닥 도장 빨강)
 const MIN_BUTTON := 88.0
 const FONT_MIN := 18  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서도 읽히게)
 const FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
@@ -59,7 +60,7 @@ const RANK_RINGS := [Color("#f3e3c3"), Color("#9fd0e8"), Color("#9cc98a"), Color
 ## 연출 시간 (초)
 const POP_TIME := 0.18
 const FLY_TIME := 0.55
-const STAMP_TIME := 0.28
+const STAMP_TIME := 0.2  # 휙 내려오는 시간 (그 뒤 0.16초 눌렸다 돌아옴)
 
 
 ## 종이 패널 (9칸 늘림)
@@ -201,24 +202,116 @@ static func pop(control: Control, amount: float = 0.25) -> void:
 	tween.tween_property(control, "scale", Vector2.ONE, POP_TIME * 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 
-## 도장 쾅: 크게 기울어진 채 내려와 찍히고 살짝 튄다
-static func stamp(control: Control, angle: float = -0.2) -> void:
+## 도장 쿵 (2c 피드백): 위에서 크게 기울어진 채 내려와(휙) 찍히는 순간 납작하게 눌렸다 돌아온다.
+## 찍히는 순간 on_hit()을 부른다 (쿵 소리·화면 흔들림·잉크는 부르는 쪽이 정함). 끝까지 STAMP_TIME + 0.16초
+static func stamp(control: Control, angle: float = -0.2, on_hit: Callable = Callable()) -> Tween:
 	control.pivot_offset = control.size * 0.5
-	control.scale = Vector2.ONE * 2.2
-	control.rotation = angle - 0.3
+	var rest := control.position
+	control.position = rest + Vector2(30.0, -90.0)
+	control.scale = Vector2.ONE * 2.4
+	control.rotation = angle - 0.35
 	control.modulate.a = 0.0
-	var tween := control.create_tween().set_parallel()
-	tween.tween_property(control, "scale", Vector2.ONE, STAMP_TIME).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var tween := control.create_tween()
+	tween.set_parallel()
+	tween.tween_property(control, "scale", Vector2.ONE, STAMP_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(control, "position", rest, STAMP_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_property(control, "rotation", angle, STAMP_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(control, "modulate:a", 1.0, STAMP_TIME * 0.4)
+	tween.chain().tween_callback(func() -> void:
+		if on_hit.is_valid():
+			on_hit.call())
+	tween.chain().tween_property(control, "scale", Vector2(1.14, 0.84), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_property(control, "scale", Vector2.ONE, 0.11).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return tween
 
 
-## 생선 count마리가 from에서 to로 포물선을 그리며 날아간다 (layer 좌표). 하나 닿을 때마다 on_each(i)를 부른다
-static func fly(layer: Control, from: Vector2, to: Vector2, count: int, on_each: Callable = Callable()) -> void:
+## 버튼이 눌리며 살짝 찌그러짐 (가로로 넓고 세로로 납작 → 돌아옴)
+static func squash(control: Control) -> Tween:
+	control.pivot_offset = control.size * 0.5
+	var tween := control.create_tween()
+	tween.tween_property(control, "scale", Vector2(1.08, 0.88), 0.05).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(control, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	return tween
+
+
+## 흔들림 (화면 흔들림은 메뉴 화면·결과 카드를 통째로): Juice.shake_offset, 끝나면 제자리.
+## 흔들리는 중에 또 흔들어도 제자리가 밀리지 않게 처음 자리를 meta로 기억한다
+static func shake(control: Control, strength: float = 6.0, time: float = 0.14) -> Tween:
+	if not control.has_meta("shake_rest"):
+		control.set_meta("shake_rest", control.position)
+	var rest: Vector2 = control.get_meta("shake_rest")
+	var tween := control.create_tween()
+	tween.tween_method(func(t: float) -> void: control.position = rest + Juice.shake_offset(t, time, strength), 0.0, time, time)
+	tween.tween_callback(func() -> void:
+		control.position = rest
+		control.remove_meta("shake_rest"))
+	return tween
+
+
+## 조각이 at(layer 좌표)에서 사방으로 튀어 사라진다. kind "star" = 작은 별 그림, "ink" = 도장 잉크 방울.
+## 번호로 방향·거리를 정해 무작위 없음
+static func burst(layer: Control, at: Vector2, count: int, kind: String = "star", reach: float = 70.0) -> Tween:
+	var pieces: Array[Control] = []
 	for i in count:
-		var fish := icon(ICONS.fish, 44.0)
-		fish.size = Vector2(44, 44)
-		fish.position = from - fish.size * 0.5 + Vector2((i * 37) % 60 - 30, (i * 23) % 40 - 20)  # 번호로 흩뜨림 (무작위 없음)
+		var piece: Control
+		if kind == "star":
+			piece = icon(ICONS.star, 26.0 + 8.0 * (i % 3))
+		else:
+			piece = Control.new()
+			piece.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var r := 4.0 + 3.0 * (i % 3)
+			piece.draw.connect(func() -> void: piece.draw_circle(piece.size * 0.5, r, INK))
+			piece.custom_minimum_size = Vector2(r, r) * 2.0
+		piece.size = piece.custom_minimum_size
+		piece.position = at - piece.size * 0.5
+		layer.add_child(piece)
+		pieces.append(piece)
+	var tween := layer.create_tween().set_parallel()
+	for i in count:
+		var piece := pieces[i]
+		var dir := Vector2.from_angle(TAU * (i + 0.3 * (i % 2)) / count - PI * 0.5)
+		var far := reach * (0.7 + 0.3 * ((i * 7) % 5) / 4.0)
+		var end := piece.position + dir * far + (Vector2(0, 18) if kind == "ink" else Vector2.ZERO)
+		tween.tween_property(piece, "position", end, 0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(piece, "rotation", 2.0 * dir.x, 0.32)
+		tween.tween_property(piece, "modulate:a", 0.0, 0.18).set_delay(0.16)
+	tween.chain().tween_callback(func() -> void:
+		for piece in pieces:
+			piece.queue_free())
+	return tween
+
+
+## 글자가 위로 떠오르며 사라짐 (부스터 "+1")
+static func float_text(layer: Control, at: Vector2, text: String, color: Color = GREEN) -> Tween:
+	var l := label(text, 40, color, HORIZONTAL_ALIGNMENT_CENTER)
+	l.size = Vector2(120, 50)
+	l.position = at - l.size * 0.5
+	layer.add_child(l)
+	pop(l, 0.4)
+	var tween := l.create_tween().set_parallel()
+	tween.tween_property(l, "position:y", l.position.y - 50.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(l, "modulate:a", 0.0, 0.25).set_delay(0.35)
+	tween.chain().tween_callback(l.queue_free)
+	return tween
+
+
+## 연출을 바로 끝 모습으로 (빨리 연달아 누르면 앞 연출을 짧게 끝냄). 끝에서 부르는 콜백도 다 불린다
+static func finish(tweens: Array) -> void:
+	for tween: Tween in tweens:
+		if tween and tween.is_valid() and tween.is_running():
+			tween.custom_step(60.0)
+	tweens.clear()
+
+
+## 그림 count개가 from에서 to로 포물선을 그리며 날아간다 (layer 좌표). 하나 닿을 때마다 on_each(i)를 부른다.
+## 기본은 생선 (받기 → 지갑, 사기 → 패널), 부스터 사기는 부스터 그림 하나
+static func fly(layer: Control, from: Vector2, to: Vector2, count: int, on_each: Callable = Callable(),
+		texture: Texture2D = ICONS.fish, size: float = 44.0, time: float = FLY_TIME) -> Array[Tween]:
+	var out: Array[Tween] = []
+	for i in count:
+		var fish := icon(texture, size)
+		fish.size = Vector2(size, size)
+		fish.position = from - fish.size * 0.5 + Vector2((i * 37) % 60 - 30, (i * 23) % 40 - 20) * (1.0 if count > 1 else 0.0)  # 번호로 흩뜨림 (무작위 없음)
 		layer.add_child(fish)
 		var start := fish.position
 		var end := to - fish.size * 0.5
@@ -228,11 +321,13 @@ static func fly(layer: Control, from: Vector2, to: Vector2, count: int, on_each:
 		tween.tween_method(func(k: float) -> void:
 			fish.position = start.lerp(end, k) + lift * 4.0 * k * (1.0 - k)  # 위로 둥글게
 			fish.rotation = -0.6 * (1.0 - k)
-			fish.scale = Vector2.ONE * lerpf(1.2, 0.7, k), 0.0, 1.0, FLY_TIME).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+			fish.scale = Vector2.ONE * lerpf(1.2, 0.7, k), 0.0, 1.0, time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		tween.tween_callback(func() -> void:
 			if on_each.is_valid():
 				on_each.call(i)
 			fish.queue_free())
+		out.append(tween)
+	return out
 
 
 ## 둥근 등급 배지: 얼굴 그림 + 등급 색 테두리 (그리기 함수, canvas = 그릴 Control)

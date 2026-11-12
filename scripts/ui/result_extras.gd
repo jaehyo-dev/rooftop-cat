@@ -135,5 +135,10 @@ func _show_rank(ranks: Array, card: Rect2, delay: float) -> void:
 	tween.tween_callback(func() -> void:
 		_rank.visible = true
 		_rank.queue_redraw()
-		main.play_ui("rank_up")
-		UiKit.stamp(_rank, -0.08))
+		main.play_ui("whoosh")
+		UiKit.stamp(_rank, -0.08, func() -> void:  # 미션 받기 도장과 같은 쿵 (2c 피드백)
+			main.play_ui("thud")
+			main.play_ui("rank_up")
+			UiKit.shake(get_parent())
+			UiKit.burst(self, _rank.position + Vector2(125, 92), 10, "ink", 120.0)
+			UiKit.burst(self, _rank.position + Vector2(125, 92), 8, "star", 150.0)))

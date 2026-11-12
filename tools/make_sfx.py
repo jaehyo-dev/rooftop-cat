@@ -191,8 +191,41 @@ def page() -> np.ndarray:
     return 0.45 * wind * np.sin(np.pi * t / 0.2) ** 2
 
 
+# --- 2c 피드백 (2026-11-12): 도장 휙·쿵, 10단계 팡파르, 부스터 쏙 ---
+
+def whoosh() -> np.ndarray:
+    """도장이 내려오는 휙: 높은 바람이 아래로 빠르게 미끄러짐 (끝에서 커졌다 뚝)"""
+    t = times(0.16)
+    wind = sum(np.sin(2 * np.pi * (f * t - 1800.0 * t * t)) for f in (1213.0, 1697.0, 2311.0)) / 3.0
+    return 0.5 * wind * (t / 0.16) ** 1.5 * np.minimum(1.0, (0.16 - t) * 200.0)
+
+
+def thud() -> np.ndarray:
+    """도장 쿵: 낮게 떨어지는 북소리 + 종이를 때리는 탁 (폰 스피커에서도 들리게 배음을 섞음)"""
+    t = times(0.24)
+    low = fade(sweep(170.0, 60.0, 0.24), 14.0)
+    slap = sum(np.sin(2 * np.pi * f * t) for f in (1873.0, 2741.0, 3529.0)) / 3.0 * np.exp(-t * 90.0)
+    return 0.9 * low + 0.35 * slap
+
+
+def fanfare() -> np.ndarray:
+    """강화 10단계 축하: 짧은 나팔 (솔-도-미-솔-도↑ 마지막은 길게)"""
+    def horn(freq: float, length: float) -> np.ndarray:
+        t = times(length)
+        tone = sum(np.sin(2 * np.pi * freq * k * t) / k for k in (1, 2, 3, 4))
+        return tone * np.minimum(1.0, t * 60.0) * np.exp(-t * 3.0)
+    notes = [(392.0, 0.0, 0.1), (523.0, 0.08, 0.1), (659.0, 0.16, 0.1), (784.0, 0.24, 0.1), (1047.0, 0.32, 0.33)]
+    return 0.45 * sum(at(horn(f, n), s, 0.66) for f, s, n in notes)
+
+
+def pop_in() -> np.ndarray:
+    """부스터가 칸에 쏙: 빠르게 올라가는 뽁 + 작은 딸랑"""
+    return 0.7 * at(fade(sweep(280.0, 900.0, 0.07), 25.0), 0.0, 0.3) + 0.4 * at(bell(1568.0, 0.16, 20.0), 0.06, 0.3)
+
+
 UI_SOUNDS = {"buy": buy, "booster_buy": booster_buy, "booster_on": booster_on, "no_money": no_money, "claim": claim,
-             "rank_up": rank_up, "swap": swap, "page": page}
+             "rank_up": rank_up, "swap": swap, "page": page,
+             "whoosh": whoosh, "thud": thud, "fanfare": fanfare, "pop_in": pop_in}
 
 SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up,
           "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash, **UI_SOUNDS}

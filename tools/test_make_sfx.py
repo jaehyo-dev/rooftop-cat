@@ -16,9 +16,9 @@ def end_pitch(sound):
 
 
 class SfxTest(unittest.TestCase):
-    def test_게임_17종_메뉴_8종이고_터지지_않으며_짧다(self):
-        self.assertEqual(len(make_sfx.SOUNDS), 17 + 8)
-        self.assertEqual(len(make_sfx.UI_SOUNDS), 8)
+    def test_게임_17종_메뉴_12종이고_터지지_않으며_짧다(self):
+        self.assertEqual(len(make_sfx.SOUNDS), 17 + 12)
+        self.assertEqual(len(make_sfx.UI_SOUNDS), 12)
         for name, make in make_sfx.SOUNDS.items():
             sound = make()
             self.assertGreater(np.abs(sound).max(), 0.1, name)
@@ -52,6 +52,12 @@ class SfxTest(unittest.TestCase):
             return float(np.sqrt(np.mean(sound ** 2)))
         for name, make in make_sfx.UI_SOUNDS.items():
             self.assertLess(rms(make()), rms(make_sfx.fish()) * 1.6, name)
+
+    def test_도장_쿵은_낮고_휙은_내려가며_팡파르는_강화_소리보다_길다(self):
+        self.assertLess(end_pitch(make_sfx.thud()[:int(0.1 * make_sfx.RATE)]), 250.0)
+        self.assertGreater(len(make_sfx.fanfare()), len(make_sfx.buy()))
+        sound = make_sfx.pop_in()
+        self.assertGreater(end_pitch(sound[int(0.03 * make_sfx.RATE):int(0.07 * make_sfx.RATE)]), end_pitch(sound[:int(0.03 * make_sfx.RATE)]))
 
 
 if __name__ == "__main__":

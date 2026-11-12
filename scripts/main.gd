@@ -31,7 +31,7 @@ var _hint := UiKit.label("", 26, UiKit.RED, HORIZONTAL_ALIGNMENT_CENTER)
 var _result_dot := UiKit.badge(34.0)
 
 ## 메뉴 소리 (tools/make_sfx.py UI_SOUNDS). 생선 소리(-17dB)보다 튀지 않게 같은 크기로
-const UI_SOUNDS := ["buy", "booster_buy", "booster_on", "no_money", "claim", "rank_up", "swap", "page"]
+const UI_SOUNDS := ["buy", "booster_buy", "booster_on", "no_money", "claim", "rank_up", "swap", "page", "whoosh", "thud", "fanfare", "pop_in"]
 const UI_VOLUME_DB := -17.0
 ## HUD (판 중·결과 카드에서만 보임)
 const HUD := ["DistanceLabel", "BestLabel", "FishIcon", "FishLabel", "ScoreLabel", "ComboLabel"]
@@ -146,7 +146,6 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	$DistanceLabel.text = "%d m" % _world.sim.distance()
 	$FishLabel.text = str(_world.sim.fish)
-	$BoxIcon.visible = _world.sim.has_box
 	$ScoreLabel.text = str(_world.sim.score())
 	var combo: FishCombo = _world.sim.combo
 	$ComboLabel.text = "콤보 %d  x%d" % [combo.count, combo.multiplier()] if combo.count > 0 else ""
@@ -210,7 +209,7 @@ func _on_game_over(meters: int) -> void:
 	_extras.clear()
 	_count_result(0.0)
 	show_screen("result")
-	$BestLabel.text = "BEST %d" % _best
+	$BestLabel.text = "BEST %s" % UiKit.comma(_best)
 
 
 ## 결과 숫자를 하나씩 차오르게 쓴다. 다 차면 새 기록 축하 (별·소리·글자 통통)
@@ -309,7 +308,7 @@ func _on_restarted() -> void:
 	_last_mult = 1
 	_last_points = 0
 	$GameOver.visible = false
-	$BestLabel.text = "BEST %d" % _best
+	$BestLabel.text = "BEST %s" % UiKit.comma(_best)
 
 
 # --- 화면 흐름 (v0.7.0 2c) ---
@@ -339,23 +338,25 @@ func _build_menus() -> void:
 	_hint.name = "Hint"
 	box.add_child(_hint)
 	box.move_child(_hint, retry.get_index())
+	# 부스터 칸은 [다시 하기] 위, 아래 줄은 큰 [다시 하기] + [메인 화면] (2c 피드백: 상점·미션은 메인 화면에서 감)
+	result_slots = BoosterSlots.new(self)
+	result_slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	result_slots.want_shop.connect(open_shop.bind("boosters"))
+	box.add_child(result_slots)
+	box.move_child(result_slots, retry.get_index())
 	var row := HBoxContainer.new()
 	row.name = "Row"
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	result_slots = BoosterSlots.new(self)
-	result_slots.want_shop.connect(open_shop.bind("boosters"))
-	row.add_child(result_slots)
-	for pair in [["Shop", "basket"], ["Missions", "note_check"]]:
-		var b := UiKit.button("", "cream", UiKit.ICONS[pair[1]])
-		b.name = pair[0]
-		b.custom_minimum_size = Vector2(UiKit.MIN_BUTTON + 8, BoosterSlots.SIZE)
-		b.add_theme_constant_override("icon_max_width", 62)
-		row.add_child(b)
-	row.get_node("Shop").pressed.connect(open_shop.bind("upgrades"))
-	row.get_node("Missions").pressed.connect(open_missions)
-	_result_dot.position = Vector2(-8, -10)
-	row.get_node("Missions").add_child(_result_dot)
+	row.add_theme_constant_override("separation", 14)
+	box.remove_child(retry)
+	row.add_child(retry)
+	var home := UiKit.button("메인 화면", "cream", null, 38)
+	home.name = "Home"
+	home.custom_minimum_size = Vector2(200, 100)
+	home.pressed.connect(go_home)
+	row.add_child(home)
+	_result_dot.position = Vector2(-8, -10)  # 받을 미션 보상 수
+	home.add_child(_result_dot)
 	box.add_child(row)
 	_extras = ResultExtras.new(self)
 	$GameOver.add_child(_extras)
@@ -378,7 +379,7 @@ func show_screen(next: String) -> void:
 	var menu := next in ["shop", "missions"]
 	_world.input_off = menu  # 상점·미션에서는 판이 입력을 받지 않음 (결과 카드 뒤 판이 다시 시작되지 않게)
 	for node: String in HUD:
-		get_node(node).visible = next in ["run", "result"]
+		get_node(node).visible = next == "run"  # 결과 카드 뒤에서는 숨김 (카드에 같은 값이 있음, 2c 피드백)
 	$GameOver.visible = next == "result"
 	$VersionLabel.visible = not menu
 	if next == "start" and was != "start":
@@ -394,7 +395,7 @@ func show_screen(next: String) -> void:
 	if next == "start":
 		_blockers.append_array(start_menu.blockers())
 	if next == "result":
-		_blockers.append_array([$GameOver/Card/Box/Retry, $GameOver/Card/Box/Row])
+		_blockers.append_array([$GameOver/Card/Box/Row, result_slots])
 	_world.touch_blockers.append_array(_blockers)
 	if has_node("DevPanel"):  # 임시 시험 패널 (배포 전 제거): 상점·미션 화면과 겹치지 않게 숨김
 		get_node("DevPanel").visible = not menu
@@ -432,6 +433,15 @@ func open_missions() -> void:
 	board.open()
 
 
+## 결과 카드 [메인 화면]: 새 옥상을 만들어 멈추고 시작 화면으로
+func go_home() -> void:
+	if screen != "result":
+		return
+	play_ui("page")
+	_world.prepare()
+	show_screen("start")
+
+
 ## 상점·미션의 [뒤로]: 온 곳(시작 화면 또는 결과 카드)으로
 func go_back() -> void:
 	if screen not in ["shop", "missions"]:
@@ -449,5 +459,7 @@ func refresh_menus() -> void:
 	UiKit.badge_text(_result_dot, Missions.pending(save.data))
 
 
-func play_ui(sound: String) -> void:
+## pitch: 빠르기 (강화 사기는 단계마다 한 음씩 높게)
+func play_ui(sound: String, pitch: float = 1.0) -> void:
+	_ui_sfx[sound].pitch_scale = pitch
 	_ui_sfx[sound].play()
