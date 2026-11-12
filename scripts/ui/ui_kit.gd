@@ -431,10 +431,15 @@ static func glow(size: float) -> Control:
 static func enter(controls: Array, from: Vector2 = Vector2(0, 24)) -> void:
 	for i in controls.size():
 		var c: Control = controls[i]
-		var rest := c.position
+		if not c.has_meta("enter_rest"):  # 들어오는 중에 다시 불려도 제자리가 밀리지 않게 처음 자리를 기억
+			c.set_meta("enter_rest", c.position)
+		var rest: Vector2 = c.get_meta("enter_rest")
+		if c.has_meta("enter_tween") and (c.get_meta("enter_tween") as Tween).is_valid():
+			(c.get_meta("enter_tween") as Tween).kill()  # 앞 들어오기를 멈추고 같은 제자리에서 다시 (Codex 리뷰)
 		c.modulate.a = 0.0
 		c.position = rest + from
 		var tween := c.create_tween().set_parallel()
+		c.set_meta("enter_tween", tween)
 		tween.tween_property(c, "modulate:a", 1.0, ENTER_TIME).set_delay(ENTER_STEP * i)
 		tween.tween_property(c, "position", rest, ENTER_TIME).set_delay(ENTER_STEP * i).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 

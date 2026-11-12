@@ -246,6 +246,28 @@ func test_날아가는_연출은_PC와_휴대폰_모두_화면_안에_머문다(
 	window.size = keep
 
 
+func test_빨리_다시_열어도_요소가_제자리로_돌아온다() -> void:
+	var main := _main(5000)
+	await wait_frames(5)
+	main.open_shop("upgrades")
+	await get_tree().create_timer(0.8).timeout  # 첫 들어오기가 끝난 자리
+	var rest := {}
+	for c: Control in main.shop.enter_order():
+		rest[c] = c.position
+	for i in 3:  # 들어오는 연출 도중에 닫고 다시 열기, 같은 탭 다시 누르기
+		main.go_back()
+		await wait_frames(2)
+		main.open_shop("upgrades")
+		await wait_frames(2)
+		main.shop.show_tab("upgrades")
+		await wait_frames(2)
+	await get_tree().create_timer(0.8).timeout
+	for c: Control in main.shop.enter_order():
+		if rest.has(c):
+			assert_eq(c.position, rest[c], "%s 제자리" % c.name)
+	await _done(main)
+
+
 func test_날아가는_길은_꼭대기까지_상자_안이다() -> void:
 	var bounds := Rect2(0, 0, 1280, 720)
 	# 지갑(위 끝) → 위 줄, 아래 쪽지 → 지갑, 같은 높이끼리 등 여러 경우

@@ -16,7 +16,7 @@ var _shine_t := 0.0
 var _base_fill: Color
 var _from_fill: Color   # 채움 색이 바뀔 때 이전 색 (STATE_TIME 동안 섞음)
 var _fill_k := 1.0
-var _group_key := ""
+var _group_key := []
 
 
 func _init(fill: Color = UiKit.PAPER, corner: float = UiKit.R_BUTTON) -> void:
@@ -90,7 +90,7 @@ func _apply() -> void:
 
 ## 아이콘 + 글자를 한 묶음으로 가운데에 (Godot 버튼은 아이콘을 왼쪽 끝에 붙여 글자와 멀어짐)
 func _center_group() -> void:
-	var key := "%s|%s|%s" % [text, size, icon]
+	var key := [text, size, icon]  # 바뀔 때만 다시 계산 (글자 만들기 없이 값으로 비교)
 	if key == _group_key:
 		return
 	_group_key = key
