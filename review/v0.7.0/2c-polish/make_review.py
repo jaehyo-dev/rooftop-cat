@@ -2,7 +2,7 @@
 - shots/<화면>_<pc|phone>.png : 전체 화면 (256색으로 줄여 저장소 크기를 줄임, 글자 판독 확인)
 - shots/zoom/<화면>_<size>_NN.png : 글자가 든 칸 2배 조각 (같은 그림은 하나만)
 - compare/<화면>_<size>.png : 1차 검토 전 | 마지막 (round1/before 와 원본 폴더)
-- gif/<이름>.gif : 연출 GIF (3MB 넘으면 크기를 줄여 다시). cat_로 시작하는 GIF는 실제 빠르기로 찍음
+- gif/<이름>.gif : 연출 GIF (3MB 넘으면 크기를 줄여 다시)
 사용: python3 review/v0.7.0/2c-polish/make_review.py <원본 폴더>
 """
 import hashlib
@@ -61,7 +61,7 @@ def gifs(src: Path) -> None:
     out = HERE / "gif"
     out.mkdir(exist_ok=True)
     for folder in sorted((src / "gif").iterdir()):
-        slow = 1.0 if folder.name.startswith("cat") else SLOW
+        slow = SLOW
         times = json.loads((folder / "times.json").read_text())
         frames = sorted(folder.glob("f*.png"))[:len(times)]
         # 3MB 안에 들 때까지: 넓이를 줄이고, 그래도 크면 한 장 걸러 (건너뛴 시간은 앞 장에 더함)

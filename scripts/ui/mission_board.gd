@@ -10,10 +10,10 @@ const STAT_ICONS := {"meters": "footprints", "fish": "fish", "combo": "combo", "
 		"dash": "snack", "smash": "smash", "smash_one": "smash", "double": "jump", "pole": "jump", "tramp": "tramp", "perfect": "tramp",
 		"gold": "gold", "yarn": "yarn", "can": "can", "bell": "bell", "runs": "rank_face", "daily_done": "note_check",
 		"full_day": "note_check", "shop": "basket", "pass_flock": "jump", "pass_pot": "jump", "pass_tank": "jump", "pass_ac": "jump"}
-const NOTE := Vector2(368, 220)  # 쪽지 (그림자 포함)
+const NOTE := Vector2(368, 212)  # 쪽지 (그림자 포함)
 const NOTE_GAP := 32.0
 const CORK := Rect2(16, 116, 1248, 600)
-const ROWS_Y := [136.0, 420.0]   # 게시판 안쪽(나무 테두리 12px 안)에 위아래 여백 8   # 머리글 위 (일일·주간), 쪽지는 그 아래 HEAD_H + GAP
+const ROWS_Y := [144.0, 420.0]   # 게시판 안쪽(나무 테두리 12px 안)에 위아래 여백 16   # 머리글 위 (일일·주간), 쪽지는 그 아래 HEAD_H + GAP
 const HEAD_H := 48.0
 const PIN := Vector2(UiKit.GAP, -UiKit.PAD)  # 압정: 쪽지 왼쪽 위 모서리 (글자·머리글을 가리지 않게)
 const PIN_SIZE := 40.0
@@ -143,13 +143,13 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	note.add_child(base)
 	var text_x := UiKit.PAD * 2.0 + UiKit.BASE_S
 	var text := UiKit.label("")
-	text.position = Vector2(text_x, 10)
-	text.size = Vector2(NOTE.x - text_x - UiKit.PAD, 76)
+	text.position = Vector2(text_x, 12)
+	text.size = Vector2(NOTE.x - text_x - UiKit.PAD, 72)  # 아이콘 받침과 같은 세로 가운데
 	UiKit.wrap_fit(text, Missions.text(entry.id), text.size.x, 2, UiKit.BODY)  # 띄어쓰기에서만 줄바꿈, 두 줄 안
 	note.add_child(text)
 	# 진행 막대 + 숫자
 	var bar := Control.new()
-	bar.position = Vector2(UiKit.PAD, 86)
+	bar.position = Vector2(UiKit.PAD, 82)
 	bar.size = Vector2(NOTE.x - UiKit.PAD * 2.0, 32)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.draw.connect(func() -> void:
@@ -170,9 +170,11 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 	gift.size = Vector2(120, 48)
 	UiKit.fit(gift, gift.size.x, UiKit.NUM)
 	note.add_child(gift)
-	var xp := UiKit.label("경험치 +%d" % reward.xp, UiKit.SUB, UiKit.SUB_BROWN)  # 등급 경험치
+	# 등급 경험치는 미션을 깬 순간 들어옴 (받기는 생선만). 깬 쪽지는 "받음"으로 (받기 뒤 경험치가 안 오르는 것처럼 보이지 않게)
+	var xp := UiKit.label(("경험치 +%d 받음" if entry.done else "경험치 +%d") % reward.xp, UiKit.SUB, UiKit.SUB_BROWN)
 	xp.position = Vector2(UiKit.PAD, bottom + 52)
-	xp.size = Vector2(160, 32)
+	xp.size = Vector2(NOTE.x - UiKit.PAD * 2.0 - 152 - UiKit.GAP, 32)
+	UiKit.fit(xp, xp.size.x, UiKit.SUB)
 	note.add_child(xp)
 	var spot := Vector2(NOTE.x - UiKit.PAD - 152, bottom)
 	# 버튼: 받기 / 바꾸기 / (받음 = 도장)
@@ -186,9 +188,9 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		note.add_child(take)
 		note.set_meta("wobble", true)  # 받을 쪽지는 살짝 흔들림
 	elif entry.done:
-		var stamp := UiKit.icon(UiKit.ICONS.stamp, 88)
+		var stamp := UiKit.icon(UiKit.ICONS.stamp, 80)
 		stamp.name = "Stamp"
-		stamp.position = Vector2(NOTE.x - UiKit.PAD - 104, bottom + 4)
+		stamp.position = Vector2(NOTE.x - UiKit.PAD - 100, bottom + UiKit.GAP)
 		stamp.pivot_offset = stamp.size * 0.5  # 가운데를 축으로 기울임
 		stamp.rotation = -0.2
 		stamp.modulate.a = 0.9
@@ -207,7 +209,7 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 		# 보조 버튼: 윗면 빛 없이, "바꾸기" + 생선 가격 두 줄 (받기보다 덜 눈에 띄게, 값이 생선인 걸 보이게)
 		var swap := UiKit.button("", "orange" if asking else "cream")
 		swap.name = "Swap"
-		swap.plate.gloss = 0.0
+		swap.plate.gloss = 1.0 if asking else 0.0  # 확인("바꿀까요?")은 다른 주황 버튼과 같은 모양
 		var top := UiKit.label("바꿀까요?" if asking else "바꾸기", UiKit.SUB, UiKit.CREAM if asking else UiKit.BROWN, HORIZONTAL_ALIGNMENT_CENTER)
 		if asking:
 			UiKit.on_orange(top)

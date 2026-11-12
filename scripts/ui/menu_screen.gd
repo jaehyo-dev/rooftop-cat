@@ -63,7 +63,7 @@ func _init(main_node: Node, screen_name: String) -> void:
 	var base := UiKit.icon_base(UiKit.ICONS.fish, UiKit.BASE_S)
 	base.position = Vector2(UiKit.GAP, (TOP_H - UiKit.SHADOW_Y - UiKit.BASE_S) * 0.5).round()
 	wallet.add_child(base)
-	_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_wallet_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT  # 생선 바로 옆 (짧은 수에서 가운데가 비지 않게)
 	_wallet_label.position = Vector2(UiKit.GAP * 2.0 + UiKit.BASE_S, 0)
 	_wallet_label.size = Vector2(WALLET_W - _wallet_label.position.x - WALLET_RIGHT, TOP_H - UiKit.SHADOW_Y)
 	wallet.add_child(_wallet_label)

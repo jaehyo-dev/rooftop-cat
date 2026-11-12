@@ -268,10 +268,10 @@ func _rec(name: String, on: bool, speed: float = SLOW) -> void:
 
 
 func _gifs() -> void:
-	# 시작 화면 고양이 10초 (실제 빠르기: 꼬리 8장·숨쉬기·깜빡임, 바닥이 흔들리지 않는지)
+	# 시작 화면 고양이 10초 (꼬리 8장·숨쉬기·깜빡임, 바닥이 흔들리지 않는지)
 	await _make("normal")
 	await _wait(1.0)
-	await _rec("cat_idle", true, 1.0)
+	await _rec("cat_idle", true)
 	await _wait(10.0)
 	await _rec("", false)
 	# 상점: 줄 고르기 (고름이 0.12초에 옮겨 감, 꼬리)

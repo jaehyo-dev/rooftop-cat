@@ -6,7 +6,7 @@ extends StyleBox
 
 var fill := UiKit.PANEL
 var border := UiKit.BROWN
-var radius := UiKit.R_PANEL      # UiKit.R_PILL = 높이의 절반
+var radius := UiKit.R_PANEL      # UiKit.R_PILL(999) = 높이의 절반
 var shadow := true
 var gloss := 0.0                 # 윗면 빛 세기 (0 = 없음, 1 = 버튼)
 var gloss_color := UiKit.GLOSS
@@ -50,7 +50,7 @@ func body_rect(rect: Rect2) -> Rect2:
 
 
 func corner(rect: Rect2) -> float:
-	return rect.size.y * 0.5 if radius == UiKit.R_PILL else minf(radius, rect.size.y * 0.5)
+	return minf(radius, rect.size.y * 0.5)  # R_PILL(999)은 늘 높이의 절반
 
 
 func _rounded(canvas: RID, rect: Rect2, color: Color, r: float, border_w: float = 0.0, border_c: Color = Color.TRANSPARENT) -> void:

@@ -18,7 +18,7 @@ var _counts := {}  # 종류 → Label
 func _init(main_node: Node) -> void:
 	main = main_node
 	name = "BoosterSlots"
-	add_theme_constant_override("separation", int(UiKit.GAP * 1.5))
+	add_theme_constant_override("separation", int(UiKit.GAP * 4.0))  # 바깥 끝을 아래 버튼 줄과 맞춤 (카드 안 352 = 96 x 3 + 32 x 2)
 	for kind: String in KINDS:
 		var b := UiKit.button("", "cream")
 		b.name = kind

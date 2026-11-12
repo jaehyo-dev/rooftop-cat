@@ -64,11 +64,11 @@ func _band(art: Texture2D, value: Control, width: float, x: float, caption: Stri
 	value.size = Vector2(width - text_x - UiKit.PAD * 1.5, BAND_H - UiKit.SHADOW_Y)
 	if caption != "":
 		var head := UiKit.label(caption, UiKit.SUB, UiKit.SUB_BROWN)
-		head.position = Vector2(text_x, 2)
+		head.position = Vector2(text_x, 6)
 		head.size = Vector2(value.size.x, 28)
 		band.add_child(head)
-		value.position.y = 32
-		value.size.y = 44
+		value.position.y = 34
+		value.size.y = 42
 	band.add_child(value)
 	return band
 

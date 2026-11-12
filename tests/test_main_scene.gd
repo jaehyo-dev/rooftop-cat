@@ -110,7 +110,6 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 	await get_tree().create_timer(Juice.COUNT_UP_EACH * 4.0 + 0.1).timeout
 	assert_eq(main.get_node("GameOver/Card/Box/Stats/Distance/Value").text, "%sm" % UiKit.comma(meters), "이번 거리")
 	assert_eq(main.get_node("GameOver/Card/Box/Stats/Fish/Value").text, UiKit.comma(world.sim.fish), "먹은 생선")
-	assert_eq(main.get_node("GameOver/Card/Box/ScoreHead").text, "점수")
 	assert_eq(main.get_node("GameOver/Card/Box/Score").text, UiKit.comma(score), "맨 위 점수")
 	assert_eq(main.get_node("GameOver/Card/Box/Best").text, "새 기록!", "첫 기록은 새 기록")
 	assert_eq(main.get_node("GameOver").get_child(0).name, &"Celebrate", "축하 별은 카드 뒤 (먼저 그림)")

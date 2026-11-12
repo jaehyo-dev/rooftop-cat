@@ -28,6 +28,7 @@ var _back_to := "start"
 var _blockers: Array[Control] = []  # 지금 화면이 World.touch_blockers에 넣은 버튼 자리
 var _ui_sfx := {}
 var _hint := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)  # 안내는 갈색 (빨강은 새 기록에만)
+var _best_row := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN)  # 결과 카드 "최고 48,210" (가진 생선과 한 줄)
 var _result_dot := UiKit.badge()
 var _shop_seen: Array = []  # 상점을 마지막으로 열었을 때 살 수 있던 강화 (새로 살 수 있게 되면 [상점]에 점)
 
@@ -217,13 +218,15 @@ func _count_result(delta: float) -> void:
 	var done := Juice.count_done(_result.values, _result.t)
 	var last := ""
 	if done:
-		last = "새 기록!" if _result.new_best else "최고 점수  %s" % UiKit.comma(_best)
+		last = "새 기록!" if _result.new_best else ""
 	$GameOver/Card/Box/Score.text = UiKit.comma(shown[3])  # 다른 화면처럼 천 단위 쉼표 (2c-fix). "점수"는 위 작은 이름표
 	# 기록 표: 이름은 왼쪽, 값은 오른쪽 (2c-polish 아트 검토: 가운데 맞춤이라 들쭉날쭉)
 	for pair in [["Distance", "%sm" % UiKit.comma(shown[0])], ["Fish", UiKit.comma(shown[1])], ["Combo", UiKit.comma(shown[2])]]:
 		(get_node("GameOver/Card/Box/Stats/%s/Value" % pair[0]) as Label).text = pair[1]
 	$GameOver/Card/Box/Stats/Fish/Bonus.visible = _result.bonus
-	$GameOver/Card/Box/Best.text = last if done else " "  # 빈 줄로 자리를 잡아 카드 크기가 변하지 않게
+	$GameOver/Card/Box/Best.text = last
+	$GameOver/Card/Box/Best.visible = _result.new_best  # 새 기록일 때만 줄을 차지 (차오르는 동안은 빈 줄로 자리를 잡음)
+	_best_row.text = "최고 %s" % UiKit.comma(_best)
 	$GameOver/Card/Box/Best.add_theme_color_override("font_color", UiKit.RED if done and _result.new_best else UiKit.SUB_BROWN)  # 빨강은 새 기록에만
 	$GameOver/Card/Box/Best.add_theme_font_size_override("font_size", UiKit.BODY if _result.new_best else UiKit.SUB)  # 새 기록은 본문 크기 빨강
 	# 다 차면 실제 지갑 (미션 받기·사기로 바뀐 값까지)
@@ -317,18 +320,16 @@ func _build_menus() -> void:
 	$GameOver.color = UiKit.DIM_BACK
 	for pair in [["Score", UiKit.NUM_BIG, UiKit.BROWN], ["Best", UiKit.TITLE, UiKit.RED]]:
 		var l: Label = box.get_node(pair[0])
+		l.add_theme_font_override("font", UiKit.FONT)  # 메뉴 글꼴 (글자 사이를 다른 글과 같게)
 		l.add_theme_font_size_override("font_size", pair[1])
 		l.add_theme_color_override("font_color", pair[2])
 		l.add_theme_constant_override("outline_size", 0)
-	var head := UiKit.label("점수", UiKit.SUB, UiKit.SUB_BROWN, HORIZONTAL_ALIGNMENT_CENTER)
-	head.name = "ScoreHead"
-	box.add_child(head)
-	box.move_child(head, 0)
 	var ribbon := Control.new()  # 카드 제목 리본 "이번 판" (다른 화면처럼 제목이 리본 위에)
 	ribbon.name = "Ribbon"
 	ribbon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ribbon.draw.connect(func() -> void: UiKit.draw_ribbon(ribbon, Rect2(ribbon.size.x * 0.5 - 140, 0, 280, 56)))
-	var ribbon_text := UiKit.on_orange(UiKit.label("이번 판", UiKit.TITLE, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+	var ribbon_text := UiKit.on_orange(UiKit.label("이번 판 점수", UiKit.TITLE, UiKit.CREAM, HORIZONTAL_ALIGNMENT_CENTER))
+	UiKit.fit(ribbon_text, 280 - UiKit.PAD * 2.0, UiKit.TITLE)
 	ribbon_text.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ribbon_text.offset_bottom = -8
 	ribbon.add_child(ribbon_text)
@@ -376,7 +377,15 @@ func _build_menus() -> void:
 	wallet_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	wallet_row.add_theme_constant_override("separation", int(UiKit.GAP))
 	wallet_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 최고 점수와 가진 생선을 한 줄로 (아이콘 + 숫자), 줄 수를 줄여 위계를 또렷하게
+	wallet_row.add_child(UiKit.icon(UiKit.ICONS.star, 36))
+	_best_row.name = "BestRow"
+	wallet_row.add_child(_best_row)
+	var spacer := Control.new()
+	spacer.custom_minimum_size.x = UiKit.PAD * 2.0
+	wallet_row.add_child(spacer)
 	wallet_row.add_child(UiKit.icon(UiKit.ICONS.fish, 36))
+	total.add_theme_font_override("font", UiKit.FONT)
 	total.add_theme_font_size_override("font_size", UiKit.SUB)
 	total.add_theme_color_override("font_color", UiKit.SUB_BROWN)
 	total.add_theme_constant_override("outline_size", 0)

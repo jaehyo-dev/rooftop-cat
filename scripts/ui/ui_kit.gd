@@ -23,7 +23,7 @@ const GLOSS := Color("#ffffff8c")       # 윗면 빛 (흰색 55%)
 const SHINE := Color("#ffffff73")       # 지나가는 빛 (흰색 45%)
 const INK := Color("#b83833d9")         # 도장 잉크 (85%)
 const VEIL := Color("#fff3dc99")        # 상점·미션 뒤 가림막 (판 크림 60%)
-const DIM_BACK := Color("#5a301873")    # 결과 카드 뒤 어둡게 (따뜻한 갈색 45%)
+const DIM_BACK := Color("#6b3a1f66")    # 결과 카드 뒤 어둡게 (따뜻한 갈색 40%)
 const CREAM := PAPER                    # 주황 위 글자 색
 # --- 모양 ---
 const R_CHIP := 12.0     # 작은 칩·쪽지·게이지 칸
@@ -62,7 +62,6 @@ const FONT := preload("res://scripts/ui/menu_font.tres")  # Gaegu Bold + 글자 
 
 const PIN_RED := preload("res://assets/sprites/ui/pin_red.png")
 const PIN_YELLOW := preload("res://assets/sprites/ui/pin_yellow.png")
-const CLIP := preload("res://assets/sprites/ui/clip.png")
 
 const ICONS := {
 	"combo": preload("res://assets/sprites/ui/icons/combo.png"),
@@ -146,6 +145,8 @@ static func button(text: String, tone: String = "cream", art: Texture2D = null, 
 	b.add_theme_font_size_override("font_size", font_size)
 	b.add_theme_constant_override("h_separation", int(GAP))
 	tone_text(b, tone)
+	for state in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_hover_pressed_color", "icon_focus_color", "icon_disabled_color"]:
+		b.add_theme_color_override(state, Color.WHITE)  # 아이콘 그림 색은 상태마다 같게 (마우스를 올리면 색이 바뀌어 보였음)
 	if art:
 		b.icon = art
 		b.expand_icon = true
