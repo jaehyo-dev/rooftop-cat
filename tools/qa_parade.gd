@@ -16,6 +16,9 @@ var _since := INF
 
 func run(q: Node, mode: String) -> void:
 	qa = q
+	if mode == "parade_bare":  # 아기 고양이 시안 합성용 배경: 6마리 줄이 한 옥상 위에 있을 때, 보이게 / 숨겨서 / 주인공까지 숨겨서 세 장
+		await _bare()
+		return
 	if mode == "parade_hit":  # 부딪힘만 다시 찍기
 		await _hit("hit_a")
 		return
@@ -136,6 +139,27 @@ func _dash() -> void:
 	var top := sim.y
 	sim.obstacles.append({"id": 990, "kind": "pot", "x": sim.x + 700.0, "w": 60.0, "y0": top, "y1": top + 70.0, "base": top})
 	await _clip("dash6", 3.0, 8)
+
+
+## 6마리가 모두 같은 옥상 땅 위를 달릴 때 (맨 뒤 아기까지 같은 옥상, 줄 앞 장애물 없음)
+func _bare() -> void:
+	await _start(5, 6)
+	await _run_until(func() -> bool:
+		var here := sim.roof_at(sim.x)
+		var back := CatParade.slot_x(Balance.PARADE_MAX - 1, sim.x) - 60.0
+		return sim.elapsed > 5.0 and sim.on_ground and not sim.dashing and sim.invuln_time <= 0.0 and not here.is_empty() and here.left < back and here.right - sim.x > 500.0 \
+				and sim.obstacles.all(func(o: Dictionary) -> bool: return o.x > sim.x + 500.0 or o.x + o.w < back - 100.0) \
+				and range(Balance.PARADE_MAX).all(func(i: int) -> bool: return absf(sim.parade.follower(i, sim.x).y - sim.y) < 1.0), 120.0)
+	await _still("bare_with")
+	for i in Balance.PARADE_MAX:
+		world.get_node("Parade%d" % i).visible = false
+	world.queue_redraw()
+	await qa._wait(0.1)
+	await _still("bare")
+	world.cat.visible = false  # 주인공까지 숨긴 배경 (합성 때 주인공을 아기 고양이 위에 다시 얹으려고)
+	world.queue_redraw()
+	await qa._wait(0.1)
+	await _still("bare_none")
 
 
 ## 부딪힘: 앞으로 누를 호가 한동안 없을 때 바로 앞에 화분을 놓아 맞게 한다

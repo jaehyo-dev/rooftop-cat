@@ -385,3 +385,9 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획: 1장(3x2 시트: 앉음, 꼬리 3자세, 눈 감기, 일어나기). 모습이 다르면 1번 더 → 1번에 됨(첫 칸만 머리 방향이 달라 안 씀).
 - 명령: `codex exec --sandbox read-only "$(cat review/v0.7.0/2c-fix/prompts/cat_sit.txt)" --image assets/concept/cat_reference_sheet.png assets/sprites/cat_base_run.png < /dev/null` → `assets/raw/cat_frames_sit.png`
 - 자르기: `python3 review/v0.7.0/2c-fix/cut_sit.py`. 요청문 전문은 `review/v0.7.0/2c-fix/prompts/cat_sit.txt`.
+
+## 줄줄이 아기 고양이 시안 (2026-11-13, 맥 Codex, cat-parade 브랜치)
+- 계획: 2장(시안 1 "동글동글 아기", 시안 2 "개구쟁이 아기"), 그림체가 어긋나면 각 1번 더 → 둘 다 1번에 됨(다시 뽑기 0번).
+- 명령: `bash review/cat-parade/kitten/make_kittens.sh 01_round|02_rascal` (첨부 `assets/concept/cat_reference_sheet.png`, `assets/sprites/cat_base_run.png`)
+- 요청문 전문: `review/cat-parade/kitten/prompts/common.txt` + `01_round.txt` / `02_rascal.txt`. 결과는 `review/cat-parade/kitten/01_round.png`, `02_rascal.png`.
+- 시안이라 게임에는 아직 쓰지 않음(CREDITS는 구현 단계에서 고른 것만 기록).
