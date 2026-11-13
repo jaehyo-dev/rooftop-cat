@@ -338,6 +338,7 @@ func test_가장_긴_값으로_채워도_글자가_칸_안에_있고_겹치지_�
 			main.begin_run()
 			await wait_frames(2)
 			var world: Node2D = main.get_node("World")
+			world.sim.parade.fill(Balance.PARADE_MAX)  # 줄줄이 시험판: "데려온 고양이 6마리" + 얼굴 6개
 			world.sim.on_ground = false
 			world.sim.y = Balance.FALL_LIMIT + 1.0
 			world.sim.vy = -1000.0
@@ -355,6 +356,41 @@ func test_가장_긴_값으로_채워도_글자가_칸_안에_있고_겹치지_�
 			_expect_clean(main, "결과 %s" % size)
 			main.queue_free()
 			await wait_frames(2)
+	window.size = keep
+	_clear()
+
+
+## 줄줄이 시험판 HUD: 콤보 아래 배수 + 얼굴 6개가 화면 안이고 콤보·점수·질주 배율 글자와 겹치지 않는다 (콤보 9999, 점수 9,999,999)
+func test_줄줄이_HUD_6마리_가장_긴_값() -> void:
+	var window := get_window()
+	var keep := window.size
+	for size in [Vector2i(1280, 720), Vector2i(844, 390)]:
+		window.size = size
+		_seed_longest(0)
+		var main := _main()
+		await wait_frames(5)
+		main.begin_run()
+		await wait_frames(2)
+		var sim: RunnerSim = main.get_node("World").sim
+		sim.parade.fill(Balance.PARADE_MAX)
+		sim.combo.count = 9999
+		sim.combo.points = 9999999
+		sim.dashing = true  # 질주 배율 "x2"도 보이게
+		await wait_frames(3)
+		var view := main.get_viewport_rect().grow(1.0)
+		var hud: Control = main.get_node("ParadeHud")
+		var mult: Label = hud.get_node("Mult")
+		assert_eq(mult.text, "x2.2", "6마리 배수")
+		var rects := {"배수": ink_rect(mult)}
+		for face: TextureRect in hud.get_node("Faces").get_children():
+			assert_true(face.visible, "얼굴 6개")
+			rects[face.name] = face.get_global_rect()
+		for key: String in rects:
+			assert_true(view.encloses(rects[key]), "%s %s 화면 안 %s" % [size, key, rects[key]])
+			for other: Label in [main.get_node("ComboLabel"), main.get_node("ScoreLabel"), main.get_node("DashBonus")]:
+				assert_false(rects[key].grow(-1.0).intersects(ink_rect(other)), "%s %s / \"%s\" 겹침" % [size, key, other.text])
+		main.queue_free()
+		await wait_frames(2)
 	window.size = keep
 	_clear()
 

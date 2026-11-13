@@ -94,6 +94,8 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 - 메뉴 판·버튼·게이지·리본·화살표·빛 원 (v0.7.0 2c-polish): `scripts/ui/plate.gd`, `scripts/ui/ui_kit.gd`가 코드로 그림. 외부 그림 없음
 - 도장 휙·쿵 소리 다시 만듦 (v0.7.0 2c-polish): `tools/make_sfx.py` whoosh·thud (탁 + 눌러 키운 북 + 55Hz 저음 꼬리)
 - 메뉴 효과음 8종 `assets/audio/sfx/buy·booster_buy·booster_on·no_money·claim·rank_up·swap·page.wav` (강화 사기, 부스터 사기, 부스터 켜기, 생선 부족, 미션 받기, 등급 오름, 바꾸기, 화면 넘김): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 생선 소리와 같은 -17dB로 틂
+- 줄줄이 시험판 소리 3종 `assets/audio/sfx/meow·nya·purr.wav` (만남 야옹, 놀라 냐!, 피버 골골 반복 층): 2026-11-13, `tools/make_sfx.py`(numpy)로 직접 합성(배음 + 입 모양 흉내). 외부 음원·샘플 없음. 야옹·냐는 게임에서 고양이마다 빠르기를 조금씩 바꿔 냄 (cat-parade 브랜치)
+- 줄줄이 시험판 길고양이 5색(회색·검정·흰색·갈색 줄무늬·크림): 새 그림 없이 기존 고양이 그림에 `scripts/cat_tint.gdshader`로 색만 바꿈 (cat-parade 브랜치)
 - 효과음 17종 `assets/audio/sfx/*.wav` (점프, 더블점프, 착지, 생선, 황금·아이템, 보잉, 퍼펙트, 떨어짐, 속도 단계 오름, 비둘기 구구, 팡, 방울 딸랑, 콤보 띵, 콤보 끊김 툭, 부딪힘 퉁, 심장 두근, 질주 슝): 2026-11-09, 뒤 5종 2026-11-10, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 콤보 음계는 같은 생선 소리를 게임 안에서 빠르기만 바꿔 냄
 - 음악 후보 `review/v0.5.0/2b/music/1_mochi_walk.ogg`, `2_waddle_swing.ogg`: 2026-11-08, `tools/make_music.py`(numpy)로 직접 작곡·합성. 외부 음원·샘플 없음 (검토용, 게임에 포함 안 됨)
 - 안개 크림색 판 `assets/sprites/backdrop/mist_mid_cream.png`, `mist_near_cream.png`: 2026-11-08, `tools/tint_mist.py`로 기존 AI 안개 그림의 색을 45% 섞음 (원본은 그대로 둠)

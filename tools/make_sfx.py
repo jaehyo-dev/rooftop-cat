@@ -226,12 +226,54 @@ def pop_in() -> np.ndarray:
     return 0.7 * at(fade(sweep(280.0, 900.0, 0.07), 25.0), 0.0, 0.3) + 0.4 * at(bell(1568.0, 0.16, 20.0), 0.06, 0.3)
 
 
+def _voice(f0: np.ndarray, formant: np.ndarray, env: np.ndarray) -> np.ndarray:
+    """고양이 목소리: 기본음 f0의 배음 중 formant(Hz) 근처를 키운 소리 (입 모양이 바뀌는 느낌)"""
+    phase = 2 * np.pi * np.cumsum(f0) / RATE
+    out = np.zeros(len(f0))
+    for h in range(1, 9):
+        weight = np.exp(-((h * f0 - formant) / 450.0) ** 2) + 0.35 / h
+        out += weight * np.sin(h * phase)
+    return out * env
+
+
+def meow() -> np.ndarray:
+    """야옹 (줄줄이 시험판 만남): 올라갔다 내려오는 음 + 이→아→우로 바뀌는 입 모양. 게임이 고양이마다 음 높이를 바꿈"""
+    t = times(0.48)
+    k = t / t[-1]
+    f0 = 470.0 + 330.0 * np.sin(np.pi * np.minimum(k * 1.25, 1.0)) - 90.0 * k + 6.0 * np.sin(2 * np.pi * 7.0 * t)
+    formant = 700.0 + 1100.0 * np.sin(np.pi * k) ** 0.7
+    env = np.minimum(1.0, t * 25.0) * (1.0 - k) ** 0.7
+    return 0.5 * _voice(f0, formant, env)
+
+
+def nya() -> np.ndarray:
+    """냐! (놀라 도망감): 짧고 높게 튀어 오르는 소리"""
+    t = times(0.2)
+    k = t / t[-1]
+    f0 = 720.0 + 300.0 * np.sin(np.pi * np.minimum(k * 2.0, 1.0)) - 180.0 * k
+    formant = 1500.0 + 500.0 * np.sin(np.pi * k)
+    env = np.minimum(1.0, t * 60.0) * (1.0 - k) ** 1.2
+    return 0.5 * _voice(f0, formant, env)
+
+
+def purr() -> np.ndarray:
+    """골골 (피버 소리 층, 이어 붙여 반복): 낮은 울림을 초당 25번 떨고 숨쉬듯 커졌다 작아짐. 1.2초 안에 모든 주파수가 정수 번 돌아 이음매가 없음"""
+    t = times(1.2)
+    tone = np.sin(2 * np.pi * 55.0 * t) + 0.6 * np.sin(2 * np.pi * 110.0 * t) + 0.3 * np.sin(2 * np.pi * 165.0 * t) + 0.12 * np.sin(2 * np.pi * 220.0 * t)
+    flutter = 0.55 + 0.45 * np.sin(2 * np.pi * 25.0 * t) ** 2
+    breath = 0.7 + 0.3 * np.cos(2 * np.pi * t / 1.2)
+    return 0.6 * tone * flutter * breath
+
+
 UI_SOUNDS = {"buy": buy, "booster_buy": booster_buy, "booster_on": booster_on, "no_money": no_money, "claim": claim,
              "rank_up": rank_up, "swap": swap, "page": page,
              "whoosh": whoosh, "thud": thud, "fanfare": fanfare, "pop_in": pop_in}
 
 SOUNDS = {"pang": pang, "bell": jingle, "coo": coo, "jump": jump, "double_jump": double_jump, "land": land, "fish": fish, "pickup": pickup, "boing": boing, "perfect": perfect, "fall": fall, "stage_up": stage_up,
-          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash, **UI_SOUNDS}
+          "combo_up": combo_up, "combo_break": combo_break, "hit": hit, "heartbeat": heartbeat, "dash": dash,
+          "meow": meow, "nya": nya, **UI_SOUNDS}
+# 반복 재생하는 소리층 (길이 제한 없음)
+LOOPS = {"purr": purr}
 
 
 def write(path: Path, sound: np.ndarray) -> None:
@@ -246,5 +288,5 @@ def write(path: Path, sound: np.ndarray) -> None:
 if __name__ == "__main__":
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    for name, make in SOUNDS.items():
+    for name, make in {**SOUNDS, **LOOPS}.items():
         write(out / f"{name}.wav", make())

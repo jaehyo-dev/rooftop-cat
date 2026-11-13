@@ -25,6 +25,8 @@ const HIT_FLASH_TIME := 0.3
 const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 진하면 고양이가 빨간 덩어리로 보임
 
 var frame_name := "run_0"
+## 그림 크기 배율 (줄줄이 시험판 길고양이 0.75)
+var size_k := 1.0
 var _textures := {}
 var _sprite := Sprite2D.new()
 var _tail := Sprite2D.new()  # 앉았을 때만: 몸 뒤 꼬리 (CatPose.sit_tail)
@@ -51,6 +53,8 @@ func _ready() -> void:
 	_tail.centered = false
 	_tail.offset = -ANCHOR
 	_tail.visible = false
+	_sprite.use_parent_material = true  # 줄줄이 시험판 색 바꾸기 재질을 몸·꼬리도 받게
+	_tail.use_parent_material = true
 	add_child(_tail)  # 몸보다 먼저 = 뒤에 그림
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
@@ -125,9 +129,19 @@ func show_sit(t: float) -> void:
 	_tail.visible = true
 	_tail.texture = _tails[CatPose.sit_tail(t)]
 	rotation = 0.0
-	scale = CatPose.sit_breath(t) * art_scale()  # 노드 원점 = 발끝이라 바닥은 그대로
+	scale = CatPose.sit_breath(t) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
 	_stand = CatPose.STAND_TIME
+
+
+## 줄줄이 시험판 따라오는 고양이: 주인공 기록(프레임·몸 배율·기울기·공중제비)을 그대로 보인다
+func show_pose(frame: String, body: Vector2, rot: float, spin_rad: float) -> void:
+	frame_name = frame
+	_sprite.texture = _textures[frame]
+	_sprite.rotation = spin_rad
+	_tail.visible = false
+	rotation = rot
+	scale = body * art_scale() * size_k
 
 
 ## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다

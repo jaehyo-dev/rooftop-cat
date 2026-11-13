@@ -38,7 +38,10 @@ const UI_VOLUME_DB := -17.0
 ## 이 소리만 더 크게 (dB, 2c-polish 사용자 "도장 소리가 너무 작다"): 쿵은 다른 효과음보다 한 단계 위, 휙은 쿵에 맞춰 조금
 const UI_GAIN_DB := {"thud": 5.0, "whoosh": 3.0}
 ## HUD (판 중·결과 카드에서만 보임)
-const HUD := ["DistanceLabel", "BestLabel", "FishIcon", "FishLabel", "ScoreLabel", "ComboLabel"]
+const HUD := ["DistanceLabel", "BestLabel", "FishIcon", "FishLabel", "ScoreLabel", "ComboLabel", "ParadeHud"]
+## 줄줄이 시험판: 고양이 얼굴 아이콘 (앉은 그림의 머리 부분, 색은 world_view.tint)
+const FACE_REGION := Rect2(322, 224, 146, 116)
+const FACE_SIZE := 40.0
 const WORLD := preload("res://scripts/world_view.gd")
 
 ## 배경 음악 "찹쌀떡 산책" (tools/make_music.py로 합성한 루프)
@@ -148,6 +151,11 @@ func _process(delta: float) -> void:
 	$ComboLabel.text = "콤보 %d  x%d" % [combo.count, combo.multiplier()] if combo.count > 0 else ""
 	_pop_hud(combo, delta)
 	_place_dash_bonus(combo)
+	_show_faces($ParadeHud/Faces, _world.sim.parade.cats)
+	$ParadeHud/Mult.text = "x%.1f" % _world.sim.parade.multiplier()
+	$ParadeHud.modulate.a = 1.0 if _world.sim.parade.cats.size() > 0 else 0.0
+	if has_node("ParadeDev"):
+		$ParadeDev/Mode.text = "부딪힘 " + _world.parade_mode
 	$BoxIcon.visible = _world.sim.has_box and screen == "run"
 	$ComboLabel.visible = screen == "run"  # 결과 카드에서는 카드에 최고 콤보가 있고 등급 배지와 겹침
 	if $GameOver.visible:
@@ -203,6 +211,9 @@ func _on_game_over(meters: int) -> void:
 	# 한 줄 안내: v0.7.0 처음 켬(점수 기준이 바뀜) → 첫 판(상점 안내)
 	_hint.text = "점수 계산이 바뀌어 최고 점수를 새로 시작해요" if save.score_reset else ("메인 화면의 상점에서 강화를 살 수 있어요" if save.data.stats.runs == 1 else "")
 	_hint.visible = _hint.text != ""  # 안내가 없으면 줄을 차지하지 않게
+	var brought: Array[Dictionary] = sim.parade.cats
+	$GameOver/Card/Box/Parade/Text.text = "데려온 고양이 %d마리" % brought.size()
+	_show_faces($GameOver/Card/Box/Parade/Faces, brought)
 	save.score_reset = false
 	_extras.clear()
 	_count_result(0.0)
@@ -438,6 +449,7 @@ func _build_menus() -> void:
 		slots.toggled_on.connect(func(_kind: String, _on: bool) -> void:
 			play_ui("booster_on")
 			refresh_menus())
+	_build_parade_ui()
 
 
 ## 화면 바꾸기: 보이는 것, World 입력, 버튼 자리(touch_blockers)를 함께 맞춘다
@@ -466,6 +478,10 @@ func show_screen(next: String) -> void:
 		_blockers.append_array(start_menu.blockers())
 	if next == "result":
 		_blockers.append_array([$GameOver/Card/Box/Row, result_slots])
+	if next == "run" and has_node("ParadeDev"):
+		_blockers.append($ParadeDev)
+	if has_node("ParadeDev"):
+		$ParadeDev.visible = next == "run"
 	_world.touch_blockers.append_array(_blockers)
 	refresh_menus()
 
@@ -549,3 +565,103 @@ func _attach_qa() -> void:
 	if "qa=" in str(JavaScriptBridge.eval("location.search")):
 		_qa_attached = true
 		get_tree().root.add_child.call_deferred(load(QA).new())
+
+
+# --- 줄줄이 고양이 행렬 시험판 (cat-parade 브랜치) ---
+
+## 얼굴 아이콘 줄: HUD(콤보 아래, 배수 + 얼굴)와 결과 카드("데려온 고양이 N마리" + 얼굴), 로컬 빌드에만 시험 단추
+func _build_parade_ui() -> void:
+	var hud := HBoxContainer.new()
+	hud.name = "ParadeHud"
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.alignment = BoxContainer.ALIGNMENT_END
+	hud.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	hud.offset_left = -424
+	hud.offset_right = -26
+	hud.offset_top = 118
+	hud.offset_bottom = 118 + FACE_SIZE
+	hud.add_theme_constant_override("separation", 2)
+	var mult: Label = $ComboLabel.duplicate()  # 콤보 글자와 같은 모양 (갈색 + 밝은 테두리)
+	mult.name = "Mult"
+	mult.add_theme_font_size_override("font_size", 30)
+	mult.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	mult.custom_minimum_size = Vector2.ZERO
+	mult.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hud.add_child(mult)
+	var gap := Control.new()
+	gap.custom_minimum_size.x = UiKit.GAP
+	hud.add_child(gap)
+	hud.add_child(_face_row("Faces"))
+	add_child(hud)
+	move_child(hud, $ComboLabel.get_index() + 1)
+	# 결과 카드: 기록 표 아래 구분선 다음 줄
+	var box: VBoxContainer = $GameOver/Card/Box
+	var row := HBoxContainer.new()
+	row.name = "Parade"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", int(UiKit.GAP))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var text := UiKit.label("", UiKit.SUB, UiKit.SUB_BROWN)
+	text.name = "Text"
+	row.add_child(text)
+	row.add_child(_face_row("Faces"))
+	box.add_child(row)
+	box.move_child(row, box.get_node("Divider").get_index() + 1)
+	if is_local_build():
+		_build_parade_dev()
+
+
+func _face_row(row_name: String) -> HBoxContainer:
+	var faces := HBoxContainer.new()
+	faces.name = row_name
+	faces.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	faces.add_theme_constant_override("separation", 0)
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load("res://assets/sprites/cat_frames/sit_body.png")
+	atlas.region = FACE_REGION
+	for i in Balance.PARADE_MAX:
+		var face := UiKit.icon(atlas, FACE_SIZE)
+		face.name = "Face%d" % i
+		faces.add_child(face)
+	return faces
+
+
+## 줄의 고양이 수만큼 얼굴을 보이고 무늬 색을 입힌다
+func _show_faces(faces: HBoxContainer, cats: Array[Dictionary]) -> void:
+	for i in faces.get_child_count():
+		var face: TextureRect = faces.get_child(i)
+		face.visible = i < cats.size()
+		if face.visible:
+			face.material = WORLD.tint(cats[i].look)
+
+
+## 시험 단추는 로컬 빌드(데스크톱·github.io가 아닌 웹 주소)에만
+static func is_local_build() -> bool:
+	return not OS.has_feature("web") or not str(JavaScriptBridge.eval("location.hostname")).ends_with("github.io")
+
+
+## 왼쪽 아래 "시험판 임시": 부딪힘 A/B, 길고양이 바로 나오기, 줄 6마리 (이 자리 터치는 점프가 아님)
+func _build_parade_dev() -> void:
+	var dev := VBoxContainer.new()
+	dev.name = "ParadeDev"
+	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	dev.offset_left = 16
+	dev.offset_top = -184
+	dev.offset_right = 200
+	dev.offset_bottom = -12
+	dev.add_theme_constant_override("separation", 4)
+	dev.add_child(UiKit.label("시험판 임시", UiKit.FONT_MIN, UiKit.RED))
+	var mode := UiKit.button("부딪힘 " + _world.parade_mode, "cream", null, UiKit.FONT_MIN)
+	mode.pressed.connect(func() -> void:
+		_world.parade_mode = "B" if _world.parade_mode == "A" else "A"
+		_world.sim.parade.mode = _world.parade_mode)  # 지금 판에도 바로 (글자는 _process가 맞춤)
+	mode.name = "Mode"
+	var summon := UiKit.button("길고양이 바로", "cream", null, UiKit.FONT_MIN)
+	summon.pressed.connect(func() -> void: _world.sim.parade.call_now())
+	var fill := UiKit.button("줄 6마리", "cream", null, UiKit.FONT_MIN)
+	fill.pressed.connect(func() -> void: _world.sim.parade.fill(Balance.PARADE_MAX))
+	for b: Control in [mode, summon, fill]:
+		b.custom_minimum_size = Vector2(184, 44)
+		dev.add_child(b)
+	dev.visible = false
+	add_child(dev)

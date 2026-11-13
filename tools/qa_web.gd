@@ -16,7 +16,9 @@ func _ready() -> void:
 	var mode := query.get_slice("qa=", 1).get_slice("&", 0)
 	AudioServer.set_bus_mute(0, true)
 	await _wait(0.5)
-	if mode == "gif":
+	if mode.begins_with("parade"):  # 줄줄이 고양이 시험판 (tools/qa_parade.gd)
+		await load("res://tools/qa_parade.gd").new().run(self, mode)
+	elif mode == "gif":
 		await _gifs()
 	else:
 		await _shots()

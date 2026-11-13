@@ -35,6 +35,7 @@ extends RefCounted
 ## 생선 길(FishRoad)과 콤보(combo): 필수 생선(bonus 없음)이 먹는 타원 뒤로 지나가면 콤보가 끊긴다. 질주·털실·구제·투명화 중과 질주 직후는 끊지 않는다.
 ## 털실(magnet_time): 반경 안 생선이 날아옴. 황금 생선: 생선 +GOLD_FISH. 쿠키: 하트 +1. 통조림: 화면 안 장애물이 생선으로 바뀜.
 ## 방울(has_bell): 다음 한 번의 부딪힘을 막는다 (하트보다 먼저 쓰임, 하나만 가짐).
+## 줄줄이 고양이(parade, 시험판): parade_on일 때만. 점수(거리·생선)에 줄 배수, 부딪히면 맨 뒤가 도망 (A: 하트도 잃음, B: 줄이 있으면 하트 대신).
 
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
 var jumped := false
@@ -52,6 +53,7 @@ var picked: Array[Dictionary] = []
 var dash_started := false
 var dash_ended := false
 var bell_blocked := false  # 방울이 부딪힘을 막음 (막힌 장애물은 hit_obstacle)
+var scared := false  # 부딪혀 맨 뒤 고양이가 도망감 (줄줄이 시험판)
 ## 이번 step에 질주로 부순 장애물들, 통조림으로 바뀐 장애물들 (x는 그 순간 판정 왼쪽 끝)
 var smashed: Array[Dictionary] = []
 var canned: Array[Dictionary] = []
@@ -103,6 +105,10 @@ var dash_time := 0.0
 var magnet_time := 0.0
 ## 금빛 방울을 가지고 있는지 (한 번에 1개만)
 var has_bell := false
+## 줄줄이 고양이 시험판: 켜져 있는지, 줄 상태, 줄 배수로 더 받은 거리 점수(미터, 소수 포함)
+var parade_on := false
+var parade: CatParade
+var parade_bonus := 0.0
 ## 고양이 앞으로 화면 끝까지 거리 (통조림 범위). 화면 너비에 따라 world_view가 넘겨준다
 var view_ahead := 940.0
 ## 투명화 남은 시간 (0이면 보통 상태)
@@ -166,6 +172,7 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: 
 	_placer = ItemPlacer.new(seed_value)
 	slots = ItemSlots.new(seed_value, perks.cookie_gap())
 	combo.step = perks.combo_step()
+	parade = CatParade.new(seed_value)
 	has_bell = perks.has_booster("bell_start")
 	_dash_boost = perks.has_booster("dash_start")
 	if use_course:
@@ -192,6 +199,9 @@ func step(dt: float, pressed: bool) -> void:
 	dash_started = false
 	dash_ended = false
 	bell_blocked = false
+	scared = false
+	parade.met.clear()
+	parade.fled.clear()
 	smashed.clear()
 	canned.clear()
 	passed.clear()
@@ -219,13 +229,18 @@ func step(dt: float, pressed: bool) -> void:
 	time_since_double_jump += dt
 	_press_age = 0.0 if press_started else _press_age + dt
 
+	var x_before := x
 	_move_forward(vx() * dt)
+	if parade_on:
+		parade_bonus += maxf(0.0, x - x_before) / Balance.PX_PER_METER * (parade.multiplier() - 1.0)
 	_fill_roofs()
 	_pick_items(dt)
 	if _dash_boost and elapsed >= Balance.BOOSTER_DASH_AT and not dashing:
 		_dash_boost = false
 		_start_dash()
 	_hit_obstacles()
+	if parade_on and not game_over:
+		parade.update(self, dt)
 	if not dashing:
 		combo.tick(dt)
 	if game_over:
@@ -332,9 +347,14 @@ func distance() -> int:
 	return int(maxf(0.0, x - _start_x) / Balance.PX_PER_METER)
 
 
-## 점수: 거리 + 생선 점수
+## 점수: 거리 + 생선 점수 (+ 줄 배수로 더 받은 거리 점수)
 func score() -> int:
-	return distance() + combo.points
+	return distance() + combo.points + int(parade_bonus)
+
+
+## 생선 점수에 곱할 줄 배수 (줄줄이 시험판이 아니면 1)
+func parade_mult() -> float:
+	return parade.multiplier() if parade_on else 1.0
 
 
 ## 점프 중 아직 누르고 있어 올라가는 중인지 (화면 연출용)
@@ -490,10 +510,10 @@ func _pick_items(dt: float) -> void:
 		match item.kind:
 			"fish":
 				fish += 1
-				bites.append(perks.fish_points() * bonus)
+				bites.append(roundi(perks.fish_points() * bonus * parade_mult()))
 			"gold":
 				fish += Balance.GOLD_FISH
-				bites.append(perks.gold_points() * bonus)
+				bites.append(roundi(perks.gold_points() * bonus * parade_mult()))
 			"box":
 				has_box = true
 			"bell":
@@ -725,6 +745,10 @@ func _hit_obstacles() -> void:
 			if has_bell:
 				has_bell = false  # 방울이 대신 막는다 (하트·콤보 그대로)
 				bell_blocked = true
+				continue
+			scared = parade_on and parade.scare()
+			if scared and parade.mode == "B":
+				combo.cut()  # B: 하트 대신 맨 뒤 고양이가 도망 (하트 깨짐 연출이 없게 time_since_hit는 그대로)
 				continue
 			hearts -= 1
 			combo.cut()

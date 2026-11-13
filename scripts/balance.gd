@@ -306,3 +306,18 @@ const KICK_DOUBLE := Vector2(-0.08, 0.12)       # 더블점프
 const KICK_TRAMP_RIDE := Vector2(0.25, -0.24)   # 트램펄린 그물에 실림 (웅크려 납작)
 ## 트램펄린 튕김: 결과별 세로 늘어남
 const KICK_TRAMP_LAUNCH := {"miss": Vector2(0.04, -0.06), "early": Vector2(-0.04, 0.06), "good": Vector2(-0.14, 0.24), "perfect": Vector2(-0.18, 0.32)}
+
+# --- 줄줄이 고양이 행렬 시험판 (cat-parade 브랜치, GAME_SPEC "2026-11-13 게임 정체성") ---
+const PARADE_MAX := 6              # 시험판 최대 줄 길이
+const PARADE_GAP := 92.0           # 따라오는 고양이 사이 거리 (주인공이 달린 거리 기준 픽셀). 80은 캡처에서 몸이 겹쳐 92: 코가 앞 고양이 꼬리 끝에 닿는 정도
+const PARADE_LEAD_GAP := 105.0     # 주인공과 첫 고양이 사이 (주인공이 커서 조금 더 띄움)
+const PARADE_EDGE := 70.0          # 맨 뒤 고양이 몸 가운데가 화면 왼쪽에서 이만큼 안에 오게 카메라가 주인공을 오른쪽으로 옮김
+const PARADE_SIZE := 0.75          # 길고양이 크기 (주인공 대비)
+const PARADE_MULT_STEP := 0.2      # 점수 배수 = 1 + 0.2 x 마리 수 (1마리 1.2 … 6마리 2.2)
+const PARADE_FEVER := 5            # 이 마리 수부터 "골골" 피버
+const STRAY_FIRST := Vector2(10.0, 15.0)  # 첫 만남 시각 (초, 사이 무작위)
+const STRAY_EVERY := Vector2(15.0, 25.0)  # 그 뒤 만남 간격 (초)
+const STRAY_CLEAR := 150.0         # 길고양이 둘레 이 거리 안에는 장애물·트램펄린·아이템이 없게
+const STRAY_EDGE := 120.0          # 옥상 끝에서 이만큼 안쪽에만
+const PARADE_JOIN_TIME := 0.55     # 만난 뒤 줄 맨 뒤로 달려와 붙는 시간 (초)
+const PARADE_TRAIL_MIN := 4.0      # 기록은 이 거리(픽셀)보다 촘촘하면 마지막 것을 바꿔 씀
