@@ -590,3 +590,22 @@ architect는 코드를 읽고 판단(봇·테스트 실행 없음). 지적한 �
 - 게임 테스트 305 통과(종료 코드 0), 도구 테스트 48 통과, 웹 내보내기 성공, 웹 캡처 10번 콘솔 오류 0 (PC·폰)
 - final-reviewer **통과** (565b8b1): QUALITY_BAR 4-1·4-2 항목별 확인, 캡처·GIF 직접 열어 봄, 쿵 크기 측정(예전보다 약 +8.6dB, 다른 효과음보다 약 +8dB). 검토 뒤 git status 변경 없음
 - 남은 것: 소리는 귀로 확인 못 함(사용자 확인), FULL_TESTS=1은 GitHub Actions에서
+
+## 20. 배포 판정 (2026-11-13, 맥)
+
+### 20-1. 판정 근거
+- **2c-polish 사용자 플레이 통과** (19-4 확인 항목, 2026-11-13 사용자).
+- **디렉터 검수**: 상점 질주 설명에 실제 상품 이름 "츄르"가 있었음(게임 글자에 상표 금지) → "간식을 먹고 무적으로 달리는 시간이 길어져요."로 고치고, 화면에 나오는 모든 글(글자 모양 테스트와 같은 목록)에 금지어(츄르·챠오·이나바·쿠키런·마리오·포켓몬·냥코·고양이 대전쟁)가 없는지 보는 `test_화면_글에_상품_이름_같은_금지어가_없다` 추가 (예전 문구로 되돌리면 실패하는 것 확인).
+- **글꼴: 주아(Jua) 선택** (사용자, 2026-11-13, `review/v0.7.0/font/` 비교). `assets/fonts/jua/`(google/fonts 3e56677, SHA-1 일치, OFL 1.1). HUD 테마·`world_view` HUD·메뉴가 모두 `scripts/ui/menu_font.tres` 하나. 글자 사이 -1px(본문 34px의 -0.03em), 줄 위·아래 0.
+  - 주아 숫자가 넓어 가장 긴 값 테스트에서 두 칸이 넘침 → 시작 화면 경험치 숫자 칸 80→96("499/500"), 미션 "바꿀까요?"를 버튼 둥근 끝 안쪽 폭에 맞춤.
+- **시험 패널 제거**: `scripts/dev_panel.gd`(생선 +10,000·강화 단계·부스터·저장 지우기·날짜 넘기기·미션 완료·경험치), `DayClock.offset_days`와 그 테스트. 검수 캡처 붙이기(`tools/qa_web.gd`, 검수용 빌드에만 있음)는 `main.gd`의 `_attach_qa`로 옮김. `grep "배포 전 제거|DevPanel|시험 패널|offset_days|임시"` → scripts·scenes·tests·tools에 남은 것 없음.
+- **v0.6.0 저장 호환** (`test_v060_저장으로_켜면_생선은_그대로_최고_점수는_0부터_깨진_저장은_남긴다`): v0.6.0 방식으로 쓴 저장으로 켜면 생선 2,345·최고 거리 유지, 최고 점수 0부터(+ 안내), v0.6.0 점수 키는 그대로, 깨진 저장은 `.broken`으로 원본 보존.
+
+### 20-2. 지운 파일 (사용자 허락)
+- `assets/sprites/ui/clip.png`, `panel.png`, `note.png`, `cork.png`, `orange.png`, `cream.png`와 각 `.import`
+- `tools/make_ui_paper.py`, `tools/test_make_ui_paper.py`
+- `assets/fonts/gaegu/` (Gaegu-Bold.ttf, .import, LICENSE.txt: 쓰는 곳 없음)
+- `scripts/dev_panel.gd`, `.uid`
+
+### 20-3. 디렉터 판정
+- **v0.7.0 배포.**

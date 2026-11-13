@@ -3,7 +3,7 @@ extends RefCounted
 ## 메뉴 화면 공용 부품 (v0.7.0 2c-polish): 판·버튼·칩·아이콘 받침·게이지·리본·글자, 작은 연출(톡 튀기·생선 날아가기·도장 쾅).
 ## 모양 값(색, 모서리, 테두리, 그림자, 윗면 빛, 눌림, 여백, 글자 크기)은 아래 "UI 스타일" 상수만 쓴다.
 ## 이 상수는 ART_BIBLE.md "UI 스타일" 표와 같아야 하고, 메뉴 화면 코드에 표에 없는 값이 있으면 tests/test_ui_style.gd가 실패한다.
-## 판·버튼은 코드로 그린다(Plate). 압정·집게·아이콘은 Codex 색연필 그림(assets/sprites/ui/), 글자는 Gaegu 글꼴.
+## 판·버튼은 코드로 그린다(Plate). 압정·집게·아이콘은 Codex 색연필 그림(assets/sprites/ui/), 글자는 주아(Jua) 글꼴.
 
 # --- UI 스타일: 색 (ART_BIBLE "UI 스타일" 표) ---
 const PANEL := Color("#fff3dc")         # 판 크림 (큰 판)
@@ -42,7 +42,7 @@ const SHINE_EVERY := 2.6 # 지나가는 빛 간격 (초)
 const SHINE_TIME := 0.55 # 빛이 한 번 지나가는 시간 (초)
 const GAP := 8.0         # 여백 단위 (모든 간격은 8의 배수)
 const PAD := 16.0        # 판·버튼 안쪽 여백 (GAP x 2)
-# --- 글자 (Gaegu Bold) ---
+# --- 글자 (주아 Jua) ---
 const TITLE := 48        # 제목 (갈색)
 const BODY := 34         # 본문 (갈색)
 const SUB := 30          # 보조 (연한 갈색). 폰(0.54배)에서 약 16px
@@ -57,8 +57,8 @@ const BASE_ART := 0.74   # 받침 안 그림 크기 비율
 
 const MIN_BUTTON := 88.0  # 버튼은 화면 높이의 12% 이상
 const FONT_MIN := 22  # 글자를 줄여 넣을 때 가장 작은 크기 (휴대폰 0.54배에서 약 12px)
-const LETTER := -4    # 글자 사이 (Gaegu는 글자 사이가 넓어 한국어가 낱말로 안 묶여 보임, 2c-polish 아트 검토)
-const FONT := preload("res://scripts/ui/menu_font.tres")  # Gaegu Bold + 글자 사이 LETTER
+const LETTER := -1    # 글자 사이 (주아 본문 34px의 -0.03em, review/v0.7.0/font/README.md 3번)
+const FONT := preload("res://scripts/ui/menu_font.tres")  # 주아 + 글자 사이 LETTER
 
 const PIN_RED := preload("res://assets/sprites/ui/pin_red.png")
 const PIN_YELLOW := preload("res://assets/sprites/ui/pin_yellow.png")

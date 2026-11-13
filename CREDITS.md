@@ -10,7 +10,7 @@
 | 이름 | 버전 | 만든 사람 | 라이선스 | 출처 | 쓰는 곳 | 수정 |
 |---|---|---|---|---|---|---|
 | Godot Engine | 4.7.2-stable | Godot Engine contributors, Juan Linietsky, Ariel Manzur | MIT (엔진에 포함된 서드파티 구성 요소는 각자의 라이선스) | https://godotengine.org | 게임 엔진, 웹 내보내기 템플릿 | 없음 |
-| Gaegu Bold (`Gaegu-Bold.ttf`) | google/fonts 커밋 86aced9 | The Gaegu Project Authors (JIKJI SOFT) | SIL OFL 1.1 | https://github.com/google/fonts/tree/86aced9/ofl/gaegu | `assets/fonts/gaegu/`, HUD·게임 끝 화면 글자 (`scenes/main.tscn` 테마) | 없음 (라이선스 전문 `assets/fonts/gaegu/LICENSE.txt` = 원래 `OFL.txt`) |
+| 주아 Jua (`Jua-Regular.ttf`, v1.001) | google/fonts 커밋 3e56677 | 우아한형제들 (The Jua Project Authors / Woowahan Brothers) | SIL OFL 1.1 | https://github.com/google/fonts/tree/3e56677/ofl/jua (2026-11-13 받음, 공식 파일과 SHA-1 일치) | `assets/fonts/jua/`, 게임의 모든 글자 (`scripts/ui/menu_font.tres`: HUD·메뉴·결과 카드·버전 글자) | 없음 (라이선스 전문 `assets/fonts/jua/LICENSE.txt` = 원래 `OFL.txt`) |
 
 - Godot 엔진과 엔진 구성 요소의 라이선스 전문은 배포할 때 `licenses/godot.txt`로 자동 생성합니다 (`tools/export_licenses.gd`).
 
@@ -44,7 +44,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/concept/cat_reference_sheet.png` | 2026-11-06 | 사용자가 다른 세션에서 AI로 만들어 제공 (요청문 기록 없음) | 기준 캐릭터 참고 시트, 6가지 동작 (게임에 포함 안 됨) | 없음 |
 | `assets/concept/poses/walk·crouch·run·jump·land·dash.png` | 2026-11-06 | 위 참고 시트 | 모션 참고용 동작 6장 (게임에 포함 안 됨) | 시트에서 잘라 남색 배경을 색 거리로 지움 |
 | `assets/sprites/items/fish_0~3.png` | 2026-11-11 (2c에 씀) | Codex 내장 이미지 생성: v0.7.0 시안 10 "세트 1"(`review/v0.7.0/concept/10_fish_set1.png`) | 생선 점수 강화 0·3·6·10단계 생선 그림 (멸치·고등어·분홍 도미·하늘보라 물고기) | 마젠타 배경을 지우고(`tools/cut_parts.py`) 지금 생선과 같은 240x136 칸에 맞춤, 반짝이 조각은 뺌 (`review/v0.7.0/2c/cut_art.py`) |
-| `assets/raw/ui_paper_sheet.png` → `assets/sprites/ui/pin_red·pin_yellow·clip.png` | 2026-11-12 | Codex 내장 이미지 생성 (시안 05·08 첨부) | 미션 쪽지·상점 띠의 압정, 빨래집게 (같은 시트의 종이 패널·버튼은 2c 피드백 B 확정 때 지움) | 마젠타 배경을 지우고 잘라 냄 (`review/v0.7.0/2c/cut_art.py`) |
+| `assets/raw/ui_paper_sheet.png` → `assets/sprites/ui/pin_red·pin_yellow.png` | 2026-11-12 | Codex 내장 이미지 생성 (시안 05·08 첨부) | 미션 쪽지·상점 띠의 압정 (같은 시트의 종이 패널·버튼은 2c 피드백 B 확정 때, 빨래집게 clip.png는 v0.7.0 배포 때 안 써서 지움) | 마젠타 배경을 지우고 잘라 냄 (`review/v0.7.0/2c/cut_art.py`) |
 | `assets/raw/ui_icons_sheet.png` → `assets/sprites/ui/icons/*.png` (16개) | 2026-11-12 | Codex 내장 이미지 생성 (아이템 시트·기준 고양이 첨부) | 강화·부스터·미션 종류·바꾸기·등급 배지·상점·별·뒤로 아이콘 | 마젠타 배경을 지우고 4x4 칸으로 잘라 냄. `cookie_clock.png`는 지금 쿠키 그림에 시계 아이콘을 작게 겹쳐 붙임 |
 | `assets/raw/ui_stamp.png` → `assets/sprites/ui/icons/stamp.png` | 2026-11-12 | Codex 내장 이미지 생성 (이 PC에서 그림이 되는지 시험한 그림) | 미션 받은 쪽지의 빨간 발바닥 도장 | 마젠타 배경을 지우고 잘라 냄 (2c-fix: 발가락까지 모두 담아 다시 자름) |
 | `assets/raw/cat_frames_sit.png` → `assets/sprites/cat_frames/sit_0·sit_1·sit_2·sit_blink·sit_up.png` | 2026-11-12 | Codex 내장 이미지 생성 (기준 시트 `assets/concept/cat_reference_sheet.png`와 `cat_base_run.png` 첨부, 요청문 `review/v0.7.0/2c-fix/prompts/cat_sit.txt`) | 시작 화면 고양이: 앉아서 꼬리 흔들기 3장, 눈 감기, 일어나기 | 마젠타 제거, 3x2 칸에서 자름, 머리 크기를 달리기 프레임에 맞춤(x0.78), 발끝·얼굴 쪽 끝 정렬 (`review/v0.7.0/2c-fix/cut_sit.py`). 첫 칸(머리 방향이 다름)은 안 씀 |
@@ -90,7 +90,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 ## 직접 만든 것
 
 - 메뉴 효과음 4종 `assets/audio/sfx/whoosh·thud·fanfare·pop_in.wav` (도장 휙, 도장 쿵, 강화 10단계 팡파르, 부스터 쏙): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 다른 메뉴 소리와 같은 -17dB, 강화 사기 소리는 게임에서 단계마다 빠르기를 반음씩 올려 냄
-- 깔끔한 메뉴 종이·버튼 그림 `assets/sprites/ui/panel·note·cork·orange·cream.png` ("거의 평면" B, 2026-11-12 사용자 확정): `tools/make_ui_paper.py`(numpy, Pillow)로 직접 그림. 외부 그림 없음. v0.7.0 2c-polish부터 게임은 이 그림 대신 코드로 그린 판(`scripts/ui/plate.gd`, ART_BIBLE 13 "UI 스타일" 값)을 씀
+- (지움, v0.7.0) 깔끔한 메뉴 종이·버튼 그림 `assets/sprites/ui/panel·note·cork·orange·cream.png`과 그린 도구 `tools/make_ui_paper.py`: 2c-polish부터 코드로 그린 판(`scripts/ui/plate.gd`)을 써서 v0.7.0 배포 때 사용자 허락을 받아 지움
 - 메뉴 판·버튼·게이지·리본·화살표·빛 원 (v0.7.0 2c-polish): `scripts/ui/plate.gd`, `scripts/ui/ui_kit.gd`가 코드로 그림. 외부 그림 없음
 - 도장 휙·쿵 소리 다시 만듦 (v0.7.0 2c-polish): `tools/make_sfx.py` whoosh·thud (탁 + 눌러 키운 북 + 55Hz 저음 꼬리)
 - 메뉴 효과음 8종 `assets/audio/sfx/buy·booster_buy·booster_on·no_money·claim·rank_up·swap·page.wav` (강화 사기, 부스터 사기, 부스터 켜기, 생선 부족, 미션 받기, 등급 오름, 바꾸기, 화면 넘김): 2026-11-12, `tools/make_sfx.py`(numpy)로 직접 합성. 외부 음원·샘플 없음. 생선 소리와 같은 -17dB로 틂

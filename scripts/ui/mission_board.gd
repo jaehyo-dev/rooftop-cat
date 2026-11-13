@@ -215,7 +215,7 @@ func _fill_note(note: Control, weekly: bool, slot: int) -> void:
 			UiKit.on_orange(top)
 		top.position = Vector2(UiKit.GAP, UiKit.GAP)
 		top.size = Vector2(152 - UiKit.PAD, 34)
-		UiKit.fit(top, top.size.x, UiKit.SUB)
+		UiKit.fit(top, top.size.x - UiKit.PAD * 2.0, UiKit.SUB)  # 버튼 둥근 끝 안쪽에 맞춤
 		swap.add_child(top)
 		var cost := HBoxContainer.new()
 		cost.alignment = BoxContainer.ALIGNMENT_CENTER

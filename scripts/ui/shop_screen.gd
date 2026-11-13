@@ -8,7 +8,7 @@ extends MenuScreen
 ## 사고팔기 판단은 SaveData.buy_upgrade·buy_booster가 한다 (화면은 부르기만).
 
 const UPGRADE_INFO := {
-	"dash": ["질주 시간", "츄르를 먹고 무적으로 달리는 시간이 길어져요.", "snack"],
+	"dash": ["질주 시간", "간식을 먹고 무적으로 달리는 시간이 길어져요.", "snack"],
 	"yarn": ["털실 자석", "털실이 생선을 끌어오는 시간과 범위가 늘어요.", "yarn"],
 	"combo": ["콤보 가속", "콤보 배수가 더 적은 생선으로 올라가요.", "combo"],
 	"gold": ["황금 생선", "황금 생선 한 마리 점수가 올라가요.", "gold"],
@@ -289,7 +289,7 @@ func _fill_list() -> void:
 		else:
 			var short := UiKit.label(_info()[kind][3], UiKit.SUB, UiKit.SUB_BROWN)
 			short.name = "Short"
-			short.position = Vector2(NAME_X, 46)
+			short.position = Vector2(NAME_X, 50)  # 주아는 글자가 커서 이름 줄과 띄움 (46→50, 판 안쪽 아래 끝까지)
 			short.size = Vector2(tag_x - NAME_X - UiKit.GAP, 30)
 			b.add_child(short)
 			_counts[kind] = lv_text

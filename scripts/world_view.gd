@@ -142,7 +142,7 @@ const GUIDE_PAW := 22.0
 const GUIDE_START := 110.0
 const HUD_BROWN := Color(0.353, 0.275, 0.212)
 const HUD_CREAM := Color(1, 0.97, 0.9)
-const HUD_FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
+const HUD_FONT := preload("res://scripts/ui/menu_font.tres")  # 주아 + 글자 사이 (메뉴와 같은 글꼴)
 ## 줄 판정 결과 글자 (0.4초 떠올랐다 사라짐). miss(안 누름)는 글자 없이 줄이 처지는 것으로 보여 줌
 const RESULT_TEXT := {"perfect": "퍼펙트!", "good": "좋아!", "early": "빨랐어!"}
 const RESULT_TIME := 0.4

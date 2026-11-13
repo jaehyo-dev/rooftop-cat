@@ -16,7 +16,7 @@ const BAND_H := 88.0      # 정보 띠 높이 (그림자 포함)
 const BAND := 256.0       # 최고 기록·지갑 띠 넓이
 const RANK_BAND := 328.0  # 등급 띠 넓이
 const ROLL_TIME := 0.6
-const XP_W := 80.0        # 등급 띠 경험치 숫자 칸    # 정보 띠 숫자가 굴러가며 차오르는 시간
+const XP_W := 96.0        # 등급 띠 경험치 숫자 칸 (주아 숫자가 넓어 80→96, 가장 긴 "499/500")    # 정보 띠 숫자가 굴러가며 차오르는 시간
 
 var main: Node
 var boosters: BoosterSlots

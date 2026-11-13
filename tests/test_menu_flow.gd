@@ -3,7 +3,7 @@ extends TestCase
 ## 버튼 자리 터치가 점프·다시 시작이 아님, 상점·미션에서 입력이 판에 가지 않음, 사기·받기·바꾸기, 화면 크기(버튼 높이·글자 잘림).
 
 const PATH := "user://test_menu_flow.cfg"
-const QA := preload("res://tools/qa_web.gd")  # 메뉴 화면 부품인지 (예전 HUD·시험 패널은 뺌)
+const QA := preload("res://tools/qa_web.gd")  # 메뉴 화면 부품인지 (예전 HUD는 뺌)
 
 
 func _clear() -> void:

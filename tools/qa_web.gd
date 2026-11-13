@@ -1,7 +1,7 @@
 extends Node
 ## v0.7.0 2c-juice 눈 검수 캡처 (자동 테스트 아님, QUALITY_BAR 4-1 넷째 항목). 창을 띄우지 않으려고 로컬 웹 빌드 안에서 돈다.
 ## 검수용 웹 빌드(review/v0.7.0/2c-juice/export_qa.sh: tools/를 넣어 내보냄) 주소에 ?qa=shots 또는 ?qa=gif 를 붙이면
-## DevPanel.attach가 이 스크립트를 붙인다 (보통 빌드에는 tools/가 없어 안 붙음).
+## main.gd의 _attach_qa가 이 스크립트를 붙인다 (보통 빌드에는 tools/가 없어 안 붙음).
 ## 화면마다 window.qaShot = {name, cells}를 쓰고 qa_web.mjs(헤드리스 Chromium)가 찍은 뒤 window.qaTaken = name으로 답한다.
 ## GIF는 window.qaRec = 이름 동안 review/v0.7.0/2c-juice/qa_web.mjs가 계속 찍는다 (느리게 돌려 프레임을 넉넉히: Engine.time_scale).
 ## 상태 만들기는 2c-fix/capture_fix.gd와 같음 (그쪽은 Godot 창이 필요해서 웹용으로 옮김).
@@ -111,9 +111,6 @@ func _make(kind: String) -> void:
 			"minute": 0 if kind == "longest" else 48, "second": 1}
 	get_tree().root.add_child(main)
 	await _wait(0.8)
-	for temp in ["DevPanel"]:  # 시험 패널은 캡처에서 뺌
-		if main.has_node(temp):
-			main.get_node(temp).queue_free()
 	var data: Dictionary = main.save.data
 	if kind == "normal":
 		data.missions.daily = Missions._entries(["d_dist_2", "d_fish_c1", "d_double"], MissionTable.DAILY)
@@ -257,6 +254,16 @@ func _shots() -> void:
 			{"level": 10, "fish": 99999, "boosters": ["bell_start", "fish_bonus"]}]}, main.get_node("GameOver/Card").get_global_rect())
 	await _wait(ResultExtras.NOTE_GAP * 4.0 + 1.2)
 	await _shot("result_longest")
+	# 판 안 HUD (v0.7.0 배포 검수: 주아 숫자): 달리는 중 콤보·점수가 보이게, 멈춰서 찍음
+	await _make("normal")
+	main.begin_run()
+	await _wait(2.0)
+	for i in 14:
+		main.get_node("World").sim.combo.eat(10)
+	await _wait(0.5)
+	Engine.time_scale = 0.0
+	await _shot("hud_run")
+	Engine.time_scale = 1.0
 
 
 # --- GIF ---

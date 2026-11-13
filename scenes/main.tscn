@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://scripts/world_view.gd" id="2"]
 [ext_resource type="Texture2D" path="res://assets/sprites/items/fish.png" id="3"]
 [ext_resource type="Texture2D" path="res://assets/sprites/items/box.png" id="4"]
-[ext_resource type="FontFile" path="res://assets/fonts/gaegu/Gaegu-Bold.ttf" id="5"]
+[ext_resource type="FontVariation" path="res://scripts/ui/menu_font.tres" id="5"]
 
 [sub_resource type="Theme" id="hud_theme"]
 default_font = ExtResource("5")

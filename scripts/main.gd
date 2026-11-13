@@ -2,7 +2,7 @@ extends Control
 ## 게임 화면(World), 거리·최고 점수·생선 수·종이상자, 오른쪽 위 점수·콤보, 결과 화면, 버전 표시.
 ## v0.7.0 2c 화면 흐름 (review/v0.7.0/PLAN.md 1번): 시작 화면 → 판 → 결과 카드, 시작 화면·결과 카드에서 상점·미션, [뒤로] = 온 곳.
 ## 화면마다 scripts/ui/의 Control이 그리고, 여기서는 어느 화면인지만 바꾼다 (판 중에는 상점·미션에 못 감).
-## 글꼴은 Gaegu Bold(main.tscn 테마, 한글 포함). 갈색 글자 + 얇은 밝은 테두리.
+## 글꼴은 주아 Jua(main.tscn 테마 = scripts/ui/menu_font.tres, 한글 2,367자). 갈색 글자 + 얇은 밝은 테두리.
 ## 손맛(2b): 콤보 배수가 오르면 숫자가 톡 튀고, 생선 점수가 오르면 점수가 살짝 흔들린다. 결과 숫자는 하나씩 차오르고 새 기록이면 별이 내린다.
 
 ## 켜면 시작 화면부터 (false = 바로 판, 예전 테스트·캡처 도구용)
@@ -15,7 +15,7 @@ var record_path := SaveData.DEFAULT_PATH
 var save: SaveData
 ## 다음 판에 켤 부스터 (판이 시작되면 쓴 만큼 줄고 다시 꺼짐, PLAN 1번). 2c에서 시작 화면·결과 카드의 부스터 칸이 바꿈
 var boosters_on: Array = []
-## 미션 날짜 (테스트·시험 패널이 시각을 바꿈)
+## 미션 날짜 (테스트가 시각을 고정함)
 var clock := DayClock.new()
 ## 지난 판 미션 결과 {"done", "ranks"} (Missions.count). 결과 카드 쪽지·등급 도장이 읽음
 var mission_result := {}
@@ -112,7 +112,7 @@ func _ready() -> void:
 	else:
 		_world.restart()
 		show_screen("run")
-	DevPanel.attach(self)
+	_attach_qa()
 	# 배경 음악: 끝나면 처음부터 반복. 웹에서는 첫 터치·클릭 뒤부터 소리가 난다 (브라우저 규칙)
 	var music_stream: AudioStreamOggVorbis = MUSIC.duplicate()
 	music_stream.loop = not OS.has_feature("web")
@@ -467,8 +467,6 @@ func show_screen(next: String) -> void:
 	if next == "result":
 		_blockers.append_array([$GameOver/Card/Box/Row, result_slots])
 	_world.touch_blockers.append_array(_blockers)
-	if has_node("DevPanel"):  # 임시 시험 패널 (배포 전 제거): 상점·미션 화면과 겹치지 않게 숨김
-		get_node("DevPanel").visible = not menu
 	refresh_menus()
 
 
@@ -539,3 +537,15 @@ func shop_has_new() -> bool:
 func play_ui(sound: String, pitch: float = 1.0) -> void:
 	_ui_sfx[sound].pitch_scale = pitch
 	_ui_sfx[sound].play()
+
+
+## 눈 검수 캡처: 검수용 웹 빌드(review/v0.7.0/2c-juice/export_qa.sh, tools/를 넣어 내보냄) 주소에 ?qa= 가 있으면
+## tools/qa_web.gd를 붙인다. 보통 빌드에는 tools/가 없어 아무것도 안 함. 캡처가 main을 다시 만들어도 한 번만
+static var _qa_attached := false
+func _attach_qa() -> void:
+	const QA := "res://tools/qa_web.gd"
+	if _qa_attached or not OS.has_feature("web") or not ResourceLoader.exists(QA):
+		return
+	if "qa=" in str(JavaScriptBridge.eval("location.search")):
+		_qa_attached = true
+		get_tree().root.add_child.call_deferred(load(QA).new())

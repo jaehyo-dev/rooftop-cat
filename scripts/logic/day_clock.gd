@@ -4,16 +4,13 @@ extends RefCounted
 ## 기기 지역 시간 기준. 일일 키 = "YYYY-MM-DD", 주간 키 = 그 주 월요일의 일일 키 (0시에 바뀜).
 ## 한 사람용이라 시간 조작은 막지 않는다.
 
-## 테스트·시험 패널용: 비어 있지 않으면 기기 시간 대신 이 시각 (Time의 datetime 사전 모양)
+## 테스트용: 비어 있지 않으면 기기 시간 대신 이 시각 (Time의 datetime 사전 모양)
 var fixed := {}
-## 시험 패널의 "하루 넘기기": 기기 시간에 더할 날 수
-var offset_days := 0
 
 
 ## 지금 시각 (지역 시간 datetime 사전)
 func now() -> Dictionary:
-	var at := fixed if not fixed.is_empty() else Time.get_datetime_dict_from_system()
-	return shift(at, offset_days)
+	return fixed if not fixed.is_empty() else Time.get_datetime_dict_from_system()
 
 
 ## at에서 days일 뒤 (지역 시간 그대로 날짜만 셈: 지역 시각을 UTC인 척 계산해 시간대·서머타임과 무관)

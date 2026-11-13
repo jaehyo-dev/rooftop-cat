@@ -1,15 +1,14 @@
 extends TestCase
 ## 화면(UI) 검수 자동 검사 (QUALITY_BAR 4-1, v0.7.0 2c 사용자 지적 뒤 추가)
-## 1) 글자 모양: 화면에 나올 수 있는 모든 글자가 글꼴(Gaegu)에 있는지 (없으면 네모 □로 나옴)
+## 1) 글자 모양: 화면에 나올 수 있는 모든 글자가 글꼴(주아, 한글 2,367자만 있음)에 있는지 (없으면 네모 □로 나옴)
 ## 2) 가장 긴 값: 숫자·이름이 가장 길 때 글자가 칸 안에 있고 다른 글자·그림과 겹치지 않는지 (PC 1280x720·폰 844x390)
 ## 3) 그림 가장자리: 잘라 쓴 그림의 가장자리 1px에 불투명 픽셀이 없는지 (있으면 시트에서 자를 때 몸이 잘린 것)
 
 ## 칸 찾기·가장 긴 값 채우기는 눈 검수 캡처(tools/qa_web.gd)와 같은 것을 씀 (검사하는 칸 = 확대해 보는 칸)
 const QA := preload("res://tools/qa_web.gd")
 const PATH := "user://test_ui_quality.cfg"
-## 글자 검사에서 빼는 파일: 시험 패널은 배포 전에 지우는 임시 코드이고 글꼴도 기본 글꼴을 씀,
-## course_data.gd의 구간 이름("화분·실외기 박자")은 검토용 내보내기(tests/export_segments.gd)에만 쓰고 화면에 안 나옴
-const GLYPH_SKIP := ["res://scripts/dev_panel.gd", "res://scripts/logic/course_data.gd"]
+## 글자 검사에서 빼는 파일: course_data.gd의 구간 이름("화분·실외기 박자")은 검토용 내보내기(tests/export_segments.gd)에만 쓰고 화면에 안 나옴
+const GLYPH_SKIP := ["res://scripts/logic/course_data.gd"]
 ## 가장자리 검사 예외 (이유별). 여기 없는 그림은 가장자리 불투명 픽셀이 0이어야 한다
 const EDGE_TILES := ["res://assets/sprites/backdrop/"]  # 옆으로 이어 붙이는 띠: 가장자리가 닿아야 이음매가 안 보임
 const EDGE_TILE_NAMES := ["brick_", "tile_", "villa_"]   # 건물 벽 조각 (위와 같은 이유)
@@ -61,8 +60,8 @@ static func _files(dir: String, ext: String) -> PackedStringArray:
 	return out
 
 
-## 글꼴에 없는 글자 → 그 글자가 나온 곳 (파일 또는 데이터 이름)
-static func missing_glyphs(font: Font) -> Dictionary:
+## 화면에 나올 수 있는 모든 글 → 나온 곳 (파일 또는 데이터 이름)
+static func screen_texts() -> Dictionary:
 	var texts := {}  # 글 → 나온 곳
 	for path in _files("res://scripts", ".gd"):
 		if path in GLYPH_SKIP:
@@ -80,6 +79,12 @@ static func missing_glyphs(font: Font) -> Dictionary:
 			texts[ShopScreen.value_text(kind, lv)] = "강화 값 " + kind
 	for s in [86399, 3599, 7 * 86400 - 1]:
 		texts[DayClock.left_text(s)] = "남은 시간"
+	return texts
+
+
+## 글꼴에 없는 글자 → 그 글자가 나온 곳
+static func missing_glyphs(font: Font) -> Dictionary:
+	var texts := screen_texts()
 	var missing := {}
 	for s: String in texts:
 		for ch in s:
@@ -98,6 +103,19 @@ func test_화면_글자는_모두_글꼴에_있다() -> void:
 		_fail("글꼴에 없는 글자 '%s' (U+%04X)" % [ch, ch.unicode_at(0)], ", ".join(missing[ch]))
 	assert_true(UiKit.FONT.has_char("가".unicode_at(0)) and not UiKit.FONT.has_char("→".unicode_at(0)), "검사 자체 확인: 한글은 있고 →는 없음")
 
+
+
+## 게임 글자에 실제 상품·상표·다른 게임 이름을 쓰지 않는다 (CLAUDE.md 오픈소스 규칙, v0.7.0 디렉터 검수에서 "츄르" 발견)
+const BANNED_WORDS := ["츄르", "챠오", "이나바", "쿠키런", "마리오", "포켓몬", "냥코", "고양이 대전쟁"]
+
+
+func test_화면_글에_상품_이름_같은_금지어가_없다() -> void:
+	var texts := screen_texts()
+	assert_true(texts.size() > 100, "검사 자체 확인: 화면 글을 모았음 (%d개)" % texts.size())
+	for s: String in texts:
+		for word: String in BANNED_WORDS:
+			if word in s:
+				_fail("화면 글에 금지어 '%s'" % word, "%s \"%s\"" % [texts[s], s.left(30)])
 
 # --- 3) 그림 가장자리 ---
 

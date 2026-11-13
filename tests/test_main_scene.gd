@@ -267,7 +267,7 @@ func test_버튼_자리_터치는_점프도_다시_시작도_아니다() -> void
 	main.record_path = PATH
 	add_child(main)
 	var world: Node2D = main.get_node("World")
-	var button := Button.new()  # 2a 시험 패널·2c 버튼 자리
+	var button := Button.new()  # 메뉴 버튼 자리
 	button.position = Vector2(10.0, 600.0)
 	button.size = Vector2(100.0, 60.0)
 	main.add_child(button)
@@ -300,3 +300,48 @@ func test_버튼_자리_터치는_점프도_다시_시작도_아니다() -> void
 	assert_false(world.sim.game_over, "숨긴 버튼 자리는 다시 받음")
 	main.queue_free()
 	DirAccess.remove_absolute(PATH)
+
+
+## v0.6.0 저장(BestRecord._save_int와 같은 방식: [save] version=1 + 키 하나씩)이 있는 기기에서 v0.7.0을 처음 켬 (배포 전 시험)
+func test_v060_저장으로_켜면_생선은_그대로_최고_점수는_0부터_깨진_저장은_남긴다() -> void:
+	const PATH := "user://test_main_v060.cfg"
+	for f in [PATH, PATH + ".tmp", PATH + ".broken"]:
+		DirAccess.remove_absolute(f)
+	for kv in [["record", "best_distance", 812], ["record", "best_score", 45210], ["wallet", "fish", 2345]]:
+		var old := ConfigFile.new()
+		old.load(PATH)
+		old.set_value("save", "version", 1)
+		old.set_value(kv[0], kv[1], kv[2])
+		old.save(PATH)
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.record_path = PATH
+	add_child(main)
+	await get_tree().create_timer(1.5).timeout  # 정보 띠 숫자가 다 굴러갈 때까지
+	assert_eq(main.save.fish(), 2345, "모은 생선 유지")
+	assert_eq(main.save.best_distance(), 812, "최고 거리 유지")
+	assert_eq(main.save.best_score(), 0, "새 최고 점수는 0부터 (점수 계산이 바뀜)")
+	assert_true(main.save.score_reset, "결과 카드가 새로 시작한다고 알려 줌")
+	assert_eq(main.start_menu._wallet.text, "2,345", "시작 화면 가진 생선")
+	assert_eq(main.start_menu._best.text, "0", "시작 화면 최고 점수")
+	main.save.save()
+	var file := ConfigFile.new()
+	file.load(PATH)
+	assert_eq(file.get_value("record", "best_score"), 45210, "v0.6.0 점수 키는 그대로 (versions/v0.6.0에서 계속 보임)")
+	main.queue_free()
+	await wait_frames(2)
+	# 깨진 저장: 원본을 .broken으로 남기고 0에서 시작
+	var broken := "[wallet\nfish=2345\n"
+	expected_errors.append("ConfigFile parse error")
+	var out := FileAccess.open(PATH, FileAccess.WRITE)
+	out.store_string(broken)
+	out.close()
+	main = load("res://scenes/main.tscn").instantiate()
+	main.record_path = PATH
+	add_child(main)
+	await wait_frames(5)
+	assert_eq(main.save.fish(), 0)
+	assert_eq(FileAccess.get_file_as_string(PATH + ".broken"), broken, "깨진 원본 보존")
+	main.queue_free()
+	await wait_frames(2)
+	for f in [PATH, PATH + ".tmp", PATH + ".broken"]:
+		DirAccess.remove_absolute(f)

@@ -50,13 +50,11 @@ func test_연말과_윤년_2월_29일() -> void:
 	assert_eq(DayClock.week_key(_at(2028, 2, 29)), "2028-02-28", "2028-02-29는 화요일")
 
 
-func test_시계는_고정_시각과_날_넘기기를_받는다() -> void:
+func test_시계는_고정_시각을_받는다() -> void:
 	var clock := DayClock.new()
 	clock.fixed = _at(2026, 11, 12, 23, 30)
 	assert_eq(DayClock.day_key(clock.now()), "2026-11-12")
-	clock.offset_days = 7
-	assert_eq(DayClock.day_key(clock.now()), "2026-11-19")
-	assert_eq(clock.now().hour, 23, "시각은 그대로")
+	assert_eq(clock.now().hour, 23)
 	var real := DayClock.new()
 	assert_eq(DayClock.day_key(real.now()), DayClock.day_key(Time.get_datetime_dict_from_system()), "기본은 기기 시간")
 
