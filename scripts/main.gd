@@ -647,7 +647,7 @@ func _build_parade_dev() -> void:
 	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	dev.offset_left = 16
 	dev.offset_top = -184
-	dev.offset_right = 200
+	dev.offset_right = 248
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
 	dev.add_child(UiKit.label("시험판 임시", UiKit.FONT_MIN, UiKit.RED))
@@ -656,12 +656,12 @@ func _build_parade_dev() -> void:
 		_world.parade_mode = "B" if _world.parade_mode == "A" else "A"
 		_world.sim.parade.mode = _world.parade_mode)  # 지금 판에도 바로 (글자는 _process가 맞춤)
 	mode.name = "Mode"
-	var summon := UiKit.button("길고양이 바로", "cream", null, UiKit.FONT_MIN)
+	var summon := UiKit.button("길고양이 바로 나오기", "cream", null, UiKit.FONT_MIN)
 	summon.pressed.connect(func() -> void: _world.sim.parade.call_now())
-	var fill := UiKit.button("줄 6마리", "cream", null, UiKit.FONT_MIN)
+	var fill := UiKit.button("줄 6마리로 시작", "cream", null, UiKit.FONT_MIN)
 	fill.pressed.connect(func() -> void: _world.sim.parade.fill(Balance.PARADE_MAX))
 	for b: Control in [mode, summon, fill]:
-		b.custom_minimum_size = Vector2(184, 44)
+		b.custom_minimum_size = Vector2(232, 44)
 		dev.add_child(b)
 	dev.visible = false
 	add_child(dev)
