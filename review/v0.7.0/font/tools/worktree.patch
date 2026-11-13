@@ -1,0 +1,145 @@
+diff --git a/scenes/main.tscn b/scenes/main.tscn
+index 4c023f7..57c6eef 100644
+--- a/scenes/main.tscn
++++ b/scenes/main.tscn
+@@ -4,7 +4,7 @@
+ [ext_resource type="Script" path="res://scripts/world_view.gd" id="2"]
+ [ext_resource type="Texture2D" path="res://assets/sprites/items/fish.png" id="3"]
+ [ext_resource type="Texture2D" path="res://assets/sprites/items/box.png" id="4"]
+-[ext_resource type="FontFile" path="res://assets/fonts/gaegu/Gaegu-Bold.ttf" id="5"]
++[ext_resource type="FontVariation" path="res://assets/fonts/cand/swap.tres" id="5"]
+ 
+ [sub_resource type="Theme" id="hud_theme"]
+ default_font = ExtResource("5")
+diff --git a/scripts/world_view.gd b/scripts/world_view.gd
+index 43ffa0a..7b5c600 100644
+--- a/scripts/world_view.gd
++++ b/scripts/world_view.gd
+@@ -142,7 +142,7 @@ const GUIDE_PAW := 22.0
+ const GUIDE_START := 110.0
+ const HUD_BROWN := Color(0.353, 0.275, 0.212)
+ const HUD_CREAM := Color(1, 0.97, 0.9)
+-const HUD_FONT := preload("res://assets/fonts/gaegu/Gaegu-Bold.ttf")
++const HUD_FONT := preload("res://assets/fonts/cand/swap.tres")
+ ## 줄 판정 결과 글자 (0.4초 떠올랐다 사라짐). miss(안 누름)는 글자 없이 줄이 처지는 것으로 보여 줌
+ const RESULT_TEXT := {"perfect": "퍼펙트!", "good": "좋아!", "early": "빨랐어!"}
+ const RESULT_TIME := 0.4
+diff --git a/tools/qa_web.gd b/tools/qa_web.gd
+index f735644..8f51ab4 100644
+--- a/tools/qa_web.gd
++++ b/tools/qa_web.gd
+@@ -16,7 +16,10 @@ func _ready() -> void:
+ 	var mode := query.get_slice("qa=", 1).get_slice("&", 0)
+ 	AudioServer.set_bus_mute(0, true)
+ 	await _wait(0.5)
+-	if mode == "gif":
++	if mode == "font":
++		_font_setup(query.get_slice("font=", 1).get_slice("&", 0))
++		await _font_shots()
++	elif mode == "gif":
+ 		await _gifs()
+ 	else:
+ 		await _shots()
+@@ -334,3 +337,102 @@ func _gifs() -> void:
+ 	main.get_node("GameOver/Card/Box/Row/Home").pressed.emit()
+ 	await _wait(1.0)
+ 	await _rec("", false)
++
++
++# --- 글꼴 비교 (review/v0.7.0/font, 임시 작업 복사본에서만) ---
++# 글꼴: [제목·큰 숫자(>=44), 본문·숫자(31~43), 보조(<=30)] 파일, 글자 사이(em), 줄 상자 위·아래 더하기(em)
++const CAND := {
++	"nsr": [["NanumSquareRoundEB", "NanumSquareRoundB", "NanumSquareRoundR"], -0.03, -0.113, 0.008],
++	"jua": [["Jua-Regular", "Jua-Regular", "Jua-Regular"], -0.03, 0.0, 0.0],
++	"gowun": [["GowunDodum-Regular", "GowunDodum-Regular", "GowunDodum-Regular"], -0.06, -0.356, -0.092],
++}
++var _cand: Array = []
++var _vars := {}
++
++
++func _font_setup(name: String) -> void:
++	if not CAND.has(name):
++		return  # gaegu = 지금 그대로
++	_cand = CAND[name]
++	# 재는 글꼴(UiKit.FONT)·HUD 글꼴(swap.tres)은 빌드마다 파일로 바꿔 둠 (실행 중에 바꾸면 글꼴 캐시 오류)
++
++
++## 크기마다 글꼴: 글자 사이·줄 높이는 em 비율이라 크기마다 픽셀 값이 다름
++func _variation(size: int, space: int) -> FontVariation:
++	var key := [size, space]
++	if not _vars.has(key):
++		var v := FontVariation.new()
++		var i := 0 if size >= 44 else (1 if size > 30 else 2)
++		v.base_font = load("res://assets/fonts/cand/%s.ttf" % _cand[0][i])
++		v.spacing_glyph = roundi(_cand[1] * size)
++		v.spacing_top = roundi(_cand[2] * size)
++		v.spacing_bottom = roundi(_cand[3] * size)
++		v.spacing_space = space
++		_vars[key] = v
++	return _vars[key]
++
++
++func _process(_dt: float) -> void:
++	if _cand.is_empty() or not is_instance_valid(main):
++		return
++	for n in main.find_children("*", "", true, false):
++		if not (n is Label or n is Button):
++			continue
++		if not n.has_meta("space"):  # 원래 글꼴의 띄어쓰기 줄임(tight_space)은 그대로
++			var f: Font = n.get_theme_font("font")
++			n.set_meta("space", f.spacing_space if f is FontVariation else 0)
++		var v := _variation(n.get_theme_font_size("font_size"), n.get_meta("space"))
++		if n.get_theme_font("font") != v:
++			n.add_theme_font_override("font", v)
++
++
++## 보조 크기(<=30) 글자 칸(창 픽셀) → 확대 조각용
++func _small_rects() -> Array:
++	var to_px := get_tree().root.get_final_transform()
++	var out := []
++	for n in main.find_children("*", "Label", true, false):
++		var l: Label = n
++		if l.is_visible_in_tree() and l.text.strip_edges() != "" and l.get_theme_font_size("font_size") <= UiKit.SUB:
++			var r := to_px * moved(l.get_global_transform(), Rect2(Vector2.ZERO, l.size))
++			out.append([roundi(r.position.x), roundi(r.position.y), roundi(r.size.x), roundi(r.size.y), l.text.left(20)])
++	return out
++
++
++func _fshot(name: String) -> void:
++	await _wait(0.3)
++	JavaScriptBridge.eval("window.qaSmall = %s" % JSON.stringify(_small_rects()))
++	await _shot(name)
++
++
++func _font_shots() -> void:
++	await _make("normal")
++	main.boosters_on = ["dash_start"]
++	main.refresh_menus()
++	await _wait(0.6)
++	await _fshot("1_start")
++	main.open_shop("upgrades")
++	await _wait(0.5)
++	main.shop.selected = "fish"
++	main.shop.refresh()
++	await _fshot("2_shop")
++	main.go_back()
++	await _wait(0.4)
++	main.open_missions()
++	await _fshot("3_missions")
++	main.go_back()
++	await _wait(0.4)
++	await _result_rankup()
++	await _wait(Juice.COUNT_UP_EACH * 4.0 + 2.5)
++	await _fshot("4_result")
++	# 판 안 HUD: 달리는 중 콤보·점수가 보이게
++	await _make("normal")
++	main.begin_run()
++	await _wait(2.0)
++	var sim = main.get_node("World").sim
++	for i in 14:
++		sim.combo.eat(10)
++	await _wait(0.5)
++	JavaScriptBridge.eval("window.qaSmall = %s" % JSON.stringify(_small_rects()))
++	Engine.time_scale = 0.0  # 멈춰서 찍음 (_shot은 프레임만 기다림)
++	await _shot("5_hud")
++	Engine.time_scale = 1.0
