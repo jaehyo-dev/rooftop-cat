@@ -154,8 +154,6 @@ func _process(delta: float) -> void:
 	_show_faces($ParadeHud/Faces, _world.sim.parade.cats)
 	$ParadeHud/Mult.text = "x%.1f" % _world.sim.parade.multiplier()
 	$ParadeHud.modulate.a = 1.0 if _world.sim.parade.cats.size() > 0 else 0.0
-	if has_node("ParadeDev"):
-		$ParadeDev/Mode.text = "부딪힘 " + _world.parade_mode
 	$BoxIcon.visible = _world.sim.has_box and screen == "run"
 	$ComboLabel.visible = screen == "run"  # 결과 카드에서는 카드에 최고 콤보가 있고 등급 배지와 겹침
 	if $GameOver.visible:
@@ -640,7 +638,7 @@ static func is_local_build() -> bool:
 	return not OS.has_feature("web") or not str(JavaScriptBridge.eval("location.hostname")).ends_with("github.io")
 
 
-## 왼쪽 아래 "시험판 임시": 부딪힘 A/B, 길고양이 바로 나오기, 줄 6마리 (이 자리 터치는 점프가 아님)
+## 왼쪽 아래 "시험판 임시": 길고양이 바로 나오기, 줄 6마리 (이 자리 터치는 점프가 아님)
 func _build_parade_dev() -> void:
 	var dev := VBoxContainer.new()
 	dev.name = "ParadeDev"
@@ -651,16 +649,11 @@ func _build_parade_dev() -> void:
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
 	dev.add_child(UiKit.label("시험판 임시", UiKit.FONT_MIN, UiKit.RED))
-	var mode := UiKit.button("부딪힘 " + _world.parade_mode, "cream", null, UiKit.FONT_MIN)
-	mode.pressed.connect(func() -> void:
-		_world.parade_mode = "B" if _world.parade_mode == "A" else "A"
-		_world.sim.parade.mode = _world.parade_mode)  # 지금 판에도 바로 (글자는 _process가 맞춤)
-	mode.name = "Mode"
 	var summon := UiKit.button("길고양이 바로 나오기", "cream", null, UiKit.FONT_MIN)
 	summon.pressed.connect(func() -> void: _world.sim.parade.call_now())
 	var fill := UiKit.button("줄 6마리로 시작", "cream", null, UiKit.FONT_MIN)
 	fill.pressed.connect(func() -> void: _world.sim.parade.fill(Balance.PARADE_MAX))
-	for b: Control in [mode, summon, fill]:
+	for b: Control in [summon, fill]:
 		b.custom_minimum_size = Vector2(232, 44)
 		dev.add_child(b)
 	dev.visible = false

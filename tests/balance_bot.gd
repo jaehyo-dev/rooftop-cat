@@ -41,8 +41,8 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 ## score(판 점수), dash_points(질주 중 생선 점수, 2배 포함), made(종류별 놓인 수), yarn_fish/yarn_time·plain_fish/plain_time(털실·평소의 생선과 시간), blocks(방울이 막은 수), canned(통조림으로 바뀐 장애물 수), cookie_full(하트 3개에서 먹은 쿠키).
 ## missions: 이 판의 미션 기록 (MissionTracker.result, v0.7.0 2b).
 ## off: 끌 아이템 종류 (효과 비교용). perks: 강화·부스터 (null = 0단계, v0.7.0). dash_at: 질주를 시작한 시각들
-## parade: 줄줄이 고양이 시험판 부딪힘 방식 "A"/"B" (빈 글자 = 끔). met_at(만난 시각들)·line_sum(마리 x 초)·scared(도망 수)·line_end(끝날 때 줄)
-static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: String = "") -> Dictionary:
+## parade: 줄줄이 고양이 시험판 켬. met_at(만난 시각들)·line_sum(마리 x 초)·scared(도망 수)·line_end(끝날 때 줄)
+static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: bool = false) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
 			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {},
 			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "dash_at": [], "eaten": {}, "made": {},
@@ -60,8 +60,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 	var tracker := MissionTracker.new()  # 게임과 같은 미션 세기 (v0.7.0 2b)
 	sim.accelerate = accelerate
 	sim.slots.off = off
-	sim.parade_on = parade != ""
-	sim.parade.mode = parade
+	sim.parade_on = parade
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value * 7919 + 13
 	var planned_roof := {}   # 점프를 계획한 옥상 (내려설 때마다 새로 계획)

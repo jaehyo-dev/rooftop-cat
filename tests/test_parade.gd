@@ -1,5 +1,5 @@
 extends TestCase
-## 줄줄이 고양이 행렬 시험판 (CatParade): 배수·피버, 기록 재생(거리 기준), 길고양이 자리·만남, 부딪힘 A/B, 점수 배수.
+## 줄줄이 고양이 행렬 시험판 (CatParade): 배수·피버, 기록 재생(거리 기준), 길고양이 자리·만남, 부딪힘(하트 -1 + 맨 뒤 도망), 점수 배수.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
 const DT := 1.0 / 120.0
@@ -129,7 +129,7 @@ func test_붙는_중에는_만난_자리에서_줄_뒤로() -> void:
 
 func test_첫_만남과_간격() -> void:
 	for seed_value in TestCase.pick([1, 2, 3, 4, 5, 6], 3):
-		var stats: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS["숙련"], seed_value, 80.0, Balance.RUN_SPEED, true, [], [], null, "B")
+		var stats: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS["숙련"], seed_value, 80.0, Balance.RUN_SPEED, true, [], [], null, true)
 		var met: Array = stats.met_at
 		if stats.time < 40.0:
 			continue  # 일찍 끝난 판은 간격을 볼 수 없음
@@ -152,21 +152,12 @@ func test_부딪힘_A는_하트도_잃고_맨_뒤가_도망() -> void:
 	assert_true(is_same(sim.parade.fled[0], last), "맨 뒤 고양이")
 
 
-func test_부딪힘_B는_줄이_있으면_하트_대신() -> void:
+func test_줄이_없으면_하트만_잃는다() -> void:
 	var sim := _sim()
-	sim.parade.mode = "B"
-	sim.parade.fill(1)
 	_block(sim)
 	sim.step(DT, false)
-	assert_eq(sim.hearts, Balance.HEARTS_MAX, "하트 그대로")
-	assert_eq(sim.parade.cats.size(), 0, "도망")
-	assert_true(sim.invuln_time > 0.0, "무적은 똑같이")
-	assert_eq(sim.time_since_hit, 99.0 + DT, "하트 깨짐 연출 없음")
-	sim.invuln_time = 0.0
-	_block(sim)
-	sim.step(DT, false)
-	assert_eq(sim.hearts, Balance.HEARTS_MAX - 1, "줄이 없으면 하트를 잃음")
-	assert_false(sim.scared)
+	assert_eq(sim.hearts, Balance.HEARTS_MAX - 1, "하트 -1")
+	assert_false(sim.scared, "도망 없음")
 
 
 func test_질주로_부순_장애물은_도망이_아니다() -> void:
@@ -195,3 +186,9 @@ func test_점수_배수() -> void:
 	for i in 60:
 		off.step(DT, false)
 	assert_eq(off.parade_bonus, 0.0, "줄을 끄면 배수 없음")
+
+
+func test_6마리일_때_PC_앞_시야_0_8초_이상() -> void:
+	var ahead := 1280.0 - CatParade.screen_x(Balance.PARADE_MAX)  # PC 화면 폭에서 주인공 오른쪽
+	assert_true(ahead / Balance.SPEED_MAX >= 0.8, "앞 시야 %.2f초" % (ahead / Balance.SPEED_MAX))
+	assert_eq(CatParade.screen_x(3), Balance.CAT_SCREEN_X, "3마리까지는 주인공 자리 그대로")

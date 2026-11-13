@@ -1,7 +1,7 @@
 extends SceneTree
-## 줄줄이 시험판 밸런스 표 (보고용 도구, 자동 테스트 아님): 끔 / A / B 각각 실력별 판 길이·평균 줄 길이·끝날 때 남은 고양이.
+## 줄줄이 시험판 밸런스 표 (보고용 도구, 자동 테스트 아님): 끔 / 켬(부딪힘 A) 각각 실력별 판 길이·평균 줄 길이·끝날 때 남은 고양이.
 ## 실행: godot --headless --path . -s res://review/cat-parade/parade_report.gd [-- --seeds=20]
-## 같은 시드·같은 봇이라 세 방식의 차이는 줄 규칙에서만 온다.
+## 같은 시드·같은 봇이라 두 방식의 차이는 줄 규칙에서만 온다.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
 const MAX_TIME := 600.0
@@ -17,7 +17,7 @@ func _initialize() -> void:
 	print("|---|---|---|---|---|---|---|---|---|")
 	for skill_name in BalanceBot.SKILLS:
 		var base_mean := 0.0
-		for mode in ["", "A", "B"]:
+		for mode in [false, true]:
 			var times: Array[float] = []
 			var line := 0.0
 			var left := 0
@@ -34,9 +34,9 @@ func _initialize() -> void:
 				hearts += 1 if st.end == "hearts" else 0
 			times.sort()
 			var mean: float = times.reduce(func(a: float, b: float) -> float: return a + b, 0.0) / seeds
-			if mode == "":
+			if not mode:
 				base_mean = mean
-			var change := "" if mode == "" else " (끔 대비 %+.0f%%)" % ((mean / base_mean - 1.0) * 100.0)
-			print("| %s | %s | %.0f%s | %.0f | %.2f | %.2f | %.1f | %.1f | %d/%d |" % [skill_name, "끔" if mode == "" else mode, mean, change,
+			var change := "" if not mode else " (끔 대비 %+.0f%%)" % ((mean / base_mean - 1.0) * 100.0)
+			print("| %s | %s | %.0f%s | %.0f | %.2f | %.2f | %.1f | %.1f | %d/%d |" % [skill_name, "켬" if mode else "끔", mean, change,
 					times[seeds / 2], line / seeds, float(left) / seeds, float(met) / seeds, float(scared) / seeds, hearts, seeds])
 	quit()

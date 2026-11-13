@@ -746,10 +746,7 @@ func _hit_obstacles() -> void:
 				has_bell = false  # 방울이 대신 막는다 (하트·콤보 그대로)
 				bell_blocked = true
 				continue
-			scared = parade_on and parade.scare()
-			if scared and parade.mode == "B":
-				combo.cut()  # B: 하트 대신 맨 뒤 고양이가 도망 (하트 깨짐 연출이 없게 time_since_hit는 그대로)
-				continue
+			scared = parade_on and parade.scare()  # 하트도 잃고 맨 뒤 고양이가 도망
 			hearts -= 1
 			combo.cut()
 			time_since_hit = 0.0

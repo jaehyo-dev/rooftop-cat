@@ -231,8 +231,6 @@ const MEOW_DB := -8.0
 static var _tint_cache := {}
 
 var sim := RunnerSim.new(randi())
-## 줄줄이 시험판 부딪힘 방식 "A"/"B" (다음 판에도 이어짐, 로컬 시험 단추가 바꿈)
-var parade_mode := "A"
 var _cat_x := Balance.CAT_SCREEN_X  # 주인공 화면 x (줄이 길면 맨 뒤까지 보이게 오른쪽으로)
 var _followers: Array[CatView] = []
 var _stray_view := CatView.new()
@@ -618,7 +616,6 @@ func restart(seed_value: int = randi(), wait: bool = false) -> void:
 	_seed = seed_value
 	sim = RunnerSim.new(seed_value, Balance.RUN_SPEED, true, make_perks.call() if not wait and make_perks.is_valid() else null)
 	sim.parade_on = true
-	sim.parade.mode = parade_mode
 	_cat_x = Balance.CAT_SCREEN_X
 	_runaways.clear()
 	_parade_fx.clear()

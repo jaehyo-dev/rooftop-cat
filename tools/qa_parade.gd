@@ -17,8 +17,7 @@ var _since := INF
 func run(q: Node, mode: String) -> void:
 	qa = q
 	if mode == "parade_hit":  # 부딪힘만 다시 찍기
-		await _hit("hit_a", "A")
-		await _hit("hit_b", "B")
+		await _hit("hit_a")
 		return
 	if mode == "parade":
 		await _meet()
@@ -26,14 +25,13 @@ func run(q: Node, mode: String) -> void:
 		await _gap("gap6_slow", 2)  # 4배 느리게
 		await _tramp()
 		await _dash()
-		await _hit("hit_a", "A")
-		await _hit("hit_b", "B")
+		await _hit("hit_a")
 	await _fever()
 	await _result()
 
 
-## 판 시작: 시드 고정, 줄 cats마리, 부딪힘 방식
-func _start(seed_value: int, cats: int, mode: String = "A") -> void:
+## 판 시작: 시드 고정, 줄 cats마리
+func _start(seed_value: int, cats: int) -> void:
 	await qa._make("normal")
 	main = qa.main
 	world = main.get_node("World")
@@ -41,7 +39,6 @@ func _start(seed_value: int, cats: int, mode: String = "A") -> void:
 	await qa._wait(0.2)
 	world.set_process(false)
 	main.set_process(false)
-	world.parade_mode = mode
 	world.restart(seed_value)
 	sim = world.sim
 	sim.parade.fill(cats)
@@ -142,8 +139,8 @@ func _dash() -> void:
 
 
 ## 부딪힘: 앞으로 누를 호가 한동안 없을 때 바로 앞에 화분을 놓아 맞게 한다
-func _hit(name: String, mode: String) -> void:
-	await _start(5, 6, mode)
+func _hit(name: String) -> void:
+	await _start(5, 6)
 	await _run_until(func() -> bool:
 		var flights: Array[Dictionary] = sim.road.flights
 		var here := sim.roof_at(sim.x)

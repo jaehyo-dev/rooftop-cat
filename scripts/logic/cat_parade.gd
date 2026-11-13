@@ -5,12 +5,10 @@ extends RefCounted
 ##   장애물·트램펄린·아이템 둘레(STRAY_CLEAR)는 피하고, 그 자리 땅 생선은 치운다. 주인공 x가 그 자리를 지나면(점프 중이어도) 만남.
 ## - 줄(cats): 만난 고양이는 맨 뒤에 붙는다. 따라오는 고양이 i(0부터)는 주인공보다 (i+1) x PARADE_GAP 뒤의 기록(trail)을 그대로 재생한다.
 ##   기록은 시간이 아니라 주인공 x 기준이라 빨라져도 간격이 같고, 주인공이 무사히 지난 길을 그대로 지난다.
-## - 부딪힘(scare): 맨 뒤 고양이가 놀라 도망간다. mode "A" = 하트도 잃음, "B" = 줄이 있으면 하트 대신 (RunnerSim._hit_obstacles).
+## - 부딪힘(scare): 하트도 잃고 맨 뒤 고양이가 놀라 도망간다 (2026-11-13 A로 확정, RunnerSim._hit_obstacles).
 
 const LOOKS := ["gray", "black", "white", "tabby", "cream"]
 
-## 부딪힘 방식 "A" / "B" (시험판 비교용)
-var mode := "A"
 ## 줄: {"look", "quirk"(0~1, 개성), "from": 만난 자리 Vector2(x, 발 높이), "t": 붙은 뒤 지난 시간}
 var cats: Array[Dictionary] = []
 ## 옥상 위에서 기다리는 길고양이: {"x", "y"(옥상 높이), "look", "quirk"}
