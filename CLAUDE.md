@@ -2,204 +2,88 @@
 
 지붕 위의 고냥이: Godot 4 (GDScript)로 만드는 색연필 손그림풍 모바일(가로 화면) 무한 달리기 게임. 게임 설계는 [GAME_SPEC.md](GAME_SPEC.md)를 따른다.
 
-- 나는 웹 개발을 공부하는 학생이야. 한국어로 대화해.
+- 공통 규칙은 전역 `~/.claude/CLAUDE.md`를 따른다. 여기에는 이 저장소에만 있는 규칙만 둔다. 전역 파일을 못 읽는 환경(클라우드 세션)은 [docs/CLAUDE_REFERENCE.md](docs/CLAUDE_REFERENCE.md) 1장의 사본을 읽어.
 - 보고·로그·커밋 메시지·하위 에이전트 요청과 답·리뷰 결과(Codex 포함)는 모두 한국어로 써.
-- 너는 이 프로젝트의 리더야. 계획을 세우고 작업을 나누고 최종 판단을 해.
-- 코드에는 한국어 주석을 달아줘.
-- Codex는 아래 "Codex 협업" 규칙대로 써.
-- 기본 브랜치는 `main`이야.
+- 기본 브랜치는 `main`. 저장소 https://github.com/jaehyo-dev/rooftop-cat · 게임 https://jaehyo-dev.github.io/rooftop-cat/
 
-## 판단 기준
+## 단계
 
-- 되돌릴 수 있는 결정(버전 번호, 파일 구조, 디자인 세부, 게임 밸런스 수치, 작업 순서 등)은 묻지 말고 가장 합리적인 쪽으로 판단해서 끝까지 진행해.
-- 판단한 내용과 이유는 작업 마지막 보고에 "내가 판단한 것" 항목으로 짧게 정리해.
-- 다음 경우에만 멈추고 물어봐:
-  - 되돌리기 어려운 작업 (커밋 기록 다시 쓰기, 강제 푸시, 파일·브랜치·태그·릴리스 삭제, 저장소 설정 변경)
-  - 비용, 계정, 보안, 개인정보와 관련된 작업
-  - 내 요청끼리 서로 충돌할 때
-- 막히는 문제가 생기면 먼저 스스로 다른 방법을 찾아보고, 그래도 안 될 때만 나한테 할 일을 한 번에 정리해서 알려줘.
-- 버전은 "그 시점에 실제로 배포된 상태" 기준으로 붙여.
+- 단계가 끝난다 = 최종 검토 통과 + main 배포. 다음 단계는 내가 "다음"이라고 할 때 시작해.
+- 버전은 아래 표를 기본으로 하되 실제 배포 상태가 우선이야. v0.1.0 전(1~2단계)은 표의 버전을 따라.
 
-## 단계별 진행
-
-- 한 번에 한 단계만 만들어. 끝나면(최종 검토 통과 + main 배포까지) 멈춰서, 내가 플레이해 볼 수 있게 보고해.
-- 다음 단계는 내가 "다음"이라고 할 때 시작해. 그 전에는 다음 단계 기능을 미리 만들지 마. 내가 자동 진행을 허락한 경우에만 "다음" 없이 이어서 진행해.
-- 단계 순서:
-
-  | 단계 | 내용 | 배포 버전 |
+  | 단계 | 내용 | 버전 |
   |---|---|---|
-  | 0 | 준비: 저장소, Godot 프로젝트, 규칙 파일, 웹 배포 (+ 기준 고양이 시안) | v0.0.1 |
-  | 1 | 자동 달리기 + 누르는 만큼 점프 + 옥상 생성 (임시 그림) | v0.0.2 |
+  | 0 | 준비: 저장소, Godot 프로젝트, 규칙 파일, 웹 배포 | v0.0.1 |
+  | 1 | 자동 달리기 + 누르는 만큼 점프 + 옥상 생성 | v0.0.2 |
   | 1.5 | 휴대폰 가로 화면 고정, 벽에 부딪히면 투명화로 통과 | v0.0.3 |
   | 2 | 떨어지면 게임 끝, 거리 점수, 최고 기록, 점점 빨라짐 | v0.0.4 |
-  | 3 | 고양이 그림과 달리기·점프·착지 모션 (v0.1.1에서 자세별 프레임 애니메이션으로 다시 만듦) | v0.1.0, v0.1.1 |
+  | 3 | 고양이 그림과 달리기·점프·착지 모션 | v0.1.0, v0.1.1 |
   | 4 | 아이템: 생선, 종이상자 | v0.2.0 |
   | 5 | 구조물: 빨래줄, 전봇대 | v0.3.0 |
   | 6 | 첫 동네(주택가) 배경과 음악 | v0.4.0 |
-  | 7 | 장애물 구간: 옥상 위 화분·안테나 등에 부딪히는 장애물과, 손으로 짠 구간을 시드로 이어 붙이는 맵 (설계는 architect에게 먼저 물음) | v0.5.0 |
+  | 7 | 장애물 구간 + 손으로 짠 구간을 시드로 이어 붙이는 맵 | v0.5.0 |
   | 8 | 미션과 생선 보상 | v0.6.0 |
   | 9 | 스킨 (품종·털 무늬) | v0.7.0 |
   | 10~ | 털실, 츄르, 전깃줄, 간판, 나머지 동네, 한 바퀴 반복, 덤블링 | GAME_SPEC 표 |
 
-  - 버전은 기본적으로 위 표를 따르지만, 실제로 배포된 상태 기준이 우선이야 (예: 한 단계 안에서 버그 수정을 따로 배포하면 패치 번호를 올림).
-- 단계 보고에는 아래 "작업 보고" 항목에 더해 다음을 꼭 넣어:
-  - 게임 주소: https://jaehyo-dev.github.io/rooftop-cat/
-  - PC와 휴대폰에서 각각 해 볼 조작과 확인할 점
-  - 다음 단계에서 만들 내용 한 줄
+## 테스트
 
-## 테스트 방법
-
-Godot 4.7.2 (`.github/workflows/deploy.yml`의 `GODOT_VERSION`과 같은 버전)를 쓴다. 명령의 `godot`은 Godot 실행 파일 경로로 바꿔도 돼.
-
-아래 순서대로 실행해. **1) 리소스 가져오기를 반드시 먼저 실행**해야 2)가 `TestCase` 같은 클래스를 찾을 수 있어 (새로 받은 저장소, `.godot/`를 지운 뒤, 에셋·`class_name`을 추가·변경한 뒤).
+Godot 4.7.2 (`deploy.yml`의 `GODOT_VERSION`과 같음). 이 맥북: `GODOT=/Users/jaehyo/Downloads/Godot.app/Contents/MacOS/Godot`. 순서대로 실행해 (1을 먼저 해야 2가 `TestCase` 등을 찾음: 새 저장소, `.godot/` 삭제 뒤, 에셋·`class_name` 변경 뒤).
 
 ```bash
-# 1) 리소스 가져오기 (반드시 먼저)
-godot --headless --path . --import
-# 2) 게임 자동 테스트 (이 맥북: GODOT=/Users/jaehyo/Downloads/Godot.app/Contents/MacOS/Godot)
-# 게임 자동 테스트 (tests/test_*.gd). Godot 경로가 다르면 GODOT=경로 bash tests/run_tests.sh
-bash tests/run_tests.sh
-# 3) 도구·버전 자동 테스트 (tools/test_*.py)
-python3 -m unittest discover -s tools -p "test_*.py" -v
-# 4) 웹 내보내기 확인 (웹 내보내기 템플릿 필요, build/는 .gdignore로 Godot 리소스에서 빠져 있음)
-mkdir -p build/web
-godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"
+godot --headless --path . --import                              # 1) 리소스 가져오기
+bash tests/run_tests.sh                                         # 2) 게임 테스트 (GODOT=경로 로 바꿀 수 있음)
+python3 -m unittest discover -s tools -p "test_*.py" -v         # 3) 도구·버전 테스트
+mkdir -p build/web && godot --headless --path . --export-release "Web" "$PWD/build/web/index.html"  # 4) 웹 내보내기
 ```
 
-- 테스트는 실패하면 종료 코드 1로 끝나. 종료 코드까지 확인해.
-- 평소(로컬)에는 모든 조합을 도는 테스트(전봇대·트램펄린 틈 조합, 구간 × 모든 단계)가 대표 조합만 돈다(약 4분). 전체 조합은 `FULL_TESTS=1 bash tests/run_tests.sh`(약 8분). GitHub Actions는 늘 `FULL_TESTS=1`로 돈다. 새 "모든 조합" 테스트는 `TestCase.pick(목록, n)`이나 `full_tests()`로 같은 방식을 따라.
-- 실행기가 테스트마다 걸린 시간과 끝에 "오래 걸린 테스트" 15개를 찍어.
-- 게임 테스트는 `godot ... -s res://tests/run_tests.gd`로 직접 부르지 말고 `tests/run_tests.sh`로 실행해. Godot는 실행기 스크립트가 파싱에 실패해도 종료 코드 0으로 끝나서, 래퍼가 "결과:" 줄이 있는지 확인해 실패로 바꿔 줘. 1)을 건너뛰면 실행기가 안내를 찍고 종료 코드 1로 끝나.
-- 게임 자동 테스트 작성법: `tests/test_이름.gd`에서 `extends TestCase`, `test_`로 시작하는 함수 안에서 `assert_eq`, `assert_true` 등을 써. 씬은 `instantiate()` 후 `add_child()`하고 `await wait_frames()`로 확인해.
-- 조작감·속도·난이도 같은 게임 플레이 수치는 `scripts/balance.gd` 한곳에 모아 둬 (색·여백 같은 화면 꾸밈 값은 각 화면 파일에 둬도 돼).
-- 진행 기록: 단계를 끝낼 때마다 PROGRESS.md에 만든 것, 내가 판단한 것, 검토 결과, 플레이하며 확인할 부분을 짧게 기록해.
-- 게임 로직(점프 높이, 옥상 간격, 속도 곡선, 떨어짐·구제 판정, 점수·기록 저장 등)은 화면·노드와 분리된 스크립트(`scripts/logic/`)에 두고, 직접 호출해서 테스트해. 무작위 값은 시드를 받을 수 있게 만들어 테스트에서 결과를 고정해.
-- GAME_SPEC.md "테스트할 로직"은 해당 기능을 만드는 단계에서 자동 테스트로 만들어.
-- 화면 확인: 웹으로 내보낸 결과를 로컬 웹 서버로 열고 Playwright(Chromium)로 PC(1280x720)와 휴대폰(390x844) 크기 스크린샷을 찍어 직접 확인해. 콘솔 오류가 없어야 해.
-- `review/`에 남기는 GIF는 3MB 이하로 해 (넘으면 크기나 프레임 수를 줄여).
-- GitHub Actions가 모든 브랜치 푸시마다 위 1~4를 실행해. 작업 브랜치에 푸시한 뒤 Actions 결과도 확인해.
+- 게임 테스트는 `-s res://tests/run_tests.gd`로 직접 부르지 말고 `tests/run_tests.sh`로 실행해 (이유: [참고](docs/CLAUDE_REFERENCE.md#2-테스트-설명)).
+- 로컬은 대표 조합만(약 4분), 전체는 `FULL_TESTS=1 bash tests/run_tests.sh`(약 8분). Actions는 늘 FULL. 새 "모든 조합" 테스트는 `TestCase.pick(목록, n)`이나 `full_tests()`를 써. 테스트 작성법은 [참고](docs/CLAUDE_REFERENCE.md#2-테스트-설명).
+- Actions가 모든 브랜치 푸시마다 1~4를 실행해.
+- 게임 플레이 수치는 `scripts/balance.gd` 한곳에 (색·여백 같은 꾸밈 값은 각 화면 파일에 둬도 됨). 로직은 화면과 분리해 `scripts/logic/`에 둬.
+- GAME_SPEC.md "테스트할 로직"은 그 기능을 만드는 단계에서 자동 테스트로 만들어.
+- 화면 확인은 웹 내보내기 결과를 로컬 서버 + Playwright(Chromium)로.
+- `review/`의 GIF는 3MB 이하(넘으면 크기·프레임 수를 줄여). 앞으로 `review/`에는 최종 비교 그림과 GIF만 커밋한다.
+- PROGRESS.md에는 만든 것, 내가 판단한 것, 검토 결과, 플레이하며 확인할 부분을 적어.
+- 최종 검토자는 `.claude/agents/final-reviewer.md`.
 
-## 코드 리뷰
+## 버전
 
-1. 기능을 완성하면 네가 직접 코드를 다시 읽고 리뷰한 뒤 최종 검토로 넘어가.
-2. 리뷰 지적은 그대로 받아들이지 말고 하나씩 판단해서 "수용 / 거절 + 이유"로 정리해.
-3. 최종 판단은 리뷰 의견이 아니라 실제 실행 결과로 해. 게임 로직은 자동 테스트를 만들어 통과해야 완료야.
-4. 작업이 끝나면 나한테 이렇게 보고해 (작업 보고):
-   - 무엇을 만들었는지
-   - 리뷰 지적과 반영 여부
-   - 테스트 결과
-   - 내가 직접 플레이해서 확인해 볼 부분
-   - 내가 판단한 것 (판단 내용과 이유)
+- 버전 번호는 `project.godot`의 `config/version` 한 곳. CHANGELOG.md와 다르면 `deploy.yml`이 실패하고 태그·배포를 하지 않아.
+- 게임이 바뀌지 않는 변경은 버전을 안 올려도 되고, 이때는 배포만 다시 돼.
+- 푸시 뒤 워크플로 결과, 릴리스 생성, 게임 주소에서 새 버전이 열리는지 확인하고 보고해.
+- Godot 버전을 올릴 때는 `GODOT_VERSION`, `project.godot`의 `config/features`, CREDITS.md를 함께 바꾸고, 이전 버전 태그들도 새 Godot로 빌드되는지 확인해.
 
-## 최종 검토
-
-- 코드 리뷰가 끝나면 반드시 final-reviewer 서브에이전트(`.claude/agents/final-reviewer.md`)로 최종 검토를 받아. 검토자에게는 이번 단계의 요구사항만 전달하고, 작업 과정 설명은 넘기지 마.
-- "불통과"면 고치고 다시 최종 검토를 받아. 재검토 최대 2번까지 하고, 그래도 불통과면 멈추고 나한테 보고해.
-- 최종 검토가 끝날 때마다 `git status`로 검토자가 파일을 바꾸지 않았는지 확인하고, 바뀌었으면 그 검토는 무효로 하고 나한테 알려줘. (`.godot/`, `build/`처럼 .gitignore에 있는 생성물은 제외)
-- "통과"가 나와야만 작업 완료로 보고해.
-
-## GitHub 등록
-
-- 작업 브랜치(main이 아닌 브랜치)에는 최종 검토 전이라도 작업 보존용으로 푸시해도 돼.
-- main에는 최종 검토 "통과" 후에만 푸시해. 통과하면 자동으로 main에 푸시해.
-- 불통과 상태이거나 테스트가 실패하면 main에는 절대 푸시하지 마.
-- 커밋 이메일은 GitHub 비공개 이메일(350977072+jaehyo-dev@users.noreply.github.com)만 써.
-- 비밀번호, API 키, 토큰이 들어간 파일은 절대 커밋하거나 푸시하지 마. (Supabase는 공개용 anon 키만 클라이언트에 넣고, 데이터 접근은 Row Level Security로 막아.)
-- 푸시한 뒤에는 저장소 주소와 게임 주소를 나한테 알려줘.
-  - 저장소: https://github.com/jaehyo-dev/rooftop-cat
-  - 게임: https://jaehyo-dev.github.io/rooftop-cat/
-
-## 버전 관리
-
-- 버전은 Semantic Versioning(메이저.마이너.패치)을 따라. 기준은 "그 시점에 실제로 배포된(main, GitHub Pages) 상태"야.
-- 게임을 바꿀 때마다 변경 종류에 맞게 버전을 올려.
-  - 메이저: 기존 기록·플레이 방식과 호환되지 않는 큰 변경 (예: 이전 저장 데이터를 못 읽음)
-  - 마이너: 새 기능 추가
-  - 패치: 버그 수정, 수치·표현의 작은 조정
-  - v0.1.0 전(1~2단계)은 "단계별 진행" 표의 버전을 따라.
-- CHANGELOG.md를 먼저 업데이트해. 버전 번호는 `project.godot`의 `config/version` 한 곳에만 있고, 게임 화면은 이 값을 읽어서 보여 줘 (자동 테스트가 CHANGELOG와 일치하는지 확인해).
-- 태그(`v메이저.마이너.패치`)와 GitHub Release는 직접 만들지 마. 최종 검토를 통과해서 main에 푸시하면 `.github/workflows/deploy.yml`이 CHANGELOG.md의 최신 버전을 읽어, 그 태그가 없으면 푸시된 커밋에 태그와 릴리스(설명 = CHANGELOG의 해당 버전 내용)를 자동으로 만들고 GitHub Pages에 배포해.
-  - 그래서 버전을 올리는 변경은 CHANGELOG와 `project.godot` 버전을 맞춘 상태로 main에 푸시해야 해 (다르면 워크플로가 실패하고 태그도 배포도 하지 않아).
-  - 게임이 바뀌지 않는 변경(규칙 문서, 워크플로 등)은 버전을 올리지 않아도 돼. 이때는 이미 태그가 있으니 태그·릴리스는 만들어지지 않고 배포만 다시 돼.
-  - 버전을 올리는 푸시는 한 번에 하나씩 하고, 푸시한 뒤에는 워크플로 실행 결과, 릴리스 생성, 게임 주소에서 새 버전이 열리는지 확인하고 보고해.
-- 이전 버전 보관: 빌드 결과물(.wasm 등)은 저장소에 커밋하지 마. 배포할 때 워크플로가 버전 태그마다 그 시점 코드를 다시 빌드해서 `versions/v버전/`에 올리고 `versions/` 목록 페이지를 만들어. 그러니 버전 태그는 지우거나 옮기지 마.
-- Godot 버전을 올릴 때는 워크플로의 `GODOT_VERSION`, `project.godot`의 `config/features`, CREDITS.md를 함께 바꾸고, 이전 버전 태그들도 새 Godot로 빌드되는지 확인해.
-
-## Codex 협업 (ChatGPT 구독)
+## Codex
 
 - codex나 /ponytail-review를 쓸 수 없는 환경이면 건너뛰고 보고에 적어.
-- codex는 기본으로 Homebrew의 `codex`(PATH)를 써. 설치·업데이트 직후 첫 실행은 macOS 보안 검사 때문에 몇 분 멈춰 있을 수 있어 (`--version`으로 먼저 깨워 두고, 끝나면 그다음부터는 바로 실행됨).
-  - 그래도 안 되면 ChatGPT 앱에 들어 있는 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`를 써. 경로에 버전 번호가 없어 앱이 업데이트돼도 그대로야.
-- `codex exec`의 `--image`는 파일을 여러 개 받으니, 요청문을 `--image`보다 앞에 둬: `codex exec --sandbox read-only "<요청>" --image <기준 그림>`
-- 터미널 입력이 없는 곳(Claude Code의 Bash 등)에서 `codex exec`를 부를 때는 끝에 `< /dev/null`을 붙여. 안 붙이면 "Reading additional input from stdin..."에서 계속 기다리며 멈춰 있어.
-- 다른 세션도 Codex로 그림을 만들 수 있으니 "가장 최근 파일" 대신 이번 실행의 그림을 써: `codex exec` 출력의 `session id`와 같은 이름의 `~/.codex/generated_images/<session id>/` 폴더에 있어.
-- 배경 제거는 `rembg i -m isnet-general-use -a <원본> <결과>`로 해 (rembg 기본 모델 BRIA RMBG-2.0은 비상업 라이선스라 쓰지 않음). rembg는 `~/.local/venvs/rembg`에 설치돼 있어.
-- 단색 면 그림(마스코트 등)은 rembg 대신 연두 배경을 초록 우세도(G - max(R, B))로 지우는 게 더 깨끗해 (rembg는 닫힌 틈에 배경을 남기고 밝은 몸을 반투명하게 만들 수 있음). 어두운 배경에 올려 초록 테두리가 없는지 확인해.
-- 이미지: 그림이 필요하면 `codex exec --sandbox read-only "<요청>"`로 Codex의 내장 이미지 생성을 써. 요청 끝에 항상 "내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"를 붙여. API 키는 절대 쓰지 마.
-  - 결과는 `~/.codex/generated_images/`의 가장 최근 파일을 찾아 `assets/raw/`로 복사해.
-  - 투명 배경이 안 되니 단색 배경으로 만들게 하고 rembg로 배경을 지워 `assets/sprites/`에 저장해.
-  - 같은 캐릭터는 기준 그림을 `--image`로 넘겨서 모습을 유지해.
-  - 만들기 전에 몇 장을 만들지 계획하고, 요청문은 ASSET_PROMPTS.md에 기록해.
-- 코드: 같은 버그를 2번 고쳐도 안 풀리면 `codex exec`로 의견을 받아. 큰 기능을 끝내면 `codex review`로 리뷰받고 수용/거절과 이유를 정리해. 최종 판단은 네가 해.
-- Codex를 실행할 때는 먼저 `logs/codex.log`에 "=== [시간] Codex 작업: <요약> ===" 한 줄을 쓰고, 명령 끝에 `2>&1 | tee -a logs/codex.log`를 붙여. `logs/`는 .gitignore에 있어.
+- 기본은 Homebrew `codex`. 설치·업데이트 직후 첫 실행은 몇 분 멈출 수 있어 `--version`으로 먼저 깨워. 안 되면 `/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex`.
+- 요청문을 `--image`보다 앞에: `codex exec --sandbox read-only "<요청>" --image <기준 그림>`. Bash에서는 끝에 `< /dev/null`을 붙여 (안 붙이면 stdin을 기다리며 멈춤).
+- 이미지: 먼저 쓸 수 있는 에셋을 찾고, 어울리는 게 없을 때 Codex의 내장 이미지 생성을 쓴다. 요청 끝에 항상 "내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"를 붙여. API 키는 절대 쓰지 마.
+- 결과 그림은 "가장 최근 파일" 대신 출력의 `session id` 폴더 `~/.codex/generated_images/<session id>/`에서 가져와 (다른 세션도 그림을 만듦).
+- 배경 제거는 `rembg i -m isnet-general-use -a <원본> <결과>` (`~/.local/venvs/rembg`, 기본 모델은 비상업이라 안 씀). 단색 면 그림은 연두 배경을 초록 우세도(G - max(R, B))로 지우고 어두운 배경에서 초록 테두리를 확인해.
 
-## 코드 정리
+## 오픈소스·에셋
 
-- 기능을 완성하면 /ponytail-review로 줄일 수 있는 부분을 확인해. 단, 내가 요청한 기능과 게임의 재미를 위한 연출은 줄이지 마. (쓸 수 없는 환경이면 건너뛰고 보고에 적어.)
+- 그림·효과·소리·음악·글꼴·셰이더·애드온·라이브러리는 만들기 전에 먼저 찾고, 어울리면 쓰고, 후보 2~4개를 게임 화면 안 시안으로 사용자에게 보여 준 뒤 확정한다. 이미 만든 것은 갈아엎지 않는다.
+- 쓸 수 있음: MIT, BSD, Apache-2.0, zlib, CC0, CC-BY 3.0/4.0, SIL OFL 1.1(글꼴)
+- 먼저 물어볼 것: CC-BY-SA, MPL-2.0, LGPL, 그 밖에 목록에 없는 라이선스
+- 쓰지 않음: GPL·AGPL(웹 게임 전체 공개 의무), CC-BY-NC, CC-BY-ND, 라이선스 없음·"무료"만·출처 불분명, 다른 게임·영화에서 추출한 것, 상표·캐릭터
+- 공식 배포처에서 받고 버전을 고정해. 에셋은 `assets/종류/이름/`에, 라이선스 전문은 옆에 `LICENSE.txt`(또는 원래 이름)로. 배포 때 워크플로가 CREDITS.md, `assets/`의 라이선스 파일, Godot 라이선스를 사이트 `licenses/`에 올려.
+- CREDITS.md: 직접 만든 에셋과 Codex AI 그림은 "직접 만든 것"에(요청문은 ASSET_PROMPTS.md), 개발·배포에만 쓰는 도구(GitHub Actions 등)는 아래쪽 표에 적어.
 
-## 오픈소스 사용 규칙
+## 프로젝트 파일
 
-외부 코드·에셋(글꼴, 그림, 소리, 음악, 셰이더, Godot 애드온, 라이브러리)은 아래 규칙을 지킬 때만 써.
+- 폴더 구조는 [참고](docs/CLAUDE_REFERENCE.md#3-프로젝트-구조).
+- `*.import`, `*.uid`는 커밋하고 `.godot/`, `build/`는 커밋하지 마.
+- 웹 내보내기는 Compatibility 렌더러, 스레드 없음 유지 (자동 테스트가 확인).
+- 화면은 모바일 가로(1280x720, `stretch/aspect=expand`). 최근접 필터는 쓰지 않아.
+- 그림: `assets/raw/`(원본, 내보내기 제외) → `assets/sprites/`(배경 제거, 게임에서 씀). `assets/concept/`는 시안·참고용(내보내기 제외). I·J·K, A~E 시안도 여기 남겨 둬.
 
-- 필요한 기능은 먼저 검증된 애드온, 라이브러리, 에셋이 있는지 찾아보고 쓰는 게 나으면 써.
-- 쓸 수 있는 라이선스: MIT, BSD, Apache-2.0, zlib, CC0, CC-BY 3.0/4.0(저작자 표시), SIL OFL 1.1(글꼴)
-- 나한테 먼저 물어볼 라이선스: CC-BY-SA, MPL-2.0, LGPL, 그 밖에 위 목록에 없는 라이선스
-- 쓰지 않는 것:
-  - GPL, AGPL (웹 게임 전체를 같은 라이선스로 공개해야 함)
-  - CC-BY-NC(비상업), CC-BY-ND(변경 금지)
-  - 라이선스가 적혀 있지 않거나 "무료"라고만 된 것, 출처가 불분명한 것
-  - 다른 게임·영화 등에서 추출한 에셋, 상표·캐릭터
-- 가져오는 방법:
-  - 원 제작자의 공식 배포처(공식 저장소, 릴리스, 에셋 페이지)에서 받고, 라이선스를 그 배포처에서 직접 확인해.
-  - 버전을 고정해 (태그·릴리스 버전 기록). 필요한 파일만 넣어.
-  - 라이선스 전문을 에셋 옆에 `LICENSE.txt`(또는 원래 이름)로 함께 넣어. 에셋은 `assets/종류/이름/` 폴더에 둬.
-  - CREDITS.md 표에 이름, 버전, 만든 사람, 라이선스, 출처 주소, 쓰는 곳, 수정 여부를 기록해. 기록하지 않은 외부 에셋은 커밋하지 마.
-  - 배포할 때 워크플로가 CREDITS.md, `assets/` 안의 라이선스 파일, Godot 엔진 라이선스를 사이트의 `licenses/`에 올려.
-- 직접 만든 에셋도 CREDITS.md "직접 만든 것"에 적어. Codex로 만든 AI 그림도 여기에 적고, 요청문은 ASSET_PROMPTS.md에 남겨.
-- 개발·배포에만 쓰는 도구(GitHub Actions 등)도 CREDITS.md 아래쪽 표에 적어.
+## 기준 캐릭터
 
-## 프로젝트 구조
-
-```
-project.godot            Godot 프로젝트 설정 (게임 버전 config/version)
-export_presets.cfg       웹 내보내기 설정 (스레드 없음: GitHub Pages용)
-scenes/                  씬 (.tscn)
-scripts/                 게임 스크립트 (.gd). 수치는 balance.gd, 로직은 logic/
-assets/                  에셋 (raw/ 원본, sprites/ 배경 제거본, concept/ 시안, 외부 에셋은 폴더마다 라이선스 파일)
-tests/                   게임 자동 테스트 (run_tests.sh → run_tests.gd 실행기, test_*.gd)
-tools/                   변경 기록·버전 페이지·라이선스 도구와 그 테스트
-.github/workflows/       자동 테스트, 태그·릴리스, GitHub Pages 배포
-.claude/agents/          final-reviewer 최종 검토자
-GAME_SPEC.md             게임 설계서
-ASSET_PROMPTS.md         AI 그림 요청문 기록
-CHANGELOG.md             변경 기록 (버전 기준)
-CREDITS.md               외부 오픈소스·에셋 출처와 라이선스
-PROGRESS.md              단계별 진행 기록
-```
-
-- Godot가 만드는 `*.import`, `*.uid` 파일은 커밋해. `.godot/`, `build/`는 커밋하지 마.
-- Godot 웹 내보내기는 Compatibility 렌더러, 스레드 없음 설정을 유지해 (자동 테스트가 확인해).
-- 화면은 모바일 가로(1280x720 기준, `stretch/aspect=expand`)야. 손그림 그림이 흐려지지 않게 픽셀 아트용 최근접 필터는 쓰지 않아.
-- 그림: `assets/raw/`(Codex 원본, 내보내기 제외) → `assets/sprites/`(배경 제거, 게임에서 씀). `assets/concept/`는 시안·참고용(내보내기 제외).
-
-## 기준 캐릭터와 그림체
-
-- 기준 캐릭터는 `assets/concept/cat_reference_sheet.png`의 고양이야. 기준 그림은 `assets/sprites/cat_base_run.png`(달리는 옆모습, 1024x1024)이고, 동작 참고는 `assets/concept/poses/`에 있어.
-- 특징: 통통한 치즈 태비, 접힌 귀, 작은 점 눈과 볼 홍조, 색연필 같은 부드러운 질감, 초록 목도리.
-- 고양이 그림을 새로 만들 때는 항상 기준 그림을 `--image`로 넘겨 모습을 유지해.
-- 초록 목도리는 모든 스킨과 동작에서 항상 유지해. 스킨은 털 무늬와 색만 바꿔.
-- 작은 화면과 복잡한 배경에서도 잘 보이도록 몸 둘레에 얇은 밝은 테두리를 넣는 게 기본이야.
-- 고양이 그림은 초록 목도리 때문에 연두 배경을 쓰지 말고 마젠타(#FF00FF) 단색 배경으로 만들어.
-- 1~2단계 임시 고양이는 기준 캐릭터와 같은 비율의 통통한 타원이야. 몸 크기와 충돌 판정 크기는 `scripts/balance.gd`의 값 한 곳에서 정하고, 3단계에서 진짜 그림을 그 크기에 맞춰.
-- I·J·K, A~E 시안은 참고용으로 `assets/concept/`에 남겨 둬.
-- 이미지 생성은 맥북 터미널의 Claude Code에서만 가능해 (Codex 로그인이 맥북에만 있음).
+- 기준 캐릭터는 `assets/concept/cat_reference_sheet.png`, 기준 그림은 `assets/sprites/cat_base_run.png`(1024x1024), 동작 참고는 `assets/concept/poses/`.
+- 통통한 치즈 태비, 접힌 귀, 작은 점 눈과 볼 홍조, 색연필 질감, 초록 목도리. 몸 둘레에 얇은 밝은 테두리가 기본.
+- 새 고양이 그림은 항상 기준 그림을 `--image`로 넘겨. 배경은 연두 말고 마젠타(#FF00FF).
+- 초록 목도리는 모든 스킨·동작에서 유지하고, 스킨은 털 무늬와 색만 바꿔.
+- 이미지 생성은 맥북 터미널의 Claude Code에서만 가능 (Codex 로그인이 맥북에만 있음).
