@@ -397,3 +397,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/cat-parade/kitten2/make_sheet.sh <품종> <차례> [다시 그리는 이유]` (첨부 `review/cat-parade/kitten2/prompts/ref_<품종>.png` = 시안 2의 그 아기 웅크림·달리기 2배 확대, `pose_guide.png` = 주인공 같은 자세 같은 칸 배치)
 - 요청문 전문: `review/cat-parade/kitten2/prompts/common.txt` + `<품종>.txt` (무늬 위치·개수·소품 자리를 글로 고정). 턱시도 2번째에 덧붙인 문장은 `review/cat-parade/kitten2/README.md` 다시 뽑기 표.
 - 자르기: `python3 tools/cut_kittens.py assets/raw/kittens/<시트> assets/sprites/kittens/<품종>`
+
+## 아기 움직임 A·B 비교 (2026-11-15, 맥 Codex, cat-parade 브랜치)
+- 계획: A 프레임 시트 1장, B 부품 시트 1장, 어긋나면 각 1번 더. A 1차는 발을 제자리에서 흔들게 그려 디딘 발이 뒤로 가지 않음(발 미끄러짐 35~47px) → B와 같은 걸음새 안내도(`make_guide.py` → `a_guide.png`)를 붙여 2차(22~28px)를 씀. B는 1번에 됨.
+- 명령: `bash review/cat-parade/motion/make_sheet.sh a_frames 1`, `EXTRA_IMAGE=review/cat-parade/motion/prompts/a_guide.png bash review/cat-parade/motion/make_sheet.sh a_frames2 2`, `bash review/cat-parade/motion/make_sheet.sh b_parts 1` (첨부 `prompts/ref_cheese.png`)
+- 요청문 전문: `review/cat-parade/motion/prompts/a_frames.txt`, `a_frames2.txt`, `b_parts.txt`. 결과 `assets/raw/kitten_motion/`.

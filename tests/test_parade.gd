@@ -116,16 +116,58 @@ func test_줄이_꽉_차면_길고양이가_안_나온다() -> void:
 
 
 ## 붙는 중에는 만난 자리에서 줄 맨 뒤로 옮겨 가고, 다 붙으면 기록 그대로
-func test_붙는_중에는_만난_자리에서_줄_뒤로() -> void:
-	var parade := CatParade.new(1)
+func test_붙는_중에는_만난_자리에서_일어나_깡충_뛰고_달려_줄_뒤로() -> void:
+	var sim := _sim()
+	sim.accelerate = false
+	for i in 120:
+		sim.step(DT, false)
+		sim.parade.record({"x": sim.x, "y": sim.y, "ground": true})
+	var parade := sim.parade
+	var from := Vector2(sim.x, sim.y)
+	parade.cats.append({"look": "cow", "quirk": 0.5, "from": from, "t": 0.0})
+	var first := parade.follower(0, sim.x)
+	assert_eq(first.x, from.x, "처음엔 만난 자리")
+	assert_eq(first.kind, "crouch", "일어나 웅크림")
+	var flew := false
+	var last_x: float = first.x
+	var slowest := INF
+	var fastest := 0.0
 	for i in 400:
-		parade.record({"x": i * 4.0, "y": 100.0})
-	parade.cats.append({"look": "cow", "quirk": 0.5, "from": Vector2(1500.0, 100.0), "t": 0.0})
-	var leader := 1500.0
-	assert_eq(parade.follower(0, leader).x, 1500.0, "처음엔 만난 자리")
-	parade.cats[0].t = Balance.PARADE_JOIN_TIME
-	assert_eq(parade.follower(0, leader).x, CatParade.slot_x(0, leader), "다 붙으면 줄 자리")
-	assert_false(parade.follower(0, leader).has("joining"))
+		sim.step(DT, false)
+		sim.parade.record({"x": sim.x, "y": sim.y, "ground": true})
+		var p := parade.follower(0, sim.x)
+		flew = flew or (p.get("kind", "") == "rise" and p.y > from.y + 1.0)
+		if parade.cats[0].has("gap") and not parade.cats[0].get("joined", false):
+			slowest = minf(slowest, (p.x - last_x) / DT)
+			fastest = maxf(fastest, (p.x - last_x) / DT)
+		last_x = p.x
+	assert_true(flew, "깡충 뜀")
+	assert_true(parade.cats[0].get("joined", false), "다 붙음")
+	assert_eq(parade.follower(0, sim.x).x, CatParade.slot_x(0, sim.x), "다 붙으면 줄 자리")
+	assert_false(parade.follower(0, sim.x).has("joining"))
+	assert_true(slowest >= -1.0 and fastest <= sim.vx() * 2.0 + 1.0, "달려 붙는 동안 뒤로 밀려나지 않고 너무 빠르지 않음 (%.0f~%.0f)" % [slowest, fastest])
+
+
+## 붙으러 달리는 중에 주인공이 느려져도 (질주 끝 등) 아기는 뒤로 가지 않는다 (주인공이 달린 거리로 붙음, Codex 리뷰)
+func test_붙는_중_주인공이_느려져도_아기는_뒤로_가지_않는다() -> void:
+	var parade := CatParade.new(1)
+	for i in 2000:
+		parade.record({"x": i * 4.0, "y": 100.0, "ground": true})
+	var cat := {"look": "cow", "quirk": 0.5, "from": Vector2(3000.0, 100.0), "t": 0.0}
+	parade.cats.append(cat)
+	var sim := RunnerSim.new(1, 900.0, false)
+	sim.x = 3000.0
+	var last := -INF
+	for i in 300:
+		var speed := 900.0 if i < 60 else 300.0  # 빠르다가 갑자기 느려짐
+		sim.x += speed * DT
+		cat.t += DT
+		parade._join_step(cat, 0, sim)
+		var x: float = parade.follower(0, sim.x).x
+		if cat.has("gap"):
+			assert_true(x >= last - 0.01, "%d: 뒤로 감 %.2f → %.2f" % [i, last, x])
+		last = x
+	assert_true(cat.get("joined", false), "다 붙음")
 
 
 func test_첫_만남과_간격() -> void:

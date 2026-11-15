@@ -225,6 +225,12 @@ const RUNAWAY_HOP := 60.0       # 놀라 뛰어오르는 높이 (120·80은 줄�
 const RUNAWAY_STAY := 0.45      # 뛰어오르는 시간 (runaway_lift와 같음)
 const RUNAWAY_SCARED := 0.35    # 뛰어오르는 시간 중 놀람 그림 비율 (그 뒤 몸을 돌려 도망 그림)
 const RUNAWAY_TOP := 300.0      # 도망 아기 발끝 화면 높이 하한 (줄이 공중일 때도 머리·"!"가 왼쪽 위 HUD 숫자 아래에)
+const RUNAWAY_OUT := 120.0      # 새 움직임 도망 아기는 발끝이 화면 왼쪽 밖 이만큼 나가면 끝
+const KITTEN_SHADOW_R := 36.0   # 새 움직임 아기 그림자 반지름 (주인공 그림자 방식, 몸 폭 약 65px의 0.55배)
+const KITTEN_DUST_RING := 26.0  # 아기 착지 먼지 고리 크기
+const KITTEN_HEAD_X := 28.0     # 새 움직임 아기 머리 가운데: 발끝 가운데에서 보는 쪽으로 이만큼
+const MEET_LOOK := 260.0        # 주인공이 길고양이 자리 이만큼 앞까지 오면 일어서서 주인공을 봄
+const SWEAT_COLOR := Color("#bfe3f5")
 const PARADE_FX_TIME := 0.8     # 만남 하트·놀람 "!"가 떠 있는 시간
 const PARADE_SHIFT_RATE := 3.0  # 줄이 길어질 때 주인공 화면 자리가 옮겨 가는 빠르기
 const FEVER_GLOW := Color("#ffd37a")
@@ -237,6 +243,11 @@ var sim := RunnerSim.new(randi())
 var _cat_x := Balance.CAT_SCREEN_X  # 주인공 화면 x (줄이 길면 맨 뒤까지 보이게 오른쪽으로)
 var _followers: Array[CatView] = []
 var _stray_view := CatView.new()
+## 아기 새 움직임 비교 (cat-parade 1단계): 치즈 아기만 "a"(프레임)·"b"(조각 인형)로, "old"면 예전 그대로
+var kitten_motion := "a"  # 권하는 쪽 (review/cat-parade/motion/README.md)
+var _kitten := KittenView.new()      # 줄의 치즈 아기
+var _kitten_run := KittenView.new()  # 도망가는 치즈 아기
+var _kitten_dust := {}               # 줄 치즈 아기 착지 먼지 {"x", "y", "k"} (로직 좌표, 그릴 때만)
 var _runaways: Array[Dictionary] = []   # 놀라 도망가는 고양이 {"look", "x", "y", "t", "view"} (로직 좌표)
 var _parade_fx: Array[Dictionary] = []  # {"kind": "heart"/"alert", "x", "y", "t"} (로직 좌표)
 var _purr := AudioStreamPlayer.new()
@@ -603,6 +614,7 @@ func _place_cat(delta: float) -> void:
 		cat.show_state(sim, delta)
 		# 따라오는 고양이가 재생할 기록: 발 높이 + 그림만 올린 높이(트램펄린·달리기 들썩임), 자세 (비틀거림은 주인공만)
 		sim.parade.record({"x": sim.x, "y": sim.y, "lift": _ground_y() - sim.y + FOOT_SINK - cat.position.y, "frame": cat.frame_name,
+				"ground": sim.on_ground, "since_land": sim.time_since_land, "since_jump": sim.time_since_jump,
 				"body": cat.scale / CatView.art_scale(), "rot": cat.rotation - deg_to_rad(CatView.stagger(sim.time_since_hit)), "spin": cat.spin()})
 	_place_parade()
 
@@ -1366,6 +1378,12 @@ func _build_parade() -> void:
 		add_child(view)
 		move_child(view, i)  # 줄 앞(0)이 가장 아래, 맨 뒤가 가장 위
 		_followers.append(view)
+	for kv in [_kitten, _kitten_run]:
+		kv.visible = false
+		add_child(kv)
+		move_child(kv, Balance.PARADE_MAX)  # 줄 아기들 위 (뒤 아기가 위인 순서는 시험판 한 마리라 생략)
+	_kitten.name = "KittenNew"
+	_kitten_run.name = "KittenRunaway"
 	_stray_view.name = "Stray"
 	_stray_view.size_k = Balance.PARADE_SIZE
 	_stray_view.visible = false
@@ -1393,12 +1411,13 @@ func _parade_events() -> void:
 	for cat_info in parade.met:
 		_sfx.meow.pitch_scale = 0.88 + 0.3 * cat_info.quirk  # 고양이마다 음 높이 조금씩
 		_sfx.meow.play()
-		_parade_fx.append({"kind": "heart", "x": cat_info.from.x, "y": cat_info.from.y + 90.0, "t": 0.0})
+		_parade_fx.append({"kind": "heart", "x": cat_info.from.x, "y": cat_info.from.y + 90.0, "t": 0.0, "kitten": _new_motion(cat_info.look)})
 	for cat_info in parade.fled:
 		var pose := parade.sample(CatParade.slot_x(parade.cats.size(), sim.x))  # 도망간 고양이가 있던 줄 자리
 		_sfx.nya.pitch_scale = 0.95 + 0.25 * cat_info.quirk
 		_sfx.nya.play()
-		_runaways.append({"look": cat_info.look, "x": pose.x, "y": pose.y, "t": 0.0, "quirk": cat_info.quirk})
+		_runaways.append({"look": cat_info.look, "x": pose.x, "y": pose.y, "t": 0.0, "quirk": cat_info.quirk,
+				"new": _new_motion(cat_info.look), "mode": kitten_motion, "vx": sim.vx()})  # 도망 중에 방식을 바꿔도 그 방식 그대로
 	_runaways = _runaways.slice(-4)
 
 
@@ -1406,8 +1425,10 @@ func _parade_events() -> void:
 func _update_parade(delta: float) -> void:
 	for r in _runaways:
 		r.t += delta
-		r.x += sim.vx() * (1.0 if r.t < RUNAWAY_STAY else RUNAWAY_KEEP) * delta  # 놀라 뛰는 동안은 제자리(화면에서 보이게), 그 뒤 뒤처짐
-	_runaways = _runaways.filter(func(r: Dictionary) -> bool: return r.t < RUNAWAY_TIME)
+		if not r.new:
+			r.x += sim.vx() * (1.0 if r.t < RUNAWAY_STAY else RUNAWAY_KEEP) * delta  # 놀라 뛰는 동안은 제자리(화면에서 보이게), 그 뒤 뒤처짐
+	# 새 움직임 아기는 세계에 멈춰 섰다 뒤로 달려 화면 왼쪽 밖으로 나가면 끝
+	_runaways = _runaways.filter(func(r: Dictionary) -> bool: return runaway_at(r).x > -RUNAWAY_OUT if r.new else r.t < RUNAWAY_TIME)
 	for fx in _parade_fx:
 		fx.t += delta
 		fx.y += 40.0 * delta
@@ -1429,6 +1450,9 @@ func _screen_at(at_x: float, feet: float, lift: float = 0.0) -> Vector2:
 ## 따라오는 고양이(기록 재생, 고양이마다 작은 개성), 길고양이(웅크려 꼬리), 도망가는 고양이(뒤돌아 깡충)
 func _place_parade() -> void:
 	var parade := sim.parade
+	_kitten.visible = false
+	_kitten_run.visible = false
+	_kitten_dust = {}
 	for i in _followers.size():
 		var view := _followers[i]
 		view.visible = false
@@ -1439,9 +1463,12 @@ func _place_parade() -> void:
 			var pose := parade.follower(i, sim.x)
 			if pose.is_empty():
 				continue
+			if _new_motion(info.look):
+				_place_kitten(pose, info.quirk)
+				continue
 			var q: float = info.quirk
 			var joining: bool = pose.has("joining")
-			var frame: String = CatPose.RUN_FRAMES[int(info.t * 12.0) % 4] if joining else pose.frame
+			var frame: String = pose.get("kind", CatPose.RUN_FRAMES[int(info.t * 12.0) % 4]) if joining else pose.frame
 			var running := frame.begins_with("run")
 			# 개성: 통통 튐 높이·박자와 살짝 다른 몸 흔들림 (달릴 때만, 몇 픽셀·몇 도)
 			var hop := kitten_hop(i, q, sim.elapsed) if running else 0.0
@@ -1454,6 +1481,9 @@ func _place_parade() -> void:
 			view.visible = true
 		elif i >= Balance.PARADE_MAX and i - Balance.PARADE_MAX < _runaways.size():
 			var r: Dictionary = _runaways[i - Balance.PARADE_MAX]
+			if r.new:
+				_place_kitten_runaway(r)
+				continue
 			var k: float = r.t / RUNAWAY_TIME
 			view.position = runaway_at(r)
 			view.set_breed(r.look)
@@ -1468,6 +1498,13 @@ func _place_parade() -> void:
 		_stray_view.position = _screen_at(s.x, s.y)
 		_stray_view.set_breed(s.look)
 		_stray_view.show_sit(sim.elapsed + s.quirk * 5.0)
+		if _new_motion(s.look) and s.x - sim.x < MEET_LOOK:
+			# 주인공이 다가오면 일어서서 주인공 쪽을 보고 신나서 들썩 (1차 검토: 웅크린 채 꼼짝 안 함)
+			_stray_view.visible = false
+			_kitten.position = _stray_view.position
+			_kitten.show_motion(kitten_motion, {"kind": "stand", "dist": 0.0, "facing": -1.0,
+					"squash": 1.0 - 0.06 * absf(sin(sim.elapsed * 14.0))})
+			_kitten.visible = true
 
 
 ## 그림자·피버 빛 (고양이 그림 아래), 하트·"!" (위)
@@ -1486,13 +1523,101 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 			_draw_shadow(Vector2(view.position.x, _ground_y() - top + FOOT_SINK), shadow, view)
 		if fever and view != _stray_view and view.modulate.a >= 1.0:
 			_draw_fever_glow(view.position, Balance.PARADE_SIZE)
+	for kv in [_kitten, _kitten_run]:
+		if kv.visible:
+			_draw_kitten_shadow(kv)
+			if fever and kv == _kitten:
+				_draw_fever_glow(kv.position, Balance.PARADE_SIZE)
+	if not _kitten_dust.is_empty():
+		_draw_kitten_dust(_screen_at(_kitten_dust.x, _kitten_dust.y), _kitten_dust.k)
 	if fever:
 		_draw_fever_glow(cat.position, 1.0)
 	for r in _runaways:  # 놀란 고양이 머리 위 "!" (같이 움직임)
+		if r.new:
+			# 머리는 몸 가운데보다 보는 쪽으로 (몸을 돌리면 "!"·땀방울도 따라 옮김, 1차 검토)
+			var facing: float = signf(KittenMotion.runaway(r.t, r.vx).facing)
+			var head := runaway_at(r) + Vector2(KITTEN_HEAD_X * facing, -RUNAWAY_ALERT_Y)
+			if r.t < KittenMotion.STARTLE + KittenMotion.TURN + 0.35:
+				_parade_fx_draw("alert", head, r.t, 1.0)
+			_draw_sweat(head + Vector2(26.0 * facing, 24.0), r.t)
+			continue
 		if r.t < RUNAWAY_TIME * 0.7:
 			_parade_fx_draw("alert", runaway_at(r) - Vector2(0.0, RUNAWAY_ALERT_Y), r.t, 1.0)
 	for fx in _parade_fx:
-		_parade_fx_draw(fx.kind, _screen_at(fx.x, fx.y), fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
+		# 새 움직임 아기의 하트는 아기 머리 위에 붙어 떠오름 (2차 검토: 하트가 자리에 남아 둥둥)
+		var at := _kitten.position + Vector2(0.0, -95.0 - 40.0 * fx.t) if fx.get("kitten", false) and _kitten.visible else _screen_at(fx.x, fx.y)
+		_parade_fx_draw(fx.kind, at, fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
+
+
+## 새 움직임을 쓰는 아기인가 (시험판: 치즈 아기만)
+func _new_motion(look: String) -> bool:
+	return look == "cheese" and kitten_motion != "old"
+
+
+## 줄의 치즈 아기: 기록의 위치에, 자세는 아기 자신의 상태로 (땅 위에서는 들어 올리지 않음, 공중에서만 기록의 그림 높이)
+func _place_kitten(pose: Dictionary, q: float) -> void:
+	var parade := sim.parade
+	var slope: float = (parade.sample(pose.x + 6.0).y - parade.sample(pose.x - 6.0).y) / 12.0
+	var st := KittenMotion.state(pose, slope)
+	var ground: bool = st.kind == "run"
+	var stride := KittenMotion.a_stride() if kitten_motion == "a" else KittenMotion.b_stride()
+	_kitten.position = _screen_at(pose.x, pose.y, 0.0 if ground or pose.has("kind") else pose.get("lift", 0.0))
+	_kitten.position.y = soft_top(_kitten.position.y, KITTEN_TOP)
+	_kitten.show_motion(kitten_motion, {"kind": st.kind, "dist": pose.x, "tilt": st.tilt, "land_k": st.land_k,
+			"squash": KittenMotion.squash(st.land_k, fposmod(pose.x / stride, 1.0), q) if ground else 1.0})
+	_kitten.visible = true
+	var since: float = pose.get("since_land", 9.0)
+	if ground and since < KittenMotion.DUST_TIME:
+		_kitten_dust = {"x": pose.x - since * sim.vx(), "y": pose.y, "k": since / KittenMotion.DUST_TIME}
+
+
+## 도망가는 치즈 아기: 멈칫(놀란 얼굴) → 몸 돌림 → 뒤로 달림 (달린 거리로 다리를 움직여 바닥을 디딤)
+func _place_kitten_runaway(r: Dictionary) -> void:
+	var run := KittenMotion.runaway(r.t, r.vx)
+	_kitten_run.position = runaway_at(r)
+	var x: float = r.x + run.dx
+	var under := CatShadow.under(sim.roofs, x, r.y)
+	var falling: bool = not under.is_empty() and KittenMotion.runaway_y(r.y, under.top, r.t) > under.top + 1.0
+	var kind: String = "fall" if falling else (run.kind if run.kind in ["run", "crouch"] else "startle")
+	_kitten_run.show_motion(r.mode, {"kind": kind, "dist": run.back, "facing": run.facing, "surprised": true,
+			"tilt": KittenMotion.FLEE_LEAN if kind == "run" else 0.0})
+	_kitten_run.visible = true
+
+
+## 아기 그림자 (주인공 그림자 방식 축소: 발밑 옥상 위, 높이 뜰수록 작고 옅게)
+func _draw_kitten_shadow(view: KittenView) -> void:
+	var feet_x := view.position.x - _cat_x + sim.x
+	var feet_y := _ground_y() + FOOT_SINK - view.position.y
+	var shadow := CatShadow.under(sim.roofs, feet_x, feet_y)
+	if shadow.is_empty():
+		return
+	var r: float = KITTEN_SHADOW_R * shadow.scale
+	draw_set_transform(Vector2(view.position.x, _ground_y() - shadow.top + FOOT_SINK), 0.0, Vector2(1.0, CatShadow.FLAT))
+	draw_texture_rect(_shadow_texture, Rect2(-r, -r, r * 2.0, r * 2.0), false, Color(SHADOW_COLOR, minf(1.0, shadow.alpha * SHADOW_PEAK)))
+	draw_set_transform(Vector2.ZERO)
+
+
+## 아기 착지 먼지: 발밑에서 납작하게 퍼지는 작은 고리 두 개 (k = 0~1)
+func _draw_kitten_dust(pos: Vector2, k: float) -> void:
+	var out := 1.0 - (1.0 - k) * (1.0 - k)
+	draw_set_transform(pos, 0.0, Vector2(1.0, BURST_FLAT))
+	draw_arc(Vector2.ZERO, KITTEN_DUST_RING * out, 0.0, TAU, 20, Color(BURST_COLOR, 0.7 * (1.0 - k)), 6.0 * (1.0 - k) + 1.0, true)
+	draw_set_transform(Vector2.ZERO)
+
+
+## 놀란 땀방울 하나 (머리 옆, 처음 0.1초 톡 커짐, 살짝 흔들림)
+func _draw_sweat(at: Vector2, t: float) -> void:
+	var s := 1.0 + 0.4 * maxf(0.0, 1.0 - t / 0.1)
+	at.y += 2.0 * sin(t * 18.0)
+	var outline := Color("#5a4636")
+	var tip := at + Vector2(0.0, -13.0) * s
+	var l := at + Vector2(-5.2, -3.0) * s
+	var r := at + Vector2(5.2, -3.0) * s
+	draw_circle(at, 6.0 * s + 1.0, outline)  # 테두리 (원 + 뾰족 끝)
+	draw_line(l, tip, outline, 3.0, true)
+	draw_line(r, tip, outline, 3.0, true)
+	draw_colored_polygon(PackedVector2Array([l, tip, r]), SWEAT_COLOR)  # 삼각형은 늘 나뉨 (예전 15각형은 가끔 삼각분할 실패)
+	draw_circle(at, 6.0 * s, SWEAT_COLOR)
 
 
 ## 줄 자리 i 아기가 달릴 때 통통 튀는 높이 (q = 개성 0~1, t = 시각). 자리마다 박자를 어긋나게 해 머리 높이가 다 같지 않게
@@ -1517,6 +1642,12 @@ static func soft_top(y: float, top: float) -> float:
 
 ## 도망가는 아기 발끝 화면 자리 (HUD 아래로 제한)
 func runaway_at(r: Dictionary) -> Vector2:
+	if r.new:
+		var run := KittenMotion.runaway(r.t, r.vx)
+		var x: float = r.x + run.dx
+		var under := CatShadow.under(sim.roofs, x, r.y)
+		# shortcut: 틈 위면 높이 그대로 달림 (화면 밖까지 0.5초 남짓), 줄이 길어 틈을 자주 지나면 그때 떨어지게
+		return _screen_at(x, KittenMotion.runaway_y(r.y, under.top if not under.is_empty() else r.y, r.t), run.lift)
 	var at := _screen_at(r.x, r.y, runaway_lift(r.t))
 	return Vector2(at.x, maxf(at.y, RUNAWAY_TOP))
 

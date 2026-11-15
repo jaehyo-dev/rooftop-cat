@@ -60,8 +60,10 @@ static func screen_x(count: int) -> float:
 
 ## sim.step이 이동·아이템·장애물 뒤에 부른다: 붙는 시간 진행, 만남, 다음 길고양이 놓기
 func update(sim: RunnerSim, dt: float) -> void:
-	for cat in cats:
+	for i in cats.size():
+		var cat := cats[i]
 		cat.t += dt
+		_join_step(cat, i, sim)
 	for i in range(strays.size() - 1, -1, -1):
 		var s := strays[i]
 		if sim.x < s.x:
@@ -96,7 +98,7 @@ func call_now() -> void:
 ## 시험 단추: 줄을 count마리로 (이미 붙은 상태로)
 func fill(count: int) -> void:
 	while cats.size() < mini(count, Balance.PARADE_MAX):
-		cats.append({"look": LOOKS[cats.size() % LOOKS.size()], "quirk": _rng.randf(), "from": Vector2.ZERO, "t": 99.0})
+		cats.append({"look": LOOKS[cats.size() % LOOKS.size()], "quirk": _rng.randf(), "from": Vector2.ZERO, "t": 99.0, "joined": true})
 	best = maxi(best, cats.size())
 
 
@@ -184,16 +186,50 @@ func sample(at: float) -> Dictionary:
 	return trail[0].duplicate()
 
 
-## 따라오는 고양이 i의 지금 모습: 기록 재생. 붙는 중이면 만난 자리에서 줄 맨 뒤로 깡충 달려옴 ("joining" = 0~1)
+## 붙는 중: 깡충 내려선 순간 줄 자리와의 거리(gap)와, 주인공이 그동안 달릴 거리(run_len)를 정하고, 다 달리면 붙음.
+## 시간이 아니라 주인공이 달린 거리로 붙으므로 아기 세계 속도 = 주인공 속도 x (1 - gap x 곡선 기울기(최대 1.5) / run_len).
+## run_len >= 1.5 x |gap| 이라 주인공이 빨라지든 느려지든 아기는 뒤로 가지 않고 주인공의 2배를 넘지 않는다
+func _join_step(cat: Dictionary, i: int, sim: RunnerSim) -> void:
+	if cat.get("joined", false):
+		return
+	if not cat.has("gap") and cat.t >= Balance.PARADE_JOIN_RISE + Balance.PARADE_JOIN_HOP_TIME:
+		var gap: float = cat.from.x + Balance.PARADE_JOIN_DX - slot_x(i, sim.x)
+		cat.gap = gap
+		cat.run_from = cat.t
+		cat.run_lead = sim.x
+		cat.run_len = maxf(Balance.PARADE_JOIN_RUN_MIN * sim.vx(), 1.5 * absf(gap))
+	elif cat.has("gap") and sim.x - cat.run_lead >= cat.run_len:
+		cat.joined = true
+
+
+## 따라오는 고양이 i의 지금 모습: 기록 재생 (아기 x의 주인공 기록). 붙는 중이면 ("joining" = true)
+## 만난 자리에서 일어나(웅크림, "kind" crouch) → 깡충(rise·fall, 앞으로 조금) → 내려서 달리며 줄 자리로 (아기 x만 다르고 높이·자세는 그 x의 기록)
 func follower(i: int, leader_x: float) -> Dictionary:
 	var cat := cats[i]
-	var pose := sample(slot_x(i, leader_x))
-	if pose.is_empty() or cat.t >= Balance.PARADE_JOIN_TIME:
-		return pose
-	var k: float = cat.t / Balance.PARADE_JOIN_TIME
-	var e := k * k * (3.0 - 2.0 * k)
+	var slot := slot_x(i, leader_x)
+	if cat.get("joined", false):
+		return sample(slot)
 	var from: Vector2 = cat.from
-	pose.x = lerpf(from.x, pose.x, e)
-	pose.y = lerpf(from.y, pose.y, e) + Balance.PARADE_JOIN_HOP * sin(PI * k)
-	pose.joining = k
+	var pose: Dictionary
+	if cat.has("gap"):
+		var u: float = clampf((leader_x - cat.run_lead) / cat.run_len, 0.0, 1.0)
+		pose = sample(slot + cat.gap * (1.0 - u * u * (3.0 - 2.0 * u)))
+		if not pose.is_empty() and pose.get("ground", true):
+			pose.since_land = minf(pose.get("since_land", 9.0), cat.t - cat.run_from)  # 깡충에서 내려선 눌림
+	elif cat.t < Balance.PARADE_JOIN_RISE:
+		pose = sample(from.x)
+		if not pose.is_empty():
+			pose.x = from.x
+			pose.y = from.y
+			pose.kind = "crouch"
+	else:
+		var k: float = (cat.t - Balance.PARADE_JOIN_RISE) / Balance.PARADE_JOIN_HOP_TIME
+		var x := from.x + Balance.PARADE_JOIN_DX * k
+		pose = sample(x)
+		if not pose.is_empty():
+			pose.y = lerpf(from.y, pose.y, k) + Balance.PARADE_JOIN_HOP * 4.0 * k * (1.0 - k)
+			pose.kind = "rise" if k < 0.5 else "fall"
+			pose.ground = false
+	if not pose.is_empty():
+		pose.joining = true
 	return pose
