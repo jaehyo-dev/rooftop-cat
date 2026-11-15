@@ -1,14 +1,19 @@
 """아기 움직임 1단계: 프레임 그림 달리기의 발 미끄러짐 (A 아기 vs 주인공, 같은 검사 tools/foot_slip.py).
 A는 8장 그림이라 한 장에 머무는 동안 발이 몸과 같이 밀리는 만큼(한 장 거리 약 19px)은 구조상 남는다.
 허용: A 30px 이하이고 주인공의 60% 이하. B는 tests/test_kitten_motion.gd (0.5px 이하)."""
+import importlib.util
 import unittest
 
-import foot_slip as fs
+# 그림을 재므로 numpy·scipy·Pillow가 있는 곳(로컬)에서만. Actions에는 없어 다른 그림 도구 테스트처럼 건너뜀
+HAS_LIBS = all(importlib.util.find_spec(m) for m in ("numpy", "scipy", "PIL"))
+if HAS_LIBS:
+    import foot_slip as fs
 
 A_MAX = 30.0
 VS_HERO = 0.6
 
 
+@unittest.skipUnless(HAS_LIBS, "numpy, scipy, Pillow 필요")
 class FootSlip(unittest.TestCase):
     def test_A는_주인공보다_덜_미끄러진다(self):
         r = fs.report()
