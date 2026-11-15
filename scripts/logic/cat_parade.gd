@@ -7,7 +7,8 @@ extends RefCounted
 ##   기록은 시간이 아니라 주인공 x 기준이라 빨라져도 간격이 같고, 주인공이 무사히 지난 길을 그대로 지난다.
 ## - 부딪힘(scare): 하트도 잃고 맨 뒤 고양이가 놀라 도망간다 (2026-11-13 A로 확정, RunnerSim._hit_obstacles).
 
-const LOOKS := ["gray", "black", "white", "tabby", "cream"]
+## 아기 고양이 품종 (assets/sprites/kittens/<품종>/, GAME_SPEC "줄줄이" 시안 2 확정): 치즈(방울)·고등어(접힌 귀)·턱시도(나비넥타이)·삼색(꽃핀)·젖소(방울 꼬리)·회색(삐친 털)
+const LOOKS := ["cheese", "mackerel", "tuxedo", "calico", "cow", "gray"]
 
 ## 줄: {"look", "quirk"(0~1, 개성), "from": 만난 자리 Vector2(x, 발 높이), "t": 붙은 뒤 지난 시간}
 var cats: Array[Dictionary] = []
@@ -132,9 +133,15 @@ func _put(sim: RunnerSim, at: float, roof: Dictionary) -> void:
 		var item: Dictionary = sim.items[i]
 		if FishRoad.is_fish(item) and absf(item.x - at) < FishRoad.RESERVED_GAP + 30.0 and item.y <= roof.top + Balance.ITEM_LIFT:
 			sim.items.remove_at(i)
-	strays.append({"x": at, "y": roof.top, "look": LOOKS[_rng.randi() % LOOKS.size()], "quirk": _rng.randf()})
+	strays.append({"x": at, "y": roof.top, "look": _new_look(), "quirk": _rng.randf()})
 	var arrive := sim.elapsed + (at - sim.x) / maxf(sim.vx(), 1.0)
 	_next_meet = arrive + _rng.randf_range(Balance.STRAY_EVERY.x, Balance.STRAY_EVERY.y)
+
+
+## 줄에 아직 없는 품종 하나 (같은 아이가 둘 보이지 않게, 줄은 최대 6 = 품종 수)
+func _new_look() -> String:
+	var free := LOOKS.filter(func(look: String) -> bool: return not cats.any(func(c: Dictionary) -> bool: return c.look == look))
+	return free[_rng.randi() % free.size()] if not free.is_empty() else LOOKS[_rng.randi() % LOOKS.size()]
 
 
 ## 주인공 기록 하나 덧붙이기 (x가 앞으로 갔을 때만). 줄 끝보다 뒤인 기록은 지운다
@@ -187,6 +194,6 @@ func follower(i: int, leader_x: float) -> Dictionary:
 	var e := k * k * (3.0 - 2.0 * k)
 	var from: Vector2 = cat.from
 	pose.x = lerpf(from.x, pose.x, e)
-	pose.y = lerpf(from.y, pose.y, e) + 50.0 * sin(PI * k)
+	pose.y = lerpf(from.y, pose.y, e) + Balance.PARADE_JOIN_HOP * sin(PI * k)
 	pose.joining = k
 	return pose

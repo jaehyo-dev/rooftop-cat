@@ -213,14 +213,18 @@ const SPEED_LINE_FISH_DIM := 0.25
 const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어드는 시간
 const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
-## 줄줄이 시험판 (cat-parade 브랜치): 길고양이 색 (털 어두운 색, 밝은 색), 도망·만남 연출, 골골 피버
-const PARADE_TINTS := {"gray": [Color("#5f5a57"), Color("#c9c3bd")], "black": [Color("#2e2928"), Color("#625956")],
-		"white": [Color("#b8aea4"), Color("#fffaf1")], "tabby": [Color("#5a3b22"), Color("#b98a5a")], "cream": [Color("#c39a66"), Color("#f8e4c0")]}
-const TINT_SHADER := preload("res://scripts/cat_tint.gdshader")
+## 줄줄이 (cat-parade 브랜치): 아기 고양이 통통 튐, 도망·만남 연출, 골골 피버
+const KITTEN_HOP := Vector2(3.5, 6.0)    # 달릴 때 통통 튀는 높이 (픽셀, 아이마다 이 사이)
+const KITTEN_HOP_HZ := Vector2(2.2, 3.0) # 통통 튀는 빠르기 (초당 번, 아이마다 이 사이). 줄 자리마다 박자도 어긋나 머리 높이가 한 줄로 같지 않게
+const KITTEN_TOP := 255.0       # 따라오는 아기 발끝 화면 높이: 이보다 위로 가면 부드럽게 눌러 머리가 왼쪽 위 HUD 생선 수(약 160) 아래에 (240은 귀가 생선 아이콘에 닿음)
+const KITTEN_TOP_SQUEEZE := 0.12# 하한을 넘은 높이의 이만큼만 더 올라감 (딱 멈추지 않고 살짝 따라 올라가게)
 const RUNAWAY_TIME := 1.1       # 놀라 도망가는 고양이가 사라지는 시간 (초)
 const RUNAWAY_KEEP := 0.65      # 놀라 도망가는 고양이는 줄 빠르기의 이만큼으로 달려 화면에서 천천히 뒤처진다
-const RUNAWAY_HOP := 120.0      # 놀라 뛰어오르는 높이
+const RUNAWAY_ALERT_Y := 82.0   # "!"를 도망 아기 발끝에서 이만큼 위 (아기 머리 바로 위)
+const RUNAWAY_HOP := 60.0       # 놀라 뛰어오르는 높이 (120·80은 줄이 공중일 때 HUD 숫자 가까이 감)
 const RUNAWAY_STAY := 0.45      # 뛰어오르는 시간 (runaway_lift와 같음)
+const RUNAWAY_SCARED := 0.35    # 뛰어오르는 시간 중 놀람 그림 비율 (그 뒤 몸을 돌려 도망 그림)
+const RUNAWAY_TOP := 300.0      # 도망 아기 발끝 화면 높이 하한 (줄이 공중일 때도 머리·"!"가 왼쪽 위 HUD 숫자 아래에)
 const PARADE_FX_TIME := 0.8     # 만남 하트·놀람 "!"가 떠 있는 시간
 const PARADE_SHIFT_RATE := 3.0  # 줄이 길어질 때 주인공 화면 자리가 옮겨 가는 빠르기
 const FEVER_GLOW := Color("#ffd37a")
@@ -228,7 +232,6 @@ const FEVER_ALPHA := 0.28
 const PURR_DB := -12.0          # 골골 소리 층 크기 (효과음보다 작게 깔림)
 const PURR_FADE := 0.6
 const MEOW_DB := -8.0
-static var _tint_cache := {}
 
 var sim := RunnerSim.new(randi())
 var _cat_x := Balance.CAT_SCREEN_X  # 주인공 화면 x (줄이 길면 맨 뒤까지 보이게 오른쪽으로)
@@ -1352,18 +1355,8 @@ func _draw_text(center: Vector2, text: String, size: int, alpha: float, color: C
 
 # --- 줄줄이 고양이 행렬 시험판 (cat-parade 브랜치) ---
 
-## 길고양이 무늬의 색 바꾸기 재질 (HUD·결과 카드 얼굴도 같이 씀)
-static func tint(look: String) -> ShaderMaterial:
-	if not _tint_cache.has(look):
-		var material := ShaderMaterial.new()
-		material.shader = TINT_SHADER
-		material.set_shader_parameter("dark", PARADE_TINTS[look][0])
-		material.set_shader_parameter("light", PARADE_TINTS[look][1])
-		_tint_cache[look] = material
-	return _tint_cache[look]
-
-
 ## 따라오는 고양이 6마리·길고양이·도망가는 고양이 그림 (주인공보다 먼저 = 뒤에 그림), 소리
+## 겹치는 순서는 오리 새끼 줄처럼: 뒤 아기가 앞 아기 위에 그려져 뒤 아기 머리가 앞 아기 엉덩이 위로 보인다
 func _build_parade() -> void:
 	for i in Balance.PARADE_MAX + 4:  # 뒤 4개는 도망가는 고양이용
 		var view := CatView.new()
@@ -1371,7 +1364,7 @@ func _build_parade() -> void:
 		view.size_k = Balance.PARADE_SIZE
 		view.visible = false
 		add_child(view)
-		move_child(view, 0)  # 맨 뒤 고양이가 가장 뒤에
+		move_child(view, i)  # 줄 앞(0)이 가장 아래, 맨 뒤가 가장 위
 		_followers.append(view)
 	_stray_view.name = "Stray"
 	_stray_view.size_k = Balance.PARADE_SIZE
@@ -1450,27 +1443,30 @@ func _place_parade() -> void:
 			var joining: bool = pose.has("joining")
 			var frame: String = CatPose.RUN_FRAMES[int(info.t * 12.0) % 4] if joining else pose.frame
 			var running := frame.begins_with("run")
-			# 개성: 통통 튐 박자와 살짝 다른 몸 흔들림 (달릴 때만, 몇 픽셀·몇 도)
-			var hop := (2.5 + 2.0 * q) * absf(sin(sim.elapsed * (8.0 + 3.0 * q) + q * 6.0)) if running else 0.0
+			# 개성: 통통 튐 높이·박자와 살짝 다른 몸 흔들림 (달릴 때만, 몇 픽셀·몇 도)
+			var hop := kitten_hop(i, q, sim.elapsed) if running else 0.0
 			var wobble := deg_to_rad(2.5 * sin(sim.elapsed * (5.0 + 3.0 * q) + q * 9.0)) if running else 0.0
 			view.position = _screen_at(pose.x, pose.y, (0.0 if joining else pose.lift) + hop)
-			view.material = tint(info.look)
+			view.position.y = soft_top(view.position.y, KITTEN_TOP)  # 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게 (그림만, 길은 그대로)
+			view.set_breed(info.look)
 			view.show_pose(frame, Vector2.ONE if joining else pose.body, (0.0 if joining else pose.rot) + wobble, 0.0 if joining else pose.spin)
 			view.modulate = Color.WHITE
 			view.visible = true
 		elif i >= Balance.PARADE_MAX and i - Balance.PARADE_MAX < _runaways.size():
 			var r: Dictionary = _runaways[i - Balance.PARADE_MAX]
 			var k: float = r.t / RUNAWAY_TIME
-			view.position = _screen_at(r.x, r.y, runaway_lift(r.t))
-			view.material = tint(r.look)
-			view.show_pose(CatPose.RUN_FRAMES[int(r.t * 14.0) % 4], Vector2(-1.0, 1.0), 0.0, 0.0)  # 뒤돌아 달아남
+			view.position = runaway_at(r)
+			view.set_breed(r.look)
+			# 놀라 뛰어오름("!") → 몸을 돌려 도망 → 뒤돌아 달아남 (도망·달리기 그림은 오른쪽을 봐서 뒤집음)
+			var frame := runaway_frame(r.t)
+			view.show_pose(frame, Vector2(1.0 if frame == "scared" else -1.0, 1.0), 0.0, 0.0)
 			view.modulate = Color(1, 1, 1, clampf((1.0 - k) * 2.5, 0.0, 1.0))
 			view.visible = true
 	_stray_view.visible = not waiting and not parade.strays.is_empty()
 	if _stray_view.visible:
 		var s: Dictionary = parade.strays[0]
 		_stray_view.position = _screen_at(s.x, s.y)
-		_stray_view.material = tint(s.look)
+		_stray_view.set_breed(s.look)
 		_stray_view.show_sit(sim.elapsed + s.quirk * 5.0)
 
 
@@ -1494,9 +1490,35 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 		_draw_fever_glow(cat.position, 1.0)
 	for r in _runaways:  # 놀란 고양이 머리 위 "!" (같이 움직임)
 		if r.t < RUNAWAY_TIME * 0.7:
-			_parade_fx_draw("alert", _screen_at(r.x, r.y, runaway_lift(r.t) + 110.0), r.t, 1.0)
+			_parade_fx_draw("alert", runaway_at(r) - Vector2(0.0, RUNAWAY_ALERT_Y), r.t, 1.0)
 	for fx in _parade_fx:
 		_parade_fx_draw(fx.kind, _screen_at(fx.x, fx.y), fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
+
+
+## 줄 자리 i 아기가 달릴 때 통통 튀는 높이 (q = 개성 0~1, t = 시각). 자리마다 박자를 어긋나게 해 머리 높이가 다 같지 않게
+static func kitten_hop(i: int, q: float, t: float) -> float:
+	var hz := lerpf(KITTEN_HOP_HZ.x, KITTEN_HOP_HZ.y, q)
+	return lerpf(KITTEN_HOP.x, KITTEN_HOP.y, q) * absf(sin(PI * hz * t + i * 1.9))
+
+
+## 도망가는 아기의 그림: 뛰어오르는 동안 앞 절반은 놀람, 나머지는 몸을 돌려 도망, 그 뒤 달리기
+static func runaway_frame(t: float) -> String:
+	if t < RUNAWAY_STAY * RUNAWAY_SCARED:
+		return "scared"
+	if t < RUNAWAY_STAY:
+		return "flee"
+	return CatPose.RUN_FRAMES[int(t * 14.0) % 4]
+
+
+## 화면 y가 top보다 위(작음)면 넘은 만큼의 KITTEN_TOP_SQUEEZE배만 올라가게
+static func soft_top(y: float, top: float) -> float:
+	return y if y >= top else top - (top - y) * KITTEN_TOP_SQUEEZE
+
+
+## 도망가는 아기 발끝 화면 자리 (HUD 아래로 제한)
+func runaway_at(r: Dictionary) -> Vector2:
+	var at := _screen_at(r.x, r.y, runaway_lift(r.t))
+	return Vector2(at.x, maxf(at.y, RUNAWAY_TOP))
 
 
 ## 놀라 뛰어오른 뒤 내려오는 높이 (깡충깡충 작게 이어짐)

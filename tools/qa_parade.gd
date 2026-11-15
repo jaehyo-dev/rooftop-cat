@@ -12,12 +12,16 @@ var sim: RunnerSim
 var _next := 0
 var _flight := {}
 var _since := INF
+var _manual := Callable()  # 정해진 누르기 (공중제비 장면): 있으면 자동 조종 대신
 
 
 func run(q: Node, mode: String) -> void:
 	qa = q
 	if mode == "parade_bare":  # 아기 고양이 시안 합성용 배경: 6마리 줄이 한 옥상 위에 있을 때, 보이게 / 숨겨서 / 주인공까지 숨겨서 세 장
 		await _bare()
+		return
+	if mode == "parade_flip":  # 공중제비만 다시 찍기
+		await _flip()
 		return
 	if mode == "parade_hit":  # 부딪힘만 다시 찍기
 		await _hit("hit_a")
@@ -28,7 +32,9 @@ func run(q: Node, mode: String) -> void:
 		await _gap("gap6_slow", 2)  # 4배 느리게
 		await _tramp()
 		await _dash()
+		await _flip()
 		await _hit("hit_a")
+	await _flat()
 	await _fever()
 	await _result()
 
@@ -48,10 +54,13 @@ func _start(seed_value: int, cats: int) -> void:
 	_next = 0
 	_flight = {}
 	_since = INF
+	_manual = Callable()
 
 
 ## 자동 조종 (tools/capture_fun.gd와 같음): 호대로 누르고, 트램펄린은 닿을 때 톡, 질주 중에는 주기적으로 뛴다
 func _pressed() -> bool:
+	if _manual.is_valid():
+		return _manual.call()
 	if sim.dashing:
 		return int(sim.elapsed * 1.6) % 2 == 0 and fmod(sim.elapsed * 1.6, 1.0) < 0.45
 	var flights: Array[Dictionary] = sim.road.flights
@@ -141,15 +150,39 @@ func _dash() -> void:
 	await _clip("dash6", 3.0, 8)
 
 
-## 6마리가 모두 같은 옥상 땅 위를 달릴 때 (맨 뒤 아기까지 같은 옥상, 줄 앞 장애물 없음)
-func _bare() -> void:
-	await _start(5, 6)
+## 6마리가 모두 같은 옥상 땅 위를 달릴 때까지 (맨 뒤 아기까지 같은 옥상, 줄 앞 장애물 없음)
+func _run_flat(ahead: float = 500.0) -> void:
 	await _run_until(func() -> bool:
 		var here := sim.roof_at(sim.x)
 		var back := CatParade.slot_x(Balance.PARADE_MAX - 1, sim.x) - 60.0
-		return sim.elapsed > 5.0 and sim.on_ground and not sim.dashing and sim.invuln_time <= 0.0 and not here.is_empty() and here.left < back and here.right - sim.x > 500.0 \
-				and sim.obstacles.all(func(o: Dictionary) -> bool: return o.x > sim.x + 500.0 or o.x + o.w < back - 100.0) \
+		return sim.elapsed > 5.0 and sim.on_ground and not sim.dashing and sim.invuln_time <= 0.0 and not here.is_empty() and here.left < back and here.right - sim.x > ahead \
+				and sim.obstacles.all(func(o: Dictionary) -> bool: return o.x > sim.x + ahead or o.x + o.w < back - 100.0) \
 				and range(Balance.PARADE_MAX).all(func(i: int) -> bool: return absf(sim.parade.follower(i, sim.x).y - sim.y) < 1.0), 120.0)
+
+
+## 평지 6마리 줄 (PC·폰 스틸)
+func _flat() -> void:
+	await _start(5, 6)
+	await _run_flat()
+	await _still("flat6")
+
+
+## 공중제비: 긴 옥상 위에서 한 번 뛰고 꼭대기 전에 다시 눌러 더블점프(앞구르기). 줄이 차례로 따라 구름
+func _flip() -> void:
+	await _start(5, 6)
+	await _run_flat(1000.0)  # 앞구르기 뒤 착지까지 같은 옥상 (틈에 빠지지 않게)
+	var t0 := sim.elapsed
+	_manual = func() -> bool:
+		var t := sim.elapsed - t0
+		return t < 0.12 or (t > 0.4 and t < 0.55)
+	await _clip("flip6", 1.5, 8)
+	_manual = Callable()
+
+
+## 합성 배경: 보이게 / 아기 숨김 / 주인공까지 숨김
+func _bare() -> void:
+	await _start(5, 6)
+	await _run_flat()
 	await _still("bare_with")
 	for i in Balance.PARADE_MAX:
 		world.get_node("Parade%d" % i).visible = false

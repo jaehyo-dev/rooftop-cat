@@ -23,10 +23,21 @@ const DASH_TINT := Color(1.0, 0.86, 0.5)
 ## 부딪힌 직후 빨갛게 깜빡임 (그 뒤는 무적 깜빡임)
 const HIT_FLASH_TIME := 0.3
 const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 진하면 고양이가 빨간 덩어리로 보임
+## 아기 고양이 (줄줄이): 품종마다 그림 폴더. 그림은 tools/cut_kittens.py가 작은 캔버스(기준점 KITTEN_ANCHOR)에 맞춰 두고
+## 여기서 KITTEN_ART배로 키워 주인공 프레임 크기에 맞춘 뒤 size_k(0.56)로 줄인다 (원본 해상도를 그대로 써서 덜 흐림)
+const KITTEN_DIR := "res://assets/sprites/kittens/"
+const KITTEN_ANCHOR := Vector2(140, 216)
+const KITTEN_ART := 2.5
+const KITTEN_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail",
+		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "wait", "scared", "flee"]
+const KITTEN_TAILS := 5
+static var _kitten_cache := {}  # 품종 → {"frames": {이름: 그림}, "tails": [그림...]}
 
 var frame_name := "run_0"
-## 그림 크기 배율 (줄줄이 시험판 길고양이 0.75)
+## 그림 크기 배율 (줄줄이 아기 고양이 Balance.PARADE_SIZE)
 var size_k := 1.0
+## 아기 고양이 품종 ("" = 주인공). set_breed로 바꾼다
+var breed := ""
 var _textures := {}
 var _sprite := Sprite2D.new()
 var _tail := Sprite2D.new()  # 앉았을 때만: 몸 뒤 꼬리 (CatPose.sit_tail)
@@ -53,11 +64,30 @@ func _ready() -> void:
 	_tail.centered = false
 	_tail.offset = -ANCHOR
 	_tail.visible = false
-	_sprite.use_parent_material = true  # 줄줄이 시험판 색 바꾸기 재질을 몸·꼬리도 받게
-	_tail.use_parent_material = true
 	add_child(_tail)  # 몸보다 먼저 = 뒤에 그림
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
+
+
+## 아기 고양이 그림으로 바꾼다 (줄 자리마다 오는 아이가 달라 매 프레임 부름, 같으면 그대로)
+func set_breed(look: String) -> void:
+	if look == breed:
+		return
+	breed = look
+	if not _kitten_cache.has(look):
+		var frames := {}
+		for frame in KITTEN_FRAMES:
+			frames[frame] = load(KITTEN_DIR + look + "/" + frame + ".png")
+		var tails: Array[Texture2D] = []
+		for i in KITTEN_TAILS:
+			tails.append(load(KITTEN_DIR + look + "/wait_tail_%d.png" % i))
+		_kitten_cache[look] = {"frames": frames, "tails": tails}
+	_textures = _kitten_cache[look].frames
+	_tails = _kitten_cache[look].tails
+	_sprite.scale = Vector2.ONE * KITTEN_ART
+	_sprite.offset = -KITTEN_ANCHOR - spin_center() / KITTEN_ART
+	_tail.scale = Vector2.ONE * KITTEN_ART
+	_tail.offset = -KITTEN_ANCHOR
 
 
 ## 이름의 프레임 그림 (질주 잔상용)
@@ -123,21 +153,21 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 
 ## 시작 화면: 앉아서 꼬리를 흔들고 숨쉰다 (t = 앉아 있은 시간). 다음 달리기 첫 순간에 "일어남"을 보이게 해 둔다
 func show_sit(t: float) -> void:
-	frame_name = CatPose.sit_frame(t)
+	frame_name = CatPose.sit_frame(t) if breed == "" else "wait"  # 아기는 눈 깜빡임 없이 꼬리만
 	_sprite.texture = _textures[frame_name]
 	_sprite.rotation = 0.0
 	_tail.visible = true
-	_tail.texture = _tails[CatPose.sit_tail(t)]
+	_tail.texture = _tails[CatPose.sit_tail(t, _tails.size())]
 	rotation = 0.0
 	scale = CatPose.sit_breath(t) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
 	_stand = CatPose.STAND_TIME
 
 
-## 줄줄이 시험판 따라오는 고양이: 주인공 기록(프레임·몸 배율·기울기·공중제비)을 그대로 보인다
+## 줄줄이 따라오는 아기 고양이: 주인공 기록(프레임·몸 배율·기울기·공중제비)을 그대로 보인다
 func show_pose(frame: String, body: Vector2, rot: float, spin_rad: float) -> void:
-	frame_name = frame
-	_sprite.texture = _textures[frame]
+	frame_name = frame if _textures.has(frame) else "run_0"  # 아기에게 없는 주인공 자세(일어남)는 달리기로
+	_sprite.texture = _textures[frame_name]
 	_sprite.rotation = spin_rad
 	_tail.visible = false
 	rotation = rot

@@ -1,5 +1,6 @@
 """캡처 프레임(<장면>_f000_pc.png…)을 GIF로 묶는다. 한 장 = 1/15초 (gap6_slow는 2 step마다 찍어 4배 느림).
-사용: python3 review/cat-parade/make_gifs.py <캡처 폴더> review/cat-parade
+사용: python3 review/cat-parade/make_gifs.py <캡처 폴더> review/cat-parade [line]
+line = 줄이 있는 왼쪽 위 1024x576만 잘라 크게 (아기 고양이 그림 검수용, kitten2/)
 3MB를 넘으면 폭을 줄여 다시 만든다 (CLAUDE.md: review GIF 3MB 이하).
 """
 import re
@@ -14,15 +15,18 @@ LIMIT = 3 * 1024 * 1024
 EVERY = {"gap6_slow": 2}
 
 
-def main(src: Path, out: Path) -> None:
+LINE_BOX = (0, 90, 1024, 666)
+
+
+def main(src: Path, out: Path, line: bool = False) -> None:
     clips = defaultdict(list)
     for f in sorted(src.glob("*_f[0-9][0-9][0-9]_pc.png")):
         clips[re.sub(r"_f\d{3}_pc\.png$", "", f.name)].append(f)
     for name, files in clips.items():
         every = EVERY.get(name, 1)
         files = files[::every]
-        for width in (640, 560, 480, 400):
-            frames = [Image.open(f).convert("RGB").resize((width, width * 9 // 16), Image.LANCZOS) for f in files]
+        for width in ((800, 720, 640, 560, 480, 400) if line else (640, 560, 480, 400)):
+            frames = [(Image.open(f).convert("RGB").crop(LINE_BOX) if line else Image.open(f).convert("RGB")).resize((width, width * 9 // 16), Image.LANCZOS) for f in files]
             pal = frames[len(frames) // 2].quantize(colors=128, method=Image.Quantize.MEDIANCUT)
             frames = [f.quantize(palette=pal, dither=Image.Dither.NONE) for f in frames]
             path = out / f"{name}.gif"
@@ -33,4 +37,4 @@ def main(src: Path, out: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]), Path(sys.argv[2]))
+    main(Path(sys.argv[1]), Path(sys.argv[2]), len(sys.argv) > 3 and sys.argv[3] == "line")

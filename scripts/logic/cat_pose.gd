@@ -33,9 +33,9 @@ static func sit_frame(t: float) -> String:
 
 
 ## 꼬리 그림 번호 (0 = 바닥, SIT_TAILS - 1 = 위). 코사인으로 오가 양 끝에서 머무는 듯 부드럽게
-static func sit_tail(t: float) -> int:
+static func sit_tail(t: float, count: int = SIT_TAILS) -> int:
 	var p := 0.5 - 0.5 * cos(TAU * maxf(t, 0.0) / SIT_WAG)
-	return roundi(p * (SIT_TAILS - 1))
+	return roundi(p * (count - 1))
 
 
 ## 숨쉬기 배율 (바닥 = 발끝 원점을 기준으로 곱함)

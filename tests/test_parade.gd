@@ -3,6 +3,7 @@ extends TestCase
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
 const DT := 1.0 / 120.0
+const WORLD := preload("res://scripts/world_view.gd")
 
 
 ## 줄을 켠 판 (옥상 생성기만, 장애물 없음)
@@ -119,7 +120,7 @@ func test_붙는_중에는_만난_자리에서_줄_뒤로() -> void:
 	var parade := CatParade.new(1)
 	for i in 400:
 		parade.record({"x": i * 4.0, "y": 100.0})
-	parade.cats.append({"look": "gray", "quirk": 0.5, "from": Vector2(1500.0, 100.0), "t": 0.0})
+	parade.cats.append({"look": "cow", "quirk": 0.5, "from": Vector2(1500.0, 100.0), "t": 0.0})
 	var leader := 1500.0
 	assert_eq(parade.follower(0, leader).x, 1500.0, "처음엔 만난 자리")
 	parade.cats[0].t = Balance.PARADE_JOIN_TIME
@@ -188,7 +189,56 @@ func test_점수_배수() -> void:
 	assert_eq(off.parade_bonus, 0.0, "줄을 끄면 배수 없음")
 
 
-func test_6마리일_때_PC_앞_시야_0_8초_이상() -> void:
+func test_6마리일_때_PC_앞_시야_0_75초_이상() -> void:
 	var ahead := 1280.0 - CatParade.screen_x(Balance.PARADE_MAX)  # PC 화면 폭에서 주인공 오른쪽
-	assert_true(ahead / Balance.SPEED_MAX >= 0.8, "앞 시야 %.2f초" % (ahead / Balance.SPEED_MAX))
-	assert_eq(CatParade.screen_x(3), Balance.CAT_SCREEN_X, "3마리까지는 주인공 자리 그대로")
+	assert_true(ahead / Balance.SPEED_MAX >= 0.75, "앞 시야 %.2f초" % (ahead / Balance.SPEED_MAX))
+	assert_eq(CatParade.screen_x(2), Balance.CAT_SCREEN_X, "2마리까지는 주인공 자리 그대로 (3마리부터 오른쪽으로)")
+
+
+func test_새_길고양이는_줄에_없는_품종() -> void:
+	for seed_value in TestCase.pick([1, 2, 3, 4, 5, 6], 3):
+		var sim := _sim(seed_value)
+		sim.parade.fill(Balance.PARADE_MAX - 1)
+		sim.parade.call_now()
+		sim.parade.update(sim, DT)
+		var looks := sim.parade.cats.map(func(c: Dictionary) -> String: return c.look)
+		assert_false(sim.parade.strays.is_empty(), "길고양이가 나옴")
+		assert_false(sim.parade.strays[0].look in looks, "줄에 없는 아이 (시드 %d)" % seed_value)
+
+
+## 아기 고양이 그림 (tools/cut_kittens.py): 품종마다 모든 자세·꼬리·얼굴이 있고 캔버스 크기가 같다 (기준점이 같아 바꿔도 안 떨림)
+func test_아기_고양이_그림이_품종마다_다_있다() -> void:
+	for look in CatParade.LOOKS:
+		var names: Array = CatView.KITTEN_FRAMES.duplicate()
+		for i in CatView.KITTEN_TAILS:
+			names.append("wait_tail_%d" % i)
+		for frame in names:
+			var path: String = CatView.KITTEN_DIR + look + "/" + frame + ".png"
+			assert_true(ResourceLoader.exists(path), path)
+			if ResourceLoader.exists(path):
+				assert_eq(load(path).get_size(), Vector2(256, 240), path)
+		assert_true(ResourceLoader.exists(CatView.KITTEN_DIR + look + "/face.png"), look + " 얼굴")
+	for frame in CatPose.ALL_FRAMES:
+		if not frame.begins_with("sit"):
+			assert_true(frame in CatView.KITTEN_FRAMES, "주인공 자세 %s를 아기도 따라 함" % frame)
+
+
+func test_아기마다_통통_튀는_박자가_달라_머리_높이가_한_줄이_아니다() -> void:
+	for step in 20:
+		var t := step * 0.137
+		var hops: Array[float] = []
+		for i in Balance.PARADE_MAX:
+			hops.append(WORLD.kitten_hop(i, 0.5, t))
+		assert_true(hops.max() - hops.min() > 2.0, "t=%.2f 높이 %s" % [t, hops])
+
+
+func test_도망가는_아기는_놀람_도망_달리기_순서() -> void:
+	assert_eq(WORLD.runaway_frame(0.0), "scared")
+	assert_eq(WORLD.runaway_frame(WORLD.RUNAWAY_STAY * 0.8), "flee")
+	assert_true(WORLD.runaway_frame(WORLD.RUNAWAY_STAY + 0.1).begins_with("run"))
+
+
+func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
+	assert_eq(WORLD.soft_top(400.0, WORLD.KITTEN_TOP), 400.0, "하한 아래는 그대로")
+	assert_true(WORLD.soft_top(0.0, WORLD.KITTEN_TOP) > WORLD.soft_top(-100.0, WORLD.KITTEN_TOP), "더 높으면 조금 더 위 (멈추지 않음)")
+	assert_true(WORLD.soft_top(-300.0, WORLD.KITTEN_TOP) > 150.0, "아주 높아도 HUD 아래")

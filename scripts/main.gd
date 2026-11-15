@@ -39,9 +39,8 @@ const UI_VOLUME_DB := -17.0
 const UI_GAIN_DB := {"thud": 5.0, "whoosh": 3.0}
 ## HUD (판 중·결과 카드에서만 보임)
 const HUD := ["DistanceLabel", "BestLabel", "FishIcon", "FishLabel", "ScoreLabel", "ComboLabel", "ParadeHud"]
-## 줄줄이 시험판: 고양이 얼굴 아이콘 (앉은 그림의 머리 부분, 색은 world_view.tint)
-const FACE_REGION := Rect2(322, 224, 146, 116)
-const FACE_SIZE := 40.0
+## 줄줄이: 아기 고양이 얼굴 아이콘 (assets/sprites/kittens/<품종>/face.png)
+const FACE_SIZE := 56.0  # 아기 얼굴 (폰에서 약 30px, 40·48은 폰에서 누가 누군지 잘 안 보임)
 const WORLD := preload("res://scripts/world_view.gd")
 
 ## 배경 음악 "찹쌀떡 산책" (tools/make_music.py로 합성한 루프)
@@ -613,24 +612,21 @@ func _face_row(row_name: String) -> HBoxContainer:
 	var faces := HBoxContainer.new()
 	faces.name = row_name
 	faces.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	faces.add_theme_constant_override("separation", 0)
-	var atlas := AtlasTexture.new()
-	atlas.atlas = load("res://assets/sprites/cat_frames/sit_body.png")
-	atlas.region = FACE_REGION
+	faces.add_theme_constant_override("separation", 4)  # 얼굴끼리 붙지 않게
 	for i in Balance.PARADE_MAX:
-		var face := UiKit.icon(atlas, FACE_SIZE)
+		var face := UiKit.icon(null, FACE_SIZE)
 		face.name = "Face%d" % i
 		faces.add_child(face)
 	return faces
 
 
-## 줄의 고양이 수만큼 얼굴을 보이고 무늬 색을 입힌다
+## 줄의 아기 수만큼 그 아이 얼굴을 보인다 (tools/cut_kittens.py가 기다리기 그림에서 자른 face.png)
 func _show_faces(faces: HBoxContainer, cats: Array[Dictionary]) -> void:
 	for i in faces.get_child_count():
 		var face: TextureRect = faces.get_child(i)
 		face.visible = i < cats.size()
 		if face.visible:
-			face.material = WORLD.tint(cats[i].look)
+			face.texture = load(CatView.KITTEN_DIR + cats[i].look + "/face.png")
 
 
 ## 시험 단추는 로컬 빌드(데스크톱·github.io가 아닌 웹 주소)에만

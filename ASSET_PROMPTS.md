@@ -391,3 +391,9 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/cat-parade/kitten/make_kittens.sh 01_round|02_rascal` (첨부 `assets/concept/cat_reference_sheet.png`, `assets/sprites/cat_base_run.png`)
 - 요청문 전문: `review/cat-parade/kitten/prompts/common.txt` + `01_round.txt` / `02_rascal.txt`. 결과는 `review/cat-parade/kitten/01_round.png`, `02_rascal.png`.
 - 시안이라 게임에는 아직 쓰지 않음(CREDITS는 구현 단계에서 고른 것만 기록).
+
+## 줄줄이 아기 고양이 동작 시트 (2026-11-15, 맥 Codex, cat-parade 브랜치)
+- 계획: 아기마다 1장(6열 x 3줄, 17칸: 달리기 4·웅크림·도약·오름·내림·착지·허우적·공중제비 4·기다리기·놀람·도망) = 6장. 무늬·소품·표정이 칸마다 바뀌면 그 아이만 다시 → 턱시도 1번 다시(공중제비 3칸 등에 없던 줄무늬), 젖소 1번 다시(얼룩 개수·자리가 칸마다 다름) = 모두 8장.
+- 명령: `bash review/cat-parade/kitten2/make_sheet.sh <품종> <차례> [다시 그리는 이유]` (첨부 `review/cat-parade/kitten2/prompts/ref_<품종>.png` = 시안 2의 그 아기 웅크림·달리기 2배 확대, `pose_guide.png` = 주인공 같은 자세 같은 칸 배치)
+- 요청문 전문: `review/cat-parade/kitten2/prompts/common.txt` + `<품종>.txt` (무늬 위치·개수·소품 자리를 글로 고정). 턱시도 2번째에 덧붙인 문장은 `review/cat-parade/kitten2/README.md` 다시 뽑기 표.
+- 자르기: `python3 tools/cut_kittens.py assets/raw/kittens/<시트> assets/sprites/kittens/<품종>`
