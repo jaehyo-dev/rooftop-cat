@@ -402,3 +402,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획: A 프레임 시트 1장, B 부품 시트 1장, 어긋나면 각 1번 더. A 1차는 발을 제자리에서 흔들게 그려 디딘 발이 뒤로 가지 않음(발 미끄러짐 35~47px) → B와 같은 걸음새 안내도(`make_guide.py` → `a_guide.png`)를 붙여 2차(22~28px)를 씀. B는 1번에 됨.
 - 명령: `bash review/cat-parade/motion/make_sheet.sh a_frames 1`, `EXTRA_IMAGE=review/cat-parade/motion/prompts/a_guide.png bash review/cat-parade/motion/make_sheet.sh a_frames2 2`, `bash review/cat-parade/motion/make_sheet.sh b_parts 1` (첨부 `prompts/ref_cheese.png`)
 - 요청문 전문: `review/cat-parade/motion/prompts/a_frames.txt`, `a_frames2.txt`, `b_parts.txt`. 결과 `assets/raw/kitten_motion/`.
+
+## 치즈 아기 A 움직임 고침 (2026-11-16, 맥 Codex, cat-parade 브랜치, motion2)
+- 계획 2장: 달리기 16장(안내도 `a_guide16.png` 첨부)·공중 자세 13장. 다시 뽑기 0번.
+- 명령: `EXTRA_IMAGE="review/cat-parade/motion/prompts/ref_a_air.png review/cat-parade/motion/prompts/a_guide16.png" bash review/cat-parade/motion/make_sheet.sh a_run16 1`, `EXTRA_IMAGE="review/cat-parade/motion/prompts/ref_a_air.png review/cat-parade/motion/prompts/ref_hero_air.png" bash review/cat-parade/motion/make_sheet.sh a_air2 1`
+- 요청문 전문: `review/cat-parade/motion/prompts/a_run16.txt`, `a_air2.txt`. 달리기 16장은 발 박자가 안내도와 달라 안 쓰고, 예전 8장 다리를 고쳐 24장을 만듦 (`tools/cut_kitten_motion.py a2`).

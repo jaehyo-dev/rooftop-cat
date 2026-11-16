@@ -2,8 +2,8 @@
 바닥을 디딘 발의 세계 x가 디디는 동안 얼마나 움직이는지 잰다. 아기 A와 주인공을 같은 방법으로 (tools/test_kitten_motion.py).
 사용: python3 tools/foot_slip.py  → 속도별 A·주인공 최대 미끄러짐 (게임 픽셀)
 - 장마다 디딘 발 = cut_kitten_motion.contacts (바닥선 위 2줄 안 불투명 덩어리).
-- 같은 장이 이어지는 동안은 같은 발(그림 안 순서). 장이 바뀌면 직전 세계 자리에서 MATCH 픽셀 안의 가장 가까운 디딘 발이
-  같은 발, 없으면 들린 것 (그래서 한 장 안에서 크게 밀리는 발도 끝까지 잰다).
+- 같은 장이 이어지는 동안은 같은 발(그림 안 순서). 장이 바뀌면 (건너뛴 장도 차례로 지나며) 직전 세계 자리에서 MATCH 픽셀 안의
+  디딘 발을 가장 가까운 짝부터 같은 발로, 짝이 없으면 들린 것 (그래서 한 장 안에서 크게 밀리는 발도 끝까지 잰다).
 - 아기 A는 게임이 쓰는 KittenMotionData.A_ADVANCE(scripts/logic/kitten_motion_data.gd)로 장을 고른다 (KittenMotion.a_frame과 같음).
 - 미끄러짐 = 한 발이 디딘 동안 (세계 x 최대 - 최소).
 """
@@ -44,7 +44,7 @@ def hero_frames() -> list:
 
 
 def kitten_a_frames(folder: Path = ROOT / "assets/sprites/kitten_motion/cheese_a") -> list:
-    return [[(x - ckm.ANCHOR_X) * KITTEN_PX for x in ckm.contacts(Image.open(folder / f"run_{i}.png"))] for i in range(8)]
+    return [[(x - ckm.ANCHOR_X) * KITTEN_PX for x in ckm.contacts(Image.open(folder / f"run_{i}.png"))] for i in range(len(a_advance()))]
 
 
 def _runs(band) -> list:
@@ -59,41 +59,63 @@ def a_advance() -> list:
     return [float(v) for v in re.search(r"const A_ADVANCE := \[([^\]]*)\]", text).group(1).split(",")]
 
 
-def frame_at(dist: float, advance: list) -> int:
-    """KittenMotion.a_frame과 같음: 한 바퀴 안에서 장마다 거리만큼 머묾."""
+def frame_at(dist: float, advance: list, inside: bool = False):
+    """KittenMotion.a_frame과 같음: 한 바퀴 안에서 장마다 거리만큼 머묾. inside면 (장, 그 장에서 간 거리)."""
     d = dist % sum(advance)
     for k, a in enumerate(advance):
+        if d < a:
+            return (k, d) if inside else k
         d -= a
-        if d < 0.0:
-            return k
-    return len(advance) - 1
+    return (len(advance) - 1, advance[-1]) if inside else len(advance) - 1
+
+
+def _match(active: list, feet: list, seen: bool) -> tuple:
+    """디디던 발(active)과 새 장의 발(세계 x)을 MATCH 안에서 가장 가까운 짝부터 잇는다 (앞에서부터 고르면 새로 디딘 발이
+    디디던 발의 짝을 빼앗아 미끄러짐을 부풀림, motion2). seen이면 보인 최소·최대에 넣는다. → (이은 발들, 들린 발들)"""
+    pairs = sorted((abs(a[0] - x), i, j) for i, a in enumerate(active) for j, x in enumerate(feet) if abs(a[0] - x) <= MATCH)
+    got, used = {}, set()
+    for _, i, j in pairs:
+        if i not in used and j not in got:
+            got[j] = active[i]
+            used.add(i)
+    out = []
+    for j, x in enumerate(feet):
+        lo, hi = (got[j][1], got[j][2]) if j in got else (float("inf"), float("-inf"))
+        out.append([x, min(lo, x), max(hi, x)] if seen else [x, lo, hi])
+    return out, [a for i, a in enumerate(active) if i not in used]
 
 
 def slip(frames: list, stride: float, speed: float, seconds: float = 3.0, advance: list = None) -> float:
     """거리 기준으로 장을 넘기며 디딘 발의 최대 미끄러짐. advance(게임 픽셀)가 없으면 장마다 stride / 장 수."""
     advance = advance or [stride / len(frames)] * len(frames)
-    active = []  # 발마다 [마지막 x, 최소, 최대] (그림 안 순서대로)
+    active = []  # 발마다 [잇는 데 쓰는 세계 x, 보인 최소, 보인 최대] (그림 안 순서대로)
     last_k = -1
     worst = 0.0
+    n = len(frames)
     for tick in range(int(seconds * FPS)):
         body = speed * tick / FPS
-        k = frame_at(body, advance)
+        k, inside = frame_at(body, advance, True)
+        abs_k = int(body // sum(advance)) * n + k  # 누적 장 번호 (한 바퀴 이상 건너뛰어도 놓치지 않게, Codex 리뷰)
         feet = sorted(body + x for x in frames[k])
-        if k == last_k:  # 같은 장: 같은 발
+        lifted = []
+        if abs_k == last_k:  # 같은 장: 같은 발
             nxt = [[x, min(a[1], x), max(a[2], x)] for a, x in zip(active, feet)]
         else:
-            nxt = []
-            pool = list(active)
-            for x in feet:
-                best = min(pool, key=lambda a: abs(a[0] - x), default=None)
-                if best is not None and abs(best[0] - x) <= MATCH:
-                    pool.remove(best)
-                    nxt.append([x, min(best[1], x), max(best[2], x)])
-                else:
-                    nxt.append([x, x, x])
-        for a in active:
+            # 건너뛴 장(빠르면 한 장면에 몇 장씩 넘어감)도 차례로 지나며 발을 잇는다. 그 장은 화면에 안 보였으니 최소·최대에는 안 넣음
+            skipped = [j % n for j in range(last_k + 1, abs_k)] if last_k >= 0 else []
+            start = body - inside
+            starts = []
+            for j in reversed(skipped):
+                start -= advance[j]
+                starts.append(start)
+            for j, st in zip(skipped, reversed(starts)):
+                active, gone = _match(active, [st + x for x in frames[j]], seen=False)
+                lifted += gone
+            nxt, gone = _match(active, feet, seen=True)
+            lifted += gone
+        for a in lifted:
             worst = max(worst, a[2] - a[1])
-        active, last_k = nxt, k
+        active, last_k = nxt, abs_k
     for a in active:
         worst = max(worst, a[2] - a[1])
     return worst

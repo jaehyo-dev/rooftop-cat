@@ -27,6 +27,9 @@ func run(q: Node, mode: String) -> void:
 		for m in ["a", "b"]:
 			await _motion(m)
 		return
+	if mode == "parade_motion2":  # 치즈 아기 A 움직임 고침 (review/cat-parade/motion2): 평지·틈·트램펄린·도망
+		await _motion2()
+		return
 	if mode == "parade_hit":  # 부딪힘만 다시 찍기
 		await _hit("hit_a")
 		return
@@ -253,8 +256,21 @@ func _motion(m: String) -> void:
 	await _clip("motion_%s_meet_real" % m, 2.4, 4)
 
 
-func _motion_start(m: String) -> void:
-	await _start(5, 1)
+func _motion2() -> void:
+	for clip in [["flat", 2.0], ["gap", 2.6], ["tramp", 3.2], ["flee", 1.8]]:
+		for speed in [["real", 4], ["slow", 2]]:
+			await _motion_start("a", 12 if clip[0] == "tramp" else 5)
+			match clip[0]:
+				"flat": await _motion_flat()
+				"gap": await _motion_gap()
+				"tramp": await _run_until(func() -> bool:
+					return sim.elapsed > 5.0 and _plain() and sim.structures.any(func(s: Dictionary) -> bool: return s.kind == "tramp" and s.left - sim.x < 380.0 and s.left - sim.x > 200.0), 120.0)
+				_: await _motion_flee()
+			await _clip("motion2_%s_%s" % [clip[0], speed[0]], clip[1], speed[1])
+
+
+func _motion_start(m: String, seed_value: int = 5) -> void:
+	await _start(seed_value, 1)
 	world.kitten_motion = m
 	sim.parade.set("_next_meet", INF)  # 다른 길고양이가 붙지 않게 (치즈 아기 한 마리만)
 

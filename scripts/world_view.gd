@@ -247,6 +247,10 @@ var _stray_view := CatView.new()
 var kitten_motion := "a"  # 권하는 쪽 (review/cat-parade/motion/README.md)
 var _kitten := KittenView.new()      # 줄의 치즈 아기
 var _kitten_run := KittenView.new()  # 도망가는 치즈 아기
+var _kitten_tramp := {}              # 아기가 지금 누르고 있는 트램펄린 (그물을 평평하게 그림)
+const NO_MAT := -1.0e6               # 기록 "mat" 없음 (기록 사이를 보간하므로 -INF 대신 유한한 값: -INF와 섞으면 NaN)
+const KITTEN_PRESS := 0.2           # 아기가 트램펄린을 누르는 깊이 = 주인공이 누른 깊이 x 이 값 (몸무게만큼)
+var _kpose_memo := {}                # 기록할 아기 공중 자세의 지금 자세·지난 시간 (KittenMotion.air_pose)
 var _kitten_dust := {}               # 줄 치즈 아기 착지 먼지 {"x", "y", "k"} (로직 좌표, 그릴 때만)
 var _runaways: Array[Dictionary] = []   # 놀라 도망가는 고양이 {"look", "x", "y", "t", "view"} (로직 좌표)
 var _parade_fx: Array[Dictionary] = []  # {"kind": "heart"/"alert", "x", "y", "t"} (로직 좌표)
@@ -613,9 +617,15 @@ func _place_cat(delta: float) -> void:
 	else:
 		cat.show_state(sim, delta)
 		# 따라오는 고양이가 재생할 기록: 발 높이 + 그림만 올린 높이(트램펄린·달리기 들썩임), 자세 (비틀거림은 주인공만)
-		sim.parade.record({"x": sim.x, "y": sim.y, "lift": _ground_y() - sim.y + FOOT_SINK - cat.position.y, "frame": cat.frame_name,
+		var rec := {"x": sim.x, "y": sim.y, "lift": _ground_y() - sim.y + FOOT_SINK - cat.position.y, "frame": cat.frame_name,
+				"kpose": KittenMotion.air_pose(_kpose_memo, cat.frame_name, sim.on_ground, sim.vy, delta,
+						sim.is_riding() or sim.time_since_bounce < sim.time_since_jump), "tlift": _cat_lift,
 				"ground": sim.on_ground, "since_land": sim.time_since_land, "since_jump": sim.time_since_jump,
-				"body": cat.scale / CatView.art_scale(), "rot": cat.rotation - deg_to_rad(CatView.stagger(sim.time_since_hit)), "spin": cat.spin()})
+				"body": cat.scale / CatView.art_scale(), "rot": cat.rotation - deg_to_rad(CatView.stagger(sim.time_since_hit)), "spin": cat.spin()}
+		var mat := _tramp_mat()
+		if mat != NO_MAT:
+			rec["mat"] = mat  # 트램펄린을 누르는 동안만 (없음과 높이를 섞어 보간하지 않게, Codex 리뷰)
+		sim.parade.record(rec)
 	_place_parade()
 
 
@@ -1054,6 +1064,8 @@ func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
 	if left > _view_size().x + 100.0 or left + Balance.TRAMP_WIDTH < -100.0:
 		return
 	var look := tramp_look(sim, tramp)
+	if is_same(tramp, _kitten_tramp):
+		look = {"frame": "rest", "sy": 1.0}  # 아기가 누르는 동안은 주인공 반동(불룩·출렁임)을 끝낸 평평한 그물 (motion2 12차 검토)
 	var tex: Texture2D = TRAMP_TEXTURES[look.frame]
 	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
 	var feet: float = ground - tramp.base + FOOT_SINK
@@ -1417,7 +1429,7 @@ func _parade_events() -> void:
 		_sfx.nya.pitch_scale = 0.95 + 0.25 * cat_info.quirk
 		_sfx.nya.play()
 		_runaways.append({"look": cat_info.look, "x": pose.x, "y": pose.y, "t": 0.0, "quirk": cat_info.quirk,
-				"new": _new_motion(cat_info.look), "mode": kitten_motion, "vx": sim.vx()})  # 도망 중에 방식을 바꿔도 그 방식 그대로
+				"new": _new_motion(cat_info.look), "mode": kitten_motion, "vx": sim.vx(), "lead0": sim.x})  # 도망 중에 방식을 바꿔도 그 방식 그대로
 	_runaways = _runaways.slice(-4)
 
 
@@ -1452,6 +1464,7 @@ func _place_parade() -> void:
 	var parade := sim.parade
 	_kitten.visible = false
 	_kitten_run.visible = false
+	_kitten_tramp = {}
 	_kitten_dust = {}
 	for i in _followers.size():
 		var view := _followers[i]
@@ -1537,7 +1550,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 			# 머리는 몸 가운데보다 보는 쪽으로 (몸을 돌리면 "!"·땀방울도 따라 옮김, 1차 검토)
 			var facing: float = signf(KittenMotion.runaway(r.t, r.vx).facing)
 			var head := runaway_at(r) + Vector2(KITTEN_HEAD_X * facing, -RUNAWAY_ALERT_Y)
-			if r.t < KittenMotion.STARTLE + KittenMotion.TURN + 0.35:
+			if r.t < KittenMotion.STARTLE + KittenMotion.STAND + KittenMotion.TURN + 0.35:
 				_parade_fx_draw("alert", head, r.t, 1.0)
 			_draw_sweat(head + Vector2(26.0 * facing, 24.0), r.t)
 			continue
@@ -1559,26 +1572,58 @@ func _place_kitten(pose: Dictionary, q: float) -> void:
 	var parade := sim.parade
 	var slope: float = (parade.sample(pose.x + 6.0).y - parade.sample(pose.x - 6.0).y) / 12.0
 	var st := KittenMotion.state(pose, slope)
-	var ground: bool = st.kind == "run"
+	var ground: bool = st.kind == "run"  # 기록이 땅 (아래에서 웅크림·오르는 길 자세로 바뀌어도)
+	var tlift: float = pose.get("tlift", 0.0)
+	var ahead := parade.sample(pose.x + sim.vx() * KittenMotion.PRE_CROUCH)
+	# 앞에서 주인공이 뛴 자리·트램펄린으로 뛰어오른 자리: 미리 웅크림
+	# (주인공 웅크림 0.03초는 아기에게 너무 짧아 안 보임 1차, 트램펄린 앞만 웅크림 없이 뜸 4차 검토)
+	if ground and not pose.has("kind") and (KittenMotion.jumps_soon(ahead) or (tlift <= 2.0 and ahead.get("tlift", 0.0) > 2.0)):
+		st.kind = "crouch"
+	if ground and not pose.has("kind") and tlift > 2.0:
+		# 트램펄린 오르는 길: 땅이지만 몸이 떠 있어 달리기 그림이면 공중을 달림 (3차 검토) → 오를 때·내릴 때 자세
+		st.kind = "rise" if parade.sample(pose.x + 6.0).get("tlift", 0.0) >= tlift else "fall"
 	var stride := KittenMotion.a_stride() if kitten_motion == "a" else KittenMotion.b_stride()
-	_kitten.position = _screen_at(pose.x, pose.y, 0.0 if ground or pose.has("kind") else pose.get("lift", 0.0))
+	# 트램펄린 들어 올림(오르는 길·매트 위)은 기록 그대로 (예전엔 땅 위에서 버려 매트 밑을 지나감, motion2 1차 검토).
+	# 주인공 달리기 들썩임은 빼고 ("lift"에는 들어 있어 땅 위에서 몸이 4px 떴다 내려옴, 2차 검토).
+	# 그물은 주인공 무게로만 눌려 그려지므로 아기는 주인공이 누른 깊이를 KITTEN_PRESS배로만 따라 내려감
+	# (그대로 따라가면 그물 밑으로 꺼짐 2차, 매트 높이로 붙잡으면 멈췄다 툭 떨어짐 4차 검토)
+	var lift: float = 0.0 if pose.has("kind") else pose.get("tlift", 0.0)
+	var mat: float = pose.get("mat", NO_MAT)
+	if not pose.has("kind") and pose.y + lift < mat:
+		lift = mat - KITTEN_PRESS * (mat - pose.y - lift) - pose.y
+		for s in sim.structures:
+			if s.kind == "tramp" and pose.x >= s.left - 20.0 and pose.x <= s.right + 20.0:
+				_kitten_tramp = s
+	_kitten.position = _screen_at(pose.x, pose.y, lift)
 	_kitten.position.y = soft_top(_kitten.position.y, KITTEN_TOP)
 	_kitten.show_motion(kitten_motion, {"kind": st.kind, "dist": pose.x, "tilt": st.tilt, "land_k": st.land_k,
-			"squash": KittenMotion.squash(st.land_k, fposmod(pose.x / stride, 1.0), q) if ground else 1.0})
+			"squash": KittenMotion.squash(st.land_k, fposmod(pose.x / stride, 1.0), q) if st.kind == "run" else 1.0,
+			"widen": KittenMotion.widen(st.land_k) if st.kind == "run" else 1.0})
 	_kitten.visible = true
 	var since: float = pose.get("since_land", 9.0)
 	if ground and since < KittenMotion.DUST_TIME:
 		_kitten_dust = {"x": pose.x - since * sim.vx(), "y": pose.y, "k": since / KittenMotion.DUST_TIME}
 
 
+## 주인공이 트램펄린을 누르는 중·튕긴 직후면 그 트램펄린 매트(눌리지 않은) 높이, 아니면 NO_MAT (아기 높이 맞춤용)
+func _tramp_mat() -> float:
+	var line: Dictionary = sim.line_touch_eta(0.0).get("line", {}) if sim.is_riding() else {}
+	if line.is_empty() and sim.bounced_line.get("kind", "") == "tramp" and sim.time_since_bounce < sim.time_since_land \
+			and sim.time_since_bounce < Balance.TRAMP_PUSH + TRAMP_RELEASE:
+		line = sim.bounced_line
+	return line.base + tramp_height(TRAMP_SRC_NET.rest, 1.0) if line.get("kind", "") == "tramp" else NO_MAT
+
+
 ## 도망가는 치즈 아기: 멈칫(놀란 얼굴) → 몸 돌림 → 뒤로 달림 (달린 거리로 다리를 움직여 바닥을 디딤)
 func _place_kitten_runaway(r: Dictionary) -> void:
 	var run := KittenMotion.runaway(r.t, r.vx)
 	_kitten_run.position = runaway_at(r)
-	var x: float = r.x + run.dx
+	var x := _runaway_x(r, run)  # 그림 자리와 같은 x (예전엔 끼익 거리를 줄이기 전 x로 발밑을 봐 틈 위로 착각, 9차 검토)
 	var under := CatShadow.under(sim.roofs, x, r.y)
 	var falling: bool = not under.is_empty() and KittenMotion.runaway_y(r.y, under.top, r.t) > under.top + 1.0
 	var kind: String = "fall" if falling else (run.kind if run.kind in ["run", "crouch"] else "startle")
+	if kind == "startle" and run.lift > 2.0 and r.mode == "a":
+		kind = "flail"  # 깜짝 펄쩍: 놀란 얼굴·다리 벌림 (선 그림으로 뜨면 떠 보임, 3차 검토)
 	_kitten_run.show_motion(r.mode, {"kind": kind, "dist": run.back, "facing": run.facing, "surprised": true,
 			"tilt": KittenMotion.FLEE_LEAN if kind == "run" else 0.0})
 	_kitten_run.visible = true
@@ -1641,10 +1686,16 @@ static func soft_top(y: float, top: float) -> float:
 
 
 ## 도망가는 아기 발끝 화면 자리 (HUD 아래로 제한)
+## 새 움직임 도망 아기의 세계 x: 끼익 미끄러진 거리는 주인공이 그동안 간 거리를 넘지 않게
+## (부딪힌 주인공이 느려지면 화면에서 앞으로 튐, motion2 8차 검토)
+func _runaway_x(r: Dictionary, run: Dictionary) -> float:
+	return r.x + minf(run.dx + run.back, sim.x - r.get("lead0", -INF)) - run.back
+
+
 func runaway_at(r: Dictionary) -> Vector2:
 	if r.new:
 		var run := KittenMotion.runaway(r.t, r.vx)
-		var x: float = r.x + run.dx
+		var x := _runaway_x(r, run)
 		var under := CatShadow.under(sim.roofs, x, r.y)
 		# shortcut: 틈 위면 높이 그대로 달림 (화면 밖까지 0.5초 남짓), 줄이 길어 틈을 자주 지나면 그때 떨어지게
 		return _screen_at(x, KittenMotion.runaway_y(r.y, under.top if not under.is_empty() else r.y, r.t), run.lift)

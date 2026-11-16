@@ -180,7 +180,7 @@ func sample(at: float) -> Dictionary:
 		for key in a:
 			if key in ["spin", "rot"]:
 				out[key] = lerp_angle(a[key], b[key], k)
-			elif a[key] is float or a[key] is Vector2:
+			elif (a[key] is float or a[key] is Vector2) and b.has(key):  # 한쪽에만 있는 값(트램펄린 "mat")은 앞 기록 그대로
 				out[key] = lerp(a[key], b[key], k)
 		return out
 	return trail[0].duplicate()

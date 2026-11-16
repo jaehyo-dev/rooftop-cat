@@ -6,12 +6,16 @@ extends Node2D
 
 const A_DIR := "res://assets/sprites/kitten_motion/cheese_a/"
 const B_DIR := "res://assets/sprites/kitten_motion/cheese_b/"
-const A_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5", "run_6", "run_7",
-		"crouch", "takeoff", "rise", "fall", "land", "startle"]
+## 달리기 32장(motion2, 장 수는 KittenMotionData.A_ADVANCE) + 땅·공중 자세. _b = 그 자세의 다음 순간 (KittenMotion.air_pose가 번갈아 씀)
+const A_POSES := ["crouch", "crouch_b", "takeoff", "takeoff_b", "rise", "rise_b", "apex", "apex_b", "fall", "fall_b",
+		"flip_tuck", "flip_curl", "flip_ball", "flip_ball_b", "flip_open", "flail", "flail_b", "land", "startle"]
+## B 조각 인형에는 공중 자세가 셋뿐이라 가까운 것으로
+const B_AIR_OF := {"apex": "rise", "flip_tuck": "takeoff", "flip_curl": "fall", "flip_ball": "fall", "flip_open": "rise", "flail": "fall"}
 const B_PARTS := ["hind_far", "front_far", "tail", "hind_near", "front_near", "head", "torso"]  # 그리는 순서 (뒤 → 앞). 가까운 다리도 몸통 뒤라 둥근 윗부분(관절 이음매)이 가려지고, 머리도 몸통 뒤라 몸통의 목걸이가 보임 (2차 검토)
 const CENTER := 48.0     # 기울기 축: 발끝에서 이만큼 위 (게임 픽셀)
 const TAIL_SWAY := 0.12  # 달릴 때 꼬리 흔들림 (라디안)
 const CROUCH_DROP := 10.0 # 웅크림: 몸을 이만큼 낮춤 (부품 픽셀)
+const LAND_FRAME := 0.25  # 착지 눌림이 이만큼 풀릴 때까지 착지 그림 (0.6 = 0.12초는 네 발 디딘 채 미끄러짐, motion2 3차 검토)
 const TORSO_ROCK := 0.035 # 달릴 때 몸통 앞뒤 흔들림 (걸음마다 두 번, 라디안. 2차 검토: 몸통이 딱딱함)
 
 var mode := ""           # "a" / "b"
@@ -20,6 +24,7 @@ var _spin := Node2D.new()
 var _art := Node2D.new()
 var _a := Sprite2D.new()
 var _a_tex := {}
+var _land_fix := 1.0     # 달리기 키 / 착지 그림 키: 착지 동안 키를 서서히 달리기 키로 (바꾸는 순간 툭 커지지 않게, motion2 검토)
 var _b := {}             # 부품 이름 → Sprite2D
 var _head_tex := {}
 
@@ -28,8 +33,9 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	add_child(_spin)
 	_spin.add_child(_art)
-	for f in A_FRAMES:
+	for f in a_frames():
 		_a_tex[f] = load(A_DIR + f + ".png")
+	_land_fix = _height("run_0") / _height("land")
 	_a.centered = false
 	_a.offset = -Vector2(KittenMotionData.A_ANCHOR[0], KittenMotionData.A_ANCHOR[1])
 	_art.add_child(_a)
@@ -47,6 +53,13 @@ func _ready() -> void:
 	_head_tex = {false: _b.head.texture, true: load(B_DIR + "head_surprised.png")}
 
 
+static func a_frames() -> Array:
+	var out := []
+	for k in KittenMotionData.A_ADVANCE.size():
+		out.append("run_%d" % k)
+	return out + A_POSES
+
+
 ## p: {"kind": run/land/crouch/takeoff/rise/fall/startle, "dist"(아기가 달린 거리), "tilt", "land_k", "squash", "facing"(1 = 오른쪽), "surprised"}
 func show_motion(m: String, p: Dictionary) -> void:
 	mode = m
@@ -54,8 +67,8 @@ func show_motion(m: String, p: Dictionary) -> void:
 	for part in _b:
 		_b[part].visible = m == "b"
 	var k := KittenMotion.px() if m == "a" else KittenMotion.b_scale()
-	var stretch: Vector2 = KittenMotion.AIR_STRETCH.get(p.kind, Vector2.ONE)
-	scale = Vector2(p.get("facing", 1.0) * k * stretch.x, k * p.get("squash", 1.0) * stretch.y)
+	var stretch: Vector2 = KittenMotion.AIR_STRETCH.get(p.kind.trim_suffix("_b"), Vector2.ONE)
+	scale = Vector2(p.get("facing", 1.0) * k * stretch.x * p.get("widen", 1.0), k * p.get("squash", 1.0) * stretch.y)
 	_spin.position = Vector2(0.0, -CENTER / k)
 	_art.position = Vector2(0.0, CENTER / k)
 	_spin.rotation = p.get("tilt", 0.0)
@@ -69,10 +82,21 @@ static func torso_center() -> Vector2:
 	return Vector2(KittenMotionData.B_SIZE.torso[0], KittenMotionData.B_SIZE.torso[1]) * 0.5
 
 
+func _height(frame: String) -> float:
+	var img: Image = _a_tex[frame].get_image()
+	if img.is_compressed():
+		img.decompress()
+	return float(img.get_used_rect().size.y)
+
+
 func _show_a(p: Dictionary) -> void:
 	var kind: String = p.kind
+	_a.scale = Vector2.ONE
 	if kind == "run":
-		kind = "land" if p.get("land_k", 1.0) < 0.6 else "run_%d" % KittenMotion.a_frame(p.dist)
+		var land_k: float = p.get("land_k", 1.0)
+		kind = "land" if land_k < LAND_FRAME else "run_%d" % KittenMotion.a_frame(p.dist)
+		if land_k < LAND_FRAME:
+			_a.scale.y = lerpf(1.0, _land_fix, land_k / LAND_FRAME)  # 발끝 축 (스프라이트 원점 = 발끝)
 	elif kind == "stand":
 		kind = "land"  # A에는 그냥 선 그림이 따로 없어 네 발로 선 착지 그림
 	frame_name = kind
@@ -80,7 +104,8 @@ func _show_a(p: Dictionary) -> void:
 
 
 func _show_b(p: Dictionary) -> void:
-	var kind: String = p.kind
+	var kind: String = p.kind.trim_suffix("_b")
+	kind = B_AIR_OF.get(kind, kind)
 	var pose: Dictionary
 	if kind == "run":
 		pose = KittenMotion.b_run(p.dist)
