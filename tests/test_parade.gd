@@ -248,8 +248,9 @@ func test_새_길고양이는_줄에_없는_품종() -> void:
 		assert_false(sim.parade.strays[0].look in looks, "줄에 없는 아이 (시드 %d)" % seed_value)
 
 
-## 아기 고양이 그림 (tools/cut_kittens.py): 품종마다 모든 자세·꼬리·얼굴이 있고 캔버스 크기가 같다 (기준점이 같아 바꿔도 안 떨림)
-func test_아기_고양이_그림이_품종마다_다_있다() -> void:
+## 기다리는 길고양이 그림 (tools/cut_kittens.py): 품종마다 기다리기 몸·꼬리·얼굴이 있고 캔버스 크기가 같다.
+## 줄·도망 아기 그림은 tests/test_kitten_motion.gd
+func test_기다리는_아기_그림이_품종마다_다_있다() -> void:
 	for look in CatParade.LOOKS:
 		var names: Array = CatView.KITTEN_FRAMES.duplicate()
 		for i in CatView.KITTEN_TAILS:
@@ -260,27 +261,56 @@ func test_아기_고양이_그림이_품종마다_다_있다() -> void:
 			if ResourceLoader.exists(path):
 				assert_eq(load(path).get_size(), Vector2(256, 240), path)
 		assert_true(ResourceLoader.exists(CatView.KITTEN_DIR + look + "/face.png"), look + " 얼굴")
-	for frame in CatPose.ALL_FRAMES:
-		if not frame.begins_with("sit"):
-			assert_true(frame in CatView.KITTEN_FRAMES, "주인공 자세 %s를 아기도 따라 함" % frame)
-
-
-func test_아기마다_통통_튀는_박자가_달라_머리_높이가_한_줄이_아니다() -> void:
-	for step in 20:
-		var t := step * 0.137
-		var hops: Array[float] = []
-		for i in Balance.PARADE_MAX:
-			hops.append(WORLD.kitten_hop(i, 0.5, t))
-		assert_true(hops.max() - hops.min() > 2.0, "t=%.2f 높이 %s" % [t, hops])
-
-
-func test_도망가는_아기는_놀람_도망_달리기_순서() -> void:
-	assert_eq(WORLD.runaway_frame(0.0), "scared")
-	assert_eq(WORLD.runaway_frame(WORLD.RUNAWAY_STAY * 0.8), "flee")
-	assert_true(WORLD.runaway_frame(WORLD.RUNAWAY_STAY + 0.1).begins_with("run"))
 
 
 func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
 	assert_eq(WORLD.soft_top(400.0, WORLD.KITTEN_TOP), 400.0, "하한 아래는 그대로")
 	assert_true(WORLD.soft_top(0.0, WORLD.KITTEN_TOP) > WORLD.soft_top(-100.0, WORLD.KITTEN_TOP), "더 높으면 조금 더 위 (멈추지 않음)")
 	assert_true(WORLD.soft_top(-300.0, WORLD.KITTEN_TOP) > 150.0, "아주 높아도 HUD 아래")
+
+
+## 6마리 줄 (새 움직임): 모두 그려지고, 뒤 아기가 앞 아기 위(오리 새끼 줄), 주인공은 맨 위, 품종이 줄 순서대로
+func test_6마리_줄은_뒤_아기가_위에_그려진다() -> void:
+	var main: Control = load("res://scenes/main.tscn").instantiate()
+	main.show_start = false
+	add_child(main)
+	var world: Node2D = main.get_node("World")
+	world.sim.parade.fill(Balance.PARADE_MAX)
+	await wait_frames(40)
+	var last := -1
+	for i in Balance.PARADE_MAX:
+		var view: KittenView = world.get_node("Kitten%d" % i)
+		assert_true(view.visible, "아기 %d 보임" % i)
+		assert_eq(view.breed, world.sim.parade.cats[i].look, "자리 %d 품종" % i)
+		assert_true(view.get_index() > last, "아기 %d가 앞 아기보다 위" % i)
+		last = view.get_index()
+	assert_true(world.cat.get_index() > last, "주인공이 아기들 위")
+	main.queue_free()
+
+
+## 만난 아기는 줄이 지나갈 때까지 서서 기다렸다가 줄 맨 뒤 자리가 오면 붙는다 (줄 앞에 끼어들지 않음)
+func test_만난_아기는_줄_맨_뒤가_올_때까지_기다린다() -> void:
+	var parade := CatParade.new(1)
+	for i in 3000:
+		parade.record({"x": i * 4.0, "y": 100.0, "ground": true})
+	parade.fill(3)
+	var cat := {"look": "cow", "quirk": 0.5, "from": Vector2(3000.0, 100.0), "t": 0.0, "wait": true}  # update()가 만날 때 만드는 모양
+	parade.cats.append(cat)
+	var sim := RunnerSim.new(1, 600.0, false)
+	sim.x = 3000.0
+	var waited := false
+	for i in 600:
+		sim.x += 600.0 * DT
+		cat.t += DT
+		parade._join_step(cat, 3, sim)
+		var pose := parade.follower(3, sim.x)
+		if cat.get("wait", false):
+			waited = true
+			assert_eq(pose.x, cat.from.x, "만난 자리에 서 있음")
+			assert_eq(pose.kind, "stand")
+			assert_true(CatParade.slot_x(3, sim.x) < cat.from.x, "줄 맨 뒤 자리가 아직 안 옴")
+		elif not cat.get("joined", false):
+			assert_true(pose.x < CatParade.slot_x(2, sim.x), "붙는 동안 앞 아기 자리를 앞지르지 않음")
+	assert_true(waited, "먼저 서서 기다림")
+	assert_true(cat.get("joined", false), "줄 맨 뒤에 붙음")
+	assert_eq(parade.follower(3, sim.x).x, CatParade.slot_x(3, sim.x))

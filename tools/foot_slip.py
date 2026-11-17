@@ -1,10 +1,10 @@
 """발 미끄러짐 재기 (cat-parade 아기 움직임 1단계): 프레임 그림 달리기를 60장/초로 돌리며
 바닥을 디딘 발의 세계 x가 디디는 동안 얼마나 움직이는지 잰다. 아기 A와 주인공을 같은 방법으로 (tools/test_kitten_motion.py).
-사용: python3 tools/foot_slip.py  → 속도별 A·주인공 최대 미끄러짐 (게임 픽셀)
+사용: python3 tools/foot_slip.py [품종]  → 속도별 아기·주인공 최대 미끄러짐 (게임 픽셀)
 - 장마다 디딘 발 = cut_kitten_motion.contacts (바닥선 위 2줄 안 불투명 덩어리).
 - 같은 장이 이어지는 동안은 같은 발(그림 안 순서). 장이 바뀌면 (건너뛴 장도 차례로 지나며) 직전 세계 자리에서 MATCH 픽셀 안의
   디딘 발을 가장 가까운 짝부터 같은 발로, 짝이 없으면 들린 것 (그래서 한 장 안에서 크게 밀리는 발도 끝까지 잰다).
-- 아기 A는 게임이 쓰는 KittenMotionData.A_ADVANCE(scripts/logic/kitten_motion_data.gd)로 장을 고른다 (KittenMotion.a_frame과 같음).
+- 아기는 게임이 쓰는 KittenMotionData.ADVANCE[품종](scripts/logic/kitten_motion_data.gd)으로 장을 고른다 (KittenMotion.a_frame과 같음).
 - 미끄러짐 = 한 발이 디딘 동안 (세계 x 최대 - 최소).
 """
 import re
@@ -43,8 +43,12 @@ def hero_frames() -> list:
     return out
 
 
-def kitten_a_frames(folder: Path = ROOT / "assets/sprites/kitten_motion/cheese_a") -> list:
-    return [[(x - ckm.ANCHOR_X) * KITTEN_PX for x in ckm.contacts(Image.open(folder / f"run_{i}.png"))] for i in range(len(a_advance()))]
+BREEDS = ("cheese", "mackerel", "tuxedo", "calico", "cow", "gray")  # CatParade.LOOKS
+
+
+def kitten_a_frames(breed: str = "cheese") -> list:
+    folder = ROOT / "assets/sprites/kitten_motion" / breed
+    return [[(x - ckm.ANCHOR_X) * KITTEN_PX for x in ckm.contacts(Image.open(folder / f"run_{i}.png"))] for i in range(len(a_advance(breed)))]
 
 
 def _runs(band) -> list:
@@ -53,10 +57,11 @@ def _runs(band) -> list:
     return [float((labels == i).nonzero()[0].mean()) for i in range(1, n + 1)]
 
 
-def a_advance() -> list:
-    """게임이 쓰는 A 장마다 거리 (캔버스 픽셀)."""
+def a_advance(breed: str = "cheese") -> list:
+    """게임이 쓰는 장마다 거리 (캔버스 픽셀, 장 수만큼)."""
     text = (ROOT / "scripts/logic/kitten_motion_data.gd").read_text()
-    return [float(v) for v in re.search(r"const A_ADVANCE := \[([^\]]*)\]", text).group(1).split(",")]
+    n = int(re.search(r"const RUN_FRAMES := (\d+)", text).group(1))
+    return [float(re.search(rf'"{breed}": ([\d.]+)', text.split("const ADVANCE", 1)[1]).group(1))] * n
 
 
 def frame_at(dist: float, advance: list, inside: bool = False):
@@ -121,12 +126,12 @@ def slip(frames: list, stride: float, speed: float, seconds: float = 3.0, advanc
     return worst
 
 
-def report() -> dict:
-    a = kitten_a_frames()
-    adv = [x * KITTEN_PX for x in a_advance()]
+def report(breed: str = "cheese") -> dict:
+    a = kitten_a_frames(breed)
+    adv = [x * KITTEN_PX for x in a_advance(breed)]
     return {"A": {v: round(slip(a, sum(adv), v, advance=adv), 1) for v in SPEEDS}, "A_stride": round(sum(adv), 1),
             "hero": {v: round(slip(hero_frames(), HERO_STRIDE, v), 1) for v in SPEEDS}, "hero_stride": HERO_STRIDE}
 
 
 if __name__ == "__main__":
-    print(report())
+    print(report(sys.argv[1] if len(sys.argv) > 1 else "cheese"))

@@ -640,7 +640,7 @@ func _build_parade_dev() -> void:
 	dev.name = "ParadeDev"
 	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	dev.offset_left = 16
-	dev.offset_top = -232
+	dev.offset_top = -184
 	dev.offset_right = 248
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
@@ -649,13 +649,7 @@ func _build_parade_dev() -> void:
 	summon.pressed.connect(func() -> void: _world.sim.parade.call_now())
 	var fill := UiKit.button("줄 6마리로 시작", "cream", null, UiKit.FONT_MIN)
 	fill.pressed.connect(func() -> void: _world.sim.parade.fill(Balance.PARADE_MAX))
-	# 아기 움직임 비교 (1단계): 치즈 아기 움직임을 A → B → 예전으로 돌려 봄
-	var motion := UiKit.button("치즈 아기 움직임: A", "cream", null, UiKit.FONT_MIN)
-	motion.pressed.connect(func() -> void:
-		var order := ["a", "b", "old"]
-		_world.kitten_motion = order[(order.find(_world.kitten_motion) + 1) % order.size()]
-		motion.text = "치즈 아기 움직임: " + ("예전" if _world.kitten_motion == "old" else _world.kitten_motion.to_upper()))
-	for b: Control in [summon, fill, motion]:
+	for b: Control in [summon, fill]:
 		b.custom_minimum_size = Vector2(232, 44)
 		dev.add_child(b)
 	dev.visible = false

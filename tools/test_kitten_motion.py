@@ -1,7 +1,7 @@
 """아기 움직임 A (motion2): 프레임 그림 달리기의 발 미끄러짐·바닥 붙음·머리 흔들림 (그림을 재므로 파이썬).
 - 발 미끄러짐: tools/foot_slip.py (아기 A와 주인공을 같은 방법으로). 요구: 예전 A(22~28px)보다 줄이기 → A_MAX.
 - 머리: 장마다 머리 자리를 run_0에 맞춰 잼. 가로는 그대로, 세로는 장 사이 HEAD_STEP 안, 전체 HEAD_RANGE 안 (걸음 박자의 작은 오르내림 하나).
-B 조각 인형은 tests/test_kitten_motion.gd."""
+6마리 모두 (아기마다 subTest). 바닥 붙음·장 넘김·도망 그림은 tests/test_kitten_motion.gd."""
 import importlib.util
 import unittest
 
@@ -35,15 +35,18 @@ def _head_shift(img, ref, box) -> tuple:
 
 @unittest.skipUnless(HAS_LIBS, "numpy, scipy, Pillow 필요")
 class FootSlip(unittest.TestCase):
-    def test_A는_예전보다_덜_미끄러진다(self):
-        r = fs.report()
-        for v in fs.SPEEDS:
-            self.assertLessEqual(r["A"][v], A_MAX, f"속도 {v}: A {r['A'][v]}px")
-            self.assertLessEqual(r["A"][v], r["hero"][v] * 0.25, f"속도 {v}: A {r['A'][v]} / 주인공 {r['hero'][v]}")
+    def test_아기마다_디딘_발이_덜_미끄러진다(self):
+        for b in fs.BREEDS:
+            with self.subTest(b):
+                r = fs.report(b)
+                for v in fs.SPEEDS:
+                    self.assertLessEqual(r["A"][v], A_MAX, f"{b} 속도 {v}: {r['A'][v]}px")
+                    self.assertLessEqual(r["A"][v], r["hero"][v] * 0.25, f"{b} 속도 {v}: {r['A'][v]} / 주인공 {r['hero'][v]}")
 
     def test_달리는_동안_늘_한_발_이상_디딤(self):
-        for i, feet in enumerate(fs.kitten_a_frames()):
-            self.assertGreaterEqual(len(feet), 1, f"run_{i}")
+        for b in fs.BREEDS:
+            for i, feet in enumerate(fs.kitten_a_frames(b)):
+                self.assertGreaterEqual(len(feet), 1, f"{b} run_{i}")
 
     def test_한_장_안에서_밀리는_발도_잰다(self):
         # 한 장뿐인 그림을 빠르게 돌리면 발이 몸과 같이 계속 밀린다 (예전 검사는 새 발로 봐 0이었음, Codex 리뷰)
@@ -68,8 +71,13 @@ class FootSlip(unittest.TestCase):
 @unittest.skipUnless(HAS_LIBS, "numpy, scipy, Pillow 필요")
 class Head(unittest.TestCase):
     def test_달릴_때_머리는_몸과_같이_작게_오르내린다(self):
-        folder = fs.ROOT / "assets/sprites/kitten_motion/cheese_a"
-        n = len(fs.a_advance())
+        for b in fs.BREEDS:
+            with self.subTest(b):
+                self._head(b)
+
+    def _head(self, b):
+        folder = fs.ROOT / "assets/sprites/kitten_motion" / b
+        n = len(fs.a_advance(b))
         frames = [Image.open(folder / f"run_{i}.png").convert("RGBA") for i in range(n)]
         m = ckm.opaque(frames[0])
         rows = np.nonzero(m.any(axis=1))[0]
@@ -77,11 +85,11 @@ class Head(unittest.TestCase):
         ys = []
         for i, f in enumerate(frames):
             dx, dy = _head_shift(f, frames[0], box)
-            self.assertEqual(dx, 0, f"run_{i} 머리 가로")
+            self.assertEqual(dx, 0, f"{b} run_{i} 머리 가로")
             ys.append(dy)
         for i in range(n):
-            self.assertLessEqual(abs(ys[i] - ys[i - 1]), HEAD_STEP, f"run_{i - 1} → run_{i} 머리 {ys}")
-        self.assertLessEqual(max(ys) - min(ys), HEAD_RANGE, f"머리 {ys}")
+            self.assertLessEqual(abs(ys[i] - ys[i - 1]), HEAD_STEP, f"{b} run_{i - 1} → run_{i} 머리 {ys}")
+        self.assertLessEqual(max(ys) - min(ys), HEAD_RANGE, f"{b} 머리 {ys}")
         self.assertGreater(max(ys) - min(ys), 0, "걸음 박자에 맞춘 오르내림이 있음")
 
 

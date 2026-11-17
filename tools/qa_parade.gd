@@ -23,12 +23,8 @@ func run(q: Node, mode: String) -> void:
 	if mode == "parade_flip":  # 공중제비만 다시 찍기
 		await _flip()
 		return
-	if mode == "parade_motion":  # 아기 움직임 A·B 비교 (review/cat-parade/motion): 치즈 아기 한 마리
-		for m in ["a", "b"]:
-			await _motion(m)
-		return
-	if mode == "parade_motion2":  # 치즈 아기 A 움직임 고침 (review/cat-parade/motion2): 평지·틈·트램펄린·도망
-		await _motion2()
+	if mode.begins_with("parade_final"):  # 6마리 움직임 마무리 영상 (review/cat-parade/final). parade_final-flat-meet = 그 장면만
+		await _final(mode.split("-").slice(1))
 		return
 	if mode == "parade_hit":  # 부딪힘만 다시 찍기
 		await _hit("hit_a")
@@ -52,6 +48,9 @@ func _start(seed_value: int, cats: int) -> void:
 	main = qa.main
 	world = main.get_node("World")
 	main.begin_run()
+	var dev: Node = main.get_node_or_null("ParadeDev")
+	if dev:
+		dev.visible = false  # 로컬 시험 단추가 줄 맨 뒤 아기를 가리지 않게
 	await qa._wait(0.2)
 	world.set_process(false)
 	main.set_process(false)
@@ -192,7 +191,7 @@ func _bare() -> void:
 	await _run_flat()
 	await _still("bare_with")
 	for i in Balance.PARADE_MAX:
-		world.get_node("Parade%d" % i).visible = false
+		world.get_node("Kitten%d" % i).visible = false
 	world.queue_redraw()
 	await qa._wait(0.1)
 	await _still("bare")
@@ -235,59 +234,45 @@ func _result() -> void:
 	await qa._shot("result6")
 
 
-## 아기 움직임 비교: 평지·틈 점프·착지·도망을 실제 속도(4 step마다 = 30장/초)와 4배 느리게(2 step마다, 15장/초로 묶음), 만남은 실제 속도만
-## 프레임 이름: motion_<a|b>_<장면>_<real|slow>_f000…
-func _motion(m: String) -> void:
-	for clip in [["flat", 2.0], ["gap", 2.6], ["flee", 1.8]]:
+## 6마리 줄 영상: 평지·틈·더블점프·트램펄린·질주·부딪혀 맨 뒤 도망·만남을 실제 속도(4 step마다 = 30장/초)와
+## 4배 느리게(2 step마다, 15장/초로 묶음). 프레임 이름: final_<장면>_<real|slow>_f000…
+func _final(only: Array) -> void:
+	for clip in [["flat", 1.2], ["gap", 2.6], ["flip", 1.6], ["tramp", 3.2], ["dash", 3.0], ["flee", 2.4], ["meet", 3.6]]:
+		if not only.is_empty() and clip[0] not in only:
+			continue
 		for speed in [["real", 4], ["slow", 2]]:
-			await _motion_start(m)
+			await _start({"tramp": 12, "meet": 3}.get(clip[0], 5), 5 if clip[0] == "meet" else 6)
+			sim.parade.set("_next_meet", INF)  # 장면 밖 길고양이가 붙지 않게
 			match clip[0]:
-				"flat": await _motion_flat()
+				"flat":
+					await _run_flat(1000.0)
+					_manual = func() -> bool: return false  # 뛰지 않고 평지만
 				"gap": await _motion_gap()
-				_: await _motion_flee()
-			await _clip("motion_%s_%s_%s" % [m, clip[0], speed[0]], clip[1], speed[1])
-	await _motion_start(m)
-	await _run_until(func() -> bool: return sim.elapsed > 3.0 and sim.on_ground)
-	sim.parade.cats.clear()
-	await _run_until(func() -> bool: return _plain())
-	sim.parade.call_now()
-	await _run_until(func() -> bool: return not sim.parade.strays.is_empty() and sim.parade.strays[0].x - sim.x < 700.0)
-	sim.parade.strays[0].look = "cheese"
-	await _clip("motion_%s_meet_real" % m, 2.4, 4)
-
-
-func _motion2() -> void:
-	for clip in [["flat", 2.0], ["gap", 2.6], ["tramp", 3.2], ["flee", 1.8]]:
-		for speed in [["real", 4], ["slow", 2]]:
-			await _motion_start("a", 12 if clip[0] == "tramp" else 5)
-			match clip[0]:
-				"flat": await _motion_flat()
-				"gap": await _motion_gap()
+				"flip":
+					await _run_flat(1000.0)
+					var t0 := sim.elapsed
+					_manual = func() -> bool:
+						var t := sim.elapsed - t0
+						return t < 0.12 or (t > 0.4 and t < 0.55)
 				"tramp": await _run_until(func() -> bool:
 					return sim.elapsed > 5.0 and _plain() and sim.structures.any(func(s: Dictionary) -> bool: return s.kind == "tramp" and s.left - sim.x < 380.0 and s.left - sim.x > 200.0), 120.0)
-				_: await _motion_flee()
-			await _clip("motion2_%s_%s" % [clip[0], speed[0]], clip[1], speed[1])
-
-
-func _motion_start(m: String, seed_value: int = 5) -> void:
-	await _start(seed_value, 1)
-	world.kitten_motion = m
-	sim.parade.set("_next_meet", INF)  # 다른 길고양이가 붙지 않게 (치즈 아기 한 마리만)
+				"dash":
+					await _run_flat(900.0)
+					sim.items.append({"kind": "dash", "x": sim.x + 40.0, "y": sim.y + 40.0})
+				"flee": await _motion_flee()
+				_:
+					await _run_until(func() -> bool: return sim.elapsed > 3.0)
+					sim.parade.call_now()
+					await _run_until(func() -> bool: return not sim.parade.strays.is_empty() and sim.parade.strays[0].x - sim.x < 760.0)
+			if sim.game_over:
+				push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])  # 콘솔 오류로 남아 qa_web이 실패
+			await _clip("final_%s_%s" % [clip[0], speed[0]], clip[1], speed[1])
+			_manual = Callable()
 
 
 ## 장면 조건 공통: 주인공이 투명화·무적·질주가 아님 (흐리거나 번쩍이지 않게)
 func _plain() -> bool:
 	return sim.ghost_time <= 0.0 and sim.invuln_time <= 0.0 and not sim.dashing
-
-
-## 주인공과 아기가 같은 긴 옥상 땅 위, 앞에 장애물 없음
-func _motion_flat() -> void:
-	await _run_until(func() -> bool:
-		var here := sim.roof_at(sim.x)
-		var back := CatParade.slot_x(0, sim.x) - 80.0
-		return sim.elapsed > 5.0 and sim.on_ground and _plain() and not here.is_empty() and here.left < back and here.right - sim.x > 900.0 \
-				and sim.obstacles.all(func(o: Dictionary) -> bool: return o.x > sim.x + 900.0 or o.x + o.w < back - 100.0) \
-				and absf(sim.parade.follower(0, sim.x).y - sim.y) < 1.0, 120.0)
 
 
 ## 틈 앞 (_gap과 같은 조건)
@@ -304,11 +289,8 @@ func _motion_gap() -> void:
 				and not next.get("platform", false) and sim.obstacles.all(func(o: Dictionary) -> bool: return o.x > here.right or o.x + o.w < sim.x - 700.0))
 
 
-## 부딪힘 직전: 앞 옥상이 길 때 바로 앞에 화분 (아기가 놀라 도망)
+## 부딪힘 직전: 줄이 다 땅 위인 긴 옥상에서 바로 앞에 화분, 누르지 않아 그대로 부딪힘 (맨 뒤 아기가 놀라 도망)
 func _motion_flee() -> void:
-	await _run_until(func() -> bool:
-		var flights: Array[Dictionary] = sim.road.flights
-		var here := sim.roof_at(sim.x)
-		return sim.elapsed > 5.0 and sim.on_ground and _plain() and not here.is_empty() and here.right - sim.x > 700.0 and here.left < CatParade.slot_x(0, sim.x) - 300.0 \
-				and (_next >= flights.size() or flights[_next].press_x - sim.x > 700.0), 120.0)
+	await _run_flat(700.0)
 	sim.obstacles.append({"id": 991, "kind": "pot", "x": sim.x + 200.0, "w": 60.0, "y0": sim.y, "y1": sim.y + 70.0, "base": sim.y})
+	_manual = func() -> bool: return false

@@ -1,28 +1,27 @@
-"""아기 움직임 비교(cat-parade 1단계): 치즈 아기 A 프레임 시트·B 조각 시트를 게임 그림으로 자르고 재는 도구.
+"""아기 움직임(방식 A, motion2): 아기마다 Codex 시트를 게임 그림으로 자르고 재는 도구. 결과는 assets/sprites/kitten_motion/<품종>/.
 
-사용: python3 tools/cut_kitten_motion.py a2 <예전 달리기 폴더> <공중 시트> <A 폴더>   (motion2: 달리기 + 공중 자세 13장, 아래)
-      python3 tools/cut_kitten_motion.py a <시트.png> <출력 폴더>   (A: 달리기 8장 + 웅크림·도약·오름·내림·착지·멈칫)
-      python3 tools/cut_kitten_motion.py b <시트.png> <출력 폴더>   (B: 몸통·머리·놀란 머리·다리 4·꼬리 + 조립 참고)
-A
+사용 (한 아기를 처음부터, 차례대로):
+  python3 tools/cut_kitten_motion.py frames <품종> <달리기 시트>  달리기 8장 + 웅크림·도약·오름·내림·착지·멈칫 (+ assets/raw/kitten_motion/<품종>_run8/)
+  python3 tools/cut_kitten_motion.py a2 <품종> <공중 시트>         달리기 32장 + 공중 자세 13장, 장마다 거리를 kitten_motion_data.gd에
+  python3 tools/cut_kitten_motion.py scared <품종> <놀람 시트>     놀란 윗몸(달리기 위에 덮음)·놀라 움츠림·깜짝 펄쩍
+frames (예전 A)
 - 크기: 달리기 8장 불투명 넓이 가운데값을 cut_kittens.RUN_AREA로 (예전 아기와 같은 크기).
 - 위치: bbox가 아니라 몸통 기준. 다리를 뺀 윗몸(아래 LEG_SHARE를 뺀 부분)을 달리기 1장과 가장 많이 겹치게 옮긴다.
   땅 자세는 발끝(가장 아랫줄)을 BASELINE에, 오름·내림은 윗몸을 가로·세로 모두 달리기 1장에 맞춘다.
-- 발: 각 장에서 BASELINE 위 CONTACT_ROWS줄 안의 불투명 덩어리 = 바닥을 디딘 발. 장 k → k+1에서 디딘 발이 뒤로 간 거리의
-  가운데값을 advance[k]로 (게임은 아기가 이만큼 달리면 다음 장으로 넘김 → 디딘 발이 세계에서 제자리).
-- 결과: <출력>/<이름>.png, 그리고 scripts/logic/kitten_motion_data.gd(측정값, 게임이 읽음)의 A 부분.
-A2 (motion2, 2026-11-16)
+a2 (motion2, 2026-11-16)
 - 달리기: 윗몸(머리·몸통·꼬리)은 예전 run_0 한 장을 모든 장에 그대로 쓰고(머리 떨림 없음), 다리는 예전 장의 것을 그 밑에 깐다.
   윗몸은 걸음 박자(한 바퀴 2번)에 맞춰 BOB 픽셀만 오르내린다. 디딘 다리는 다리끼리 떨어진 줄 아래를 비스듬히 옮겨(최대 LEG_NUDGE)
-  디딘 동안 발의 세계 x가 같게 맞춘다 (AI 그림의 발 자리 어긋남을 지움). 새로 그린 16장 시트(a_run16_1)는 발 박자가 안내도와 달라 안 씀.
+  디딘 동안 발의 세계 x가 같게 맞춘다 (AI 그림의 발 자리 어긋남을 지움).
 - 공중 13장: 크기는 웅크림2를 지금 웅크림 넓이에, 땅 자세(웅크림2·도약2)는 발끝을 BASELINE에, 공중은 윗몸을 run_0에 맞춤,
   앞구르기 공·말기는 몸 무게중심을 run_0 무게중심에 (게임이 그 언저리를 축으로 돌림).
-B
-- 크기: 조립 참고 그림 넓이를 A 멈칫(네 발로 선 모습) 넓이에 맞춘다. 부품마다 꼭 맞게 잘라 <출력>/<이름>.png.
-- 다리: 축 = 위 둥근 끝 안쪽(PIVOT_IN), 발 = 가장 아랫줄. 축 → 발 길이가 다리 길이 L.
-- 조립 자리(어깨·엉덩이·목·꼬리 뿌리)는 B_PLACE(몸통 그림 비율)로, rest.png(조립 확인 그림)를 보며 눈으로 맞췄다.
+scared (2026-11-17)
+- 놀란 달리기 칸을 run_0 윗몸에 크기(넓이)·자리(윗몸 겹침)를 맞춰, 달리기와 같은 윗몸 자르기로 scared_upper.png를 만든다.
+  게임은 도망 달리기 때 달리기 그림 위에 이것을 같은 오르내림(BOB)만큼 내려 덮는다 (32장을 또 만들지 않음).
+  놀란 윗몸이 비는 곳은 원래 윗몸을 깔아 덮었을 때 웃는 윗몸이 비치지 않게.
+- 움츠림은 땅 자세처럼, 펄쩍은 발끝을 BASELINE에 두고 무게중심 x를 run_0에 맞춤.
 개발용 도구 (numpy, scipy, Pillow).
 """
-import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -52,25 +51,22 @@ A2_SPIN = ["flip_tuck", "flip_curl", "flip_ball", "flip_ball_b", "flip_open"]
 BOB = 2               # 달리기 윗몸 오르내림 (캔버스 픽셀, 한 바퀴 2번)
 SEAM = 8              # 윗몸 아래 끝을 다리 층과 섞는 줄 수
 TRACK_MATCH = 20.0    # 같은 발로 보는 어긋남 (캔버스 픽셀)
+# 아기별 같은 발 어긋남. 턱시도: 20은 한 장에 33px 옮긴 발을 새 발로 봐 못 고침(미끄러짐 14px) → 24로 5~6px.
+# 회색: 20·24는 다른 발까지 한 발로 이어 옮기다 두 발이 붙음(모든 장 거리 실패) → 16으로 3.5~3.9px
+TRACK_MATCH_OF = {"tuxedo": 24.0, "gray": 16.0}
 SUB = 4               # 예전 장 하나를 사이 장 몇 장으로 (8 x 4 = 32장, 3은 앞발이 4~6px 밀림 motion2 검토)
 ADV_MAX = 34.0        # 상한 (한 바퀴 160 게임 픽셀: 주인공 150과 비슷, 더 길면 짧은 다리로 성큼성큼)
 ADV_MIN = 18.0        # 예전 장 하나의 거리 하한 (캔버스 픽셀). 22는 디딘 발이 바닥보다 약 10% 앞으로 밀림 (motion2 3차 검토)
 LEG_NUDGE = 14        # 디딘 다리 발끝을 옮겨도 되는 최대 (캔버스 픽셀)
 
-B_NAMES = ["torso", "head", "head_surprised", "front_near", "front_far", "hind_near", "hind_far", "tail", "assembled"]
-B_LEGS = ["front_near", "front_far", "hind_near", "hind_far"]
-PIVOT_IN = 0.45       # 다리 축: 위 끝에서 (다리 폭 x 이 값) 아래, 둥근 어깨·허벅지 안쪽
-PAD = 4
-# 몸통 그림 안 자리 (몸통 폭·높이 비율). rest.png와 조립 참고 그림을 나란히 보며 맞춤
-B_PLACE = {
-    "front": (0.80, 0.72),   # 앞다리 축 (가까운·먼 쪽 같은 자리, 먼 쪽은 FAR_SHIFT만큼 뒤)
-    "hind": (0.22, 0.66),
-    "neck": (0.80, 0.32),    # 머리 그림의 목(아래 가운데)이 오는 자리
-    "tail": (0.07, 0.30),    # 꼬리 뿌리
-}
-FAR_SHIFT = -10.0        # 먼 쪽 다리는 이만큼 (캔버스 픽셀) 옆으로 어긋나 보이게
+HEAD_SHARE = 0.55     # 놀란 윗몸에서 놀란 그림을 쓰는 오른쪽(머리) 비율
+HEAD_BLEND = 12.0     # 그 경계를 섞는 폭 (캔버스 픽셀)
+SCARED = ["scared_run", "scared_crouch", "scared_hop"]  # 놀람 시트 칸 순서
 
-DATA = Path(__file__).parent.parent / "scripts/logic/kitten_motion_data.gd"
+ROOT = Path(__file__).parent.parent
+DATA = ROOT / "scripts/logic/kitten_motion_data.gd"
+RAW = ROOT / "assets/raw/kitten_motion"
+SPRITES = ROOT / "assets/sprites/kitten_motion"
 
 
 def _upper(mask: np.ndarray) -> np.ndarray:
@@ -157,10 +153,7 @@ def cut_a(sheet: Path, out_dir: Path) -> dict:
     for name, img in placed.items():
         img.save(out_dir / f"{name}.png")
     feet = [contacts(placed[f"run_{i}"]) for i in range(8)]
-    adv = advances(feet)
-    _write_data("A", {"A_ADVANCE": [round(a, 2) for a in adv], "A_FEET": [[round(x - ANCHOR_X, 1) for x in f] for f in feet],
-                      "A_ANCHOR": [ANCHOR_X, BASELINE]})
-    return {"scale": round(scale, 4), "advance": adv, "feet": feet}
+    return {"scale": round(scale, 4), "advance": advances(feet), "feet": feet}
 
 
 def bob(k: int, n: int) -> int:
@@ -203,6 +196,8 @@ def _collar(base: Image.Image) -> Image.Image:
     red = solid & (a[..., 0] > 170) & (a[..., 1] < 90) & (a[..., 2] < 90)
     gold = solid & (a[..., 0] > 190) & (a[..., 1] > 150) & (a[..., 2] < 80)
     mask = np.zeros(red.shape, bool)
+    if not red.any():
+        return Image.new("RGBA", base.size)  # 목걸이·나비넥타이가 없는 아기
     for part in (red, gold):
         labels, n = ndimage.label(part)
         if n:
@@ -262,7 +257,7 @@ def _shear_legs(img: Image.Image, moves: dict) -> Image.Image:
     return Image.fromarray(out)
 
 
-def _tracks(feet: list, adv: float) -> list:
+def _tracks(feet: list, adv: float, match: float = TRACK_MATCH) -> list:
     """디딘 발 이어 붙이기: 장 k의 발 x가 장 k-1의 발에서 adv만큼 뒤(TRACK_MATCH 안)면 같은 발. [(장, 발 x), ...] 목록들."""
     n = len(feet)
     owner = {}
@@ -273,7 +268,7 @@ def _tracks(feet: list, adv: float) -> list:
         for x in feet[kk]:
             prev = [(t, px) for (pk, px), t in owner.items() if pk == (k - 1) and t not in used]
             best = min(prev, key=lambda a: abs(a[1] - adv - x), default=None)
-            if best is not None and abs(best[1] - adv - x) <= TRACK_MATCH:
+            if best is not None and abs(best[1] - adv - x) <= match:
                 used.add(best[0])
                 tracks[best[0]].append((k, x))
                 owner[(k, x)] = best[0]
@@ -283,12 +278,12 @@ def _tracks(feet: list, adv: float) -> list:
     return tracks
 
 
-def _leg_moves(feet: list, adv: float) -> list:
+def _leg_moves(feet: list, adv: float, match: float = TRACK_MATCH) -> list:
     """장마다 디딘 발을 옮길 거리 {x: d}: 한 발이 디딘 동안 세계 x(= 발 x + 장 x adv)가 같게 (그 발의 가운데값으로).
     두 번째 바퀴(n~2n-1)의 결과를 씀 (첫 바퀴는 바퀴 끝에서 이어 온 발이 없어서)."""
     n = len(feet)
     moves = [dict() for _ in range(n)]
-    for tr in _tracks(feet, adv):
+    for tr in _tracks(feet, adv, match):
         world = [x + k * adv for k, x in tr]
         mid = float(np.median(world))
         for (k, x), w in zip(tr, world):
@@ -298,8 +293,9 @@ def _leg_moves(feet: list, adv: float) -> list:
     return moves
 
 
-def cut_a2(src: Path, air_sheet: Path, a_dir: Path) -> dict:
-    """src = 예전 A 달리기 8장 (assets/raw/kitten_motion/a_run8, 걸음 안내도대로 그린 2차 시트에서 자른 것)."""
+def cut_a2(breed: str, air_sheet: Path) -> dict:
+    """달리기 8장(frames가 assets/raw/kitten_motion/<품종>_run8에 둔 것, 걸음 안내도대로 그린 시트) + 공중 시트 → 32장 + 공중 13장."""
+    src, a_dir = RAW / f"{breed}_run8", SPRITES / breed
     n = len(list(src.glob("run_*.png")))
     base = Image.open(src / "run_0.png").convert("RGBA")
     base_mask = opaque(base)
@@ -313,7 +309,7 @@ def cut_a2(src: Path, air_sheet: Path, a_dir: Path) -> dict:
     import foot_slip  # 여기서만 (foot_slip이 이 파일을 읽음)
 
     def frames(a: float) -> list:
-        mv = _leg_moves(feet, a)
+        mv = _leg_moves(feet, a, TRACK_MATCH_OF.get(breed, TRACK_MATCH))
         return [_shear_legs(legs[k], {x: d - j * a / SUB for x, d in mv[k].items()} | {x: -j * a / SUB for x in feet[k] if x not in mv[k]})
                 for k in range(n) for j in range(SUB)]
 
@@ -357,100 +353,74 @@ def cut_a2(src: Path, air_sheet: Path, a_dir: Path) -> dict:
             out[name] = _paste(img, ANCHOR_X - img.width // 2 + dx, y + dy)
     for name, img in out.items():
         img.save(a_dir / f"{name}.png")
-    _write_data("A", {"A_ADVANCE": [round(float(adv), 2)] * n, "A_FEET": [[round(x - ANCHOR_X, 1) for x in f] for f in feet],
-                      "A_ANCHOR": [ANCHOR_X, BASELINE]})
+    _write_data(breed, round(float(adv), 3), n)
     return {"air_scale": round(ascale, 4), "advance": float(adv), "feet": feet}
 
 
-def _leg_points(mask: np.ndarray) -> tuple:
-    """다리 그림 → (축 x, 축 y, 발 y)."""
-    rows = np.nonzero(mask.any(axis=1))[0]
-    top_cols = np.nonzero(mask[rows[0]:rows[0] + max(4, (rows[-1] - rows[0]) // 4)].any(axis=0))[0]
-    width = top_cols[-1] - top_cols[0]
-    return float((top_cols[0] + top_cols[-1]) / 2), float(rows[0] + width * PIVOT_IN), float(rows[-1] + 1)
+def cut_frames(breed: str, sheet: Path) -> dict:
+    """달리기 시트 → 예전 A 그림 (달리기 8장은 a2의 재료로 RAW/<품종>_run8에도)."""
+    out = SPRITES / breed
+    r = cut_a(sheet, out)
+    run8 = RAW / f"{breed}_run8"
+    run8.mkdir(parents=True, exist_ok=True)
+    for i in range(8):
+        shutil.copy(out / f"run_{i}.png", run8 / f"run_{i}.png")
+    return r
 
 
-def cut_b(sheet: Path, out_dir: Path, a_dir: Path) -> dict:
-    raw = _pieces(sheet, B_NAMES)
-    target = opaque(Image.open(a_dir / "startle.png")).sum()
-    scale = (target / float(opaque(raw["assembled"]).sum())) ** 0.5
-    out_dir.mkdir(parents=True, exist_ok=True)
-    parts = {}
-    for name, img in raw.items():
-        small = _small(img, scale)
-        box = opaque(small)
-        rows, cols = np.nonzero(box.any(axis=1))[0], np.nonzero(box.any(axis=0))[0]
-        crop = small.crop((cols[0] - PAD, rows[0] - PAD, cols[-1] + 1 + PAD, rows[-1] + 1 + PAD))
-        crop.save((Path(__file__).parent.parent / "review/cat-parade/motion/b_assembled.png") if name == "assembled" else out_dir / f"{name}.png")
-        parts[name] = crop
-    data = {}
-    lengths = []
-    for leg in B_LEGS:
-        px, py, foot = _leg_points(opaque(parts[leg]))
-        data[leg] = [round(px, 1), round(py, 1)]
-        lengths.append(foot - py)
-    tw, th = parts["torso"].size
-    hb = opaque(parts["head"])
-    hrows = np.nonzero(hb.any(axis=1))[0]
-    neck_cols = np.nonzero(hb[hrows[-1] - 6:hrows[-1]].any(axis=0))[0]
-    tb = opaque(parts["tail"])
-    trows = np.nonzero(tb.any(axis=1))[0]
-    root_cols = np.nonzero(tb[trows[-1] - 6:trows[-1]].any(axis=0))[0]
-    out = {
-        "B_SIZE": {n: list(parts[n].size) for n in B_NAMES if n != "assembled"},
-        "B_PIVOT": {**data, "head": [round(float(neck_cols.mean()), 1), float(hrows[-1] - 4)],
-                    "head_surprised": [round(float(neck_cols.mean()), 1), float(hrows[-1] - 4)],
-                    "tail": [round(float(root_cols.mean()), 1), float(trows[-1] - 4)]},
-        "B_PLACE": {k: [round(v[0] * tw, 1), round(v[1] * th, 1)] for k, v in B_PLACE.items()},
-        "B_LEG_LEN": round(float(np.mean(lengths)), 1),
-        "B_FAR_SHIFT": FAR_SHIFT,
-    }
-    rest = compose(parts, out)
-    rest.save(Path(__file__).parent.parent / "review/cat-parade/motion/b_rest.png")
-    # 조립한 몸이 A 멈칫과 같은 넓이가 되게 게임이 부품을 이만큼 키워 그린다
-    out["B_ART"] = round((target / float(opaque(rest).sum())) ** 0.5, 4)
-    _write_data("B", out)
-    return {"scale": round(scale, 4), "leg_len": out["B_LEG_LEN"], "torso": [tw, th], "art": out["B_ART"]}
+def cut_scared(breed: str, sheet: Path) -> dict:
+    """놀람 시트 (놀란 달리기·움츠림·펄쩍) → scared_upper·scared_crouch·scared_hop."""
+    out = SPRITES / breed
+    base = Image.open(RAW / f"{breed}_run8" / "run_0.png").convert("RGBA")  # 달리기 32장 윗몸의 원본
+    bm = opaque(base)
+    ref_upper = _upper(bm)
+    raw = _pieces(sheet, SCARED)
+    scale = (bm.sum() / float(opaque(raw["scared_run"]).sum())) ** 0.5
+    imgs = {n: _small(img, scale) for n, img in raw.items()}
+
+    def ground(img: Image.Image) -> tuple:
+        rows = np.nonzero(opaque(img).any(axis=1))[0]
+        return ANCHOR_X - img.width // 2, BASELINE - (rows[-1] + 1)
+
+    x, y = ground(imgs["scared_run"])
+    dx, dy = _best_shift(ref_upper, _upper(opaque(_paste(imgs["scared_run"], x, y))), range(-20, 21))
+    face = _paste(imgs["scared_run"], x + dx, y + dy)
+    under = base.copy()
+    under.alpha_composite(face)  # 놀란 윗몸이 비는 곳은 원래 윗몸 (덮었을 때 웃는 윗몸이 비치지 않게)
+    # 머리 쪽(윗몸 오른쪽 HEAD_SHARE)만 놀란 그림, 그 왼쪽(등·꼬리)은 원래 윗몸 그대로: 꼬리 자리가 조금 달라 두 꼬리 테두리가 겹쳐 보임
+    cols = np.nonzero(ref_upper.any(axis=0))[0]
+    xh = cols[-1] - (cols[-1] - cols[0]) * HEAD_SHARE
+    w = np.clip((np.arange(CANVAS[0]) - xh) / HEAD_BLEND + 0.5, 0.0, 1.0)[None, :, None]
+    under = Image.fromarray((np.asarray(under).astype(float) * w + np.asarray(base).astype(float) * (1.0 - w)).round().astype(np.uint8))
+    upper = _with_collar(_compose_run(under, _upper_cut(bm), Image.new("RGBA", CANVAS), 0), _collar(face), 0)
+    upper.save(out / "scared_upper.png")
+    x, y = ground(imgs["scared_crouch"])
+    cdx, _ = _best_shift(ref_upper, _upper(opaque(_paste(imgs["scared_crouch"], x, y))), range(0, 1))
+    _paste(imgs["scared_crouch"], x + cdx, y).save(out / "scared_crouch.png")
+    x, y = ground(imgs["scared_hop"])
+    hx = float(np.nonzero(opaque(imgs["scared_hop"]))[1].mean())
+    _paste(imgs["scared_hop"], round(float(np.nonzero(bm)[1].mean()) - hx), y).save(out / "scared_hop.png")
+    return {"scale": round(scale, 4), "upper_shift": [dx, dy], "uncovered": int((bm & ~opaque(face)).sum())}
 
 
-def compose(parts: dict, d: dict) -> Image.Image:
-    """서 있는 조립 모습 (다리 곧게, 그리는 순서 = 게임과 같음). 조립 자리 맞추기·크기 재기용."""
-    canvas = Image.new("RGBA", (400, 320), (0, 0, 0, 0))
-    o = (100, 80)
-    pl, pv, far = d["B_PLACE"], d["B_PIVOT"], d["B_FAR_SHIFT"]
-    order = [("hind_far", (pl["hind"][0] + far, pl["hind"][1])), ("front_far", (pl["front"][0] + far, pl["front"][1])),
-             ("tail", pl["tail"]), ("hind_near", pl["hind"]), ("front_near", pl["front"]), ("head", pl["neck"]), ("torso", None)]
-    for name, at in order:
-        x, y = (o[0], o[1]) if at is None else (round(o[0] + at[0] - pv[name][0]), round(o[1] + at[1] - pv[name][1]))
-        canvas.alpha_composite(parts[name], (x, y))
-    return canvas
-
-
-def _gd(value) -> str:
-    if isinstance(value, dict):
-        return "{" + ", ".join(f'"{k}": {_gd(v)}' for k, v in value.items()) + "}"
-    if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_gd(v) for v in value) + "]"
-    return repr(float(value)) if isinstance(value, float) else str(value)
-
-
-def _write_data(part: str, consts: dict) -> None:
-    """scripts/logic/kitten_motion_data.gd의 part(A·B) 칸을 바꿔 쓴다 (다른 칸은 그대로)."""
-    text = DATA.read_text() if DATA.exists() else (
-        "class_name KittenMotionData\n## 아기 움직임 측정값 (tools/cut_kitten_motion.py가 씀, 손으로 고치지 마)\n"
-        "## A_: 캔버스 픽셀 (발끝 원점 기준 x), B_: 부품 그림 픽셀\n\n# A 시작\n# A 끝\n\n# B 시작\n# B 끝\n")
-    body = "".join(f"const {k} := {_gd(v)}\n" for k, v in consts.items())
-    text = re.sub(rf"# {part} 시작\n.*?# {part} 끝\n", f"# {part} 시작\n{body}# {part} 끝\n", text, flags=re.S)
-    DATA.write_text(text)
+def _write_data(breed: str, adv: float, n: int) -> None:
+    """scripts/logic/kitten_motion_data.gd를 다시 쓴다 (다른 아기의 장마다 거리는 그대로)."""
+    import re
+    old = dict(re.findall(r'"(\w+)": ([\d.]+)', DATA.read_text().split("const ADVANCE", 1)[-1])) if DATA.exists() else {}
+    old[breed] = adv
+    body = ", ".join(f'"{k}": {float(v)}' for k, v in sorted(old.items()))
+    DATA.write_text(
+        "class_name KittenMotionData\n## 아기 움직임 측정값 (tools/cut_kitten_motion.py가 씀, 손으로 고치지 마). 캔버스 픽셀\n\n"
+        f"const ANCHOR := [{ANCHOR_X}, {BASELINE}]  # 발끝 원점\n"
+        f"const RUN_FRAMES := {n}\n"
+        f"## 달리기 장마다 윗몸이 내려앉은 만큼 (놀란 윗몸을 같이 내려 덮음)\n"
+        f"const BOB := [{', '.join(str(bob(i, n)) for i in range(n))}]\n"
+        f"## 품종 → 달리기 장마다 거리 (아기가 이만큼 달리면 다음 장)\n"
+        f"const ADVANCE := {{{body}}}\n")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 5 and sys.argv[1] == "a2":
-        print(cut_a2(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[4])))
-        sys.exit()
-    if len(sys.argv) != 4 or sys.argv[1] not in ("a", "b"):
+    steps = {"frames": cut_frames, "a2": cut_a2, "scared": cut_scared}
+    if len(sys.argv) != 4 or sys.argv[1] not in steps:
         sys.exit(__doc__)
-    if sys.argv[1] == "a":
-        print(cut_a(Path(sys.argv[2]), Path(sys.argv[3])))
-    else:
-        print(cut_b(Path(sys.argv[2]), Path(sys.argv[3]), Path(sys.argv[3]).parent / "cheese_a"))
+    print(steps[sys.argv[1]](sys.argv[2], Path(sys.argv[3])))

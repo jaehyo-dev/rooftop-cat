@@ -1,84 +1,47 @@
 extends TestCase
-## 아기 새 움직임 (cat-parade 1단계 A·B 비교, KittenMotion): 발 미끄러짐·바닥 붙음 자동 검사, 상태 고르기, 도망 순서.
-## A·주인공 프레임 그림의 발 미끄러짐은 tools/test_kitten_motion.py (그림을 재므로 파이썬)
+## 아기 움직임 (방식 A, 6마리, KittenMotion): 바닥 붙음, 달리기 장 넘김, 상태 고르기, 공중 자세, 도망 순서.
+## 그림의 발 미끄러짐·머리 고정은 tools/test_kitten_motion.py (그림을 재므로 파이썬)
 
-const FPS := 60.0
-const SPEEDS := [430.0, 640.0, 950.0, 1250.0]
-const B_SLIP_MAX := 0.5   # B 디딘 발이 디디는 동안 세계 x가 움직여도 되는 만큼 (게임 픽셀)
+const WORLD := preload("res://scripts/world_view.gd")
 const GROUND_TOL := 1.0   # 땅 위 발끝과 바닥 (게임 픽셀)
 
 
-## B: 다리마다 디딘 동안 발의 세계 x (아기가 달린 거리 + 발 x x 배율) 최대 - 최소
-func test_B_디딘_발은_미끄러지지_않는다() -> void:
-	var bs := KittenMotion.b_scale()
-	for speed in SPEEDS:
-		var span := {}  # 다리 → [최소, 최대]
-		var worst := 0.0
-		for tick in int(3.0 * FPS):
-			var dist: float = speed * tick / FPS
-			var pose := KittenMotion.b_run(dist)
-			for leg in KittenMotion.B_LEGS:
-				var foot: Vector2 = pose.legs[leg].foot
-				if foot.y < -0.01:
-					if span.has(leg):
-						worst = maxf(worst, span[leg][1] - span[leg][0])
-					span.erase(leg)
-					continue
-				var x := dist + foot.x * bs
-				span[leg] = [minf(span.get(leg, [x, x])[0], x), maxf(span.get(leg, [x, x])[1], x)]
-		assert_true(worst <= B_SLIP_MAX, "속도 %d: B 발 미끄러짐 %.2fpx" % [speed, worst])
+## 6마리 모두: 그림이 다 있고 크기가 같으며, 땅 자세 그림(달리기·웅크림·도약·착지·멈칫·움츠림·펄쩍)의 발끝이 기준선과 1px 안
+func test_아기마다_그림이_다_있고_발끝이_기준선에() -> void:
+	var base: int = KittenMotionData.ANCHOR[1]
+	for look in CatParade.LOOKS:
+		assert_true(KittenMotionData.ADVANCE.has(look), look + " 달리기 장 거리")
+		var names := KittenView.frames() if look == "cheese" else TestCase.pick(KittenView.frames(), 4)  # 로컬은 대표만
+		for frame in names + ["scared_upper"]:
+			var path: String = KittenView.DIR + look + "/" + frame + ".png"
+			assert_true(ResourceLoader.exists(path), path)
+			if not ResourceLoader.exists(path):
+				continue
+			var img: Image = load(path).get_image()
+			if img.is_compressed():
+				img.decompress()
+			assert_eq(img.get_size(), Vector2i(300, 260), path)
+			if frame == "scared_upper" or frame.trim_suffix("_b") in ["rise", "apex", "fall", "flail"] or frame.begins_with("flip_"):
+				continue
+			var bottom := img.get_used_rect().end.y
+			assert_true(absf(bottom - base) * KittenMotion.px() <= GROUND_TOL, "%s 발끝 %d / 기준 %d" % [path, bottom, base])
 
 
-## B: 땅 위 모든 장면에서 한 발 이상이 바닥에 닿고(1px 안), 디딘 다리는 그림 길이 안에서 닿는다 (늘임 한계 안)
-func test_B_땅_위에서는_발이_바닥에_붙는다() -> void:
-	var bs := KittenMotion.b_scale()
-	for tick in 600:
-		var pose := KittenMotion.b_run(tick * 3.7)
-		var lowest := -INF
-		for leg in KittenMotion.B_LEGS:
-			var l: Dictionary = pose.legs[leg]
-			lowest = maxf(lowest, l.foot.y)
-			if l.foot.y == 0.0:
-				var t := KittenMotion.b_leg(l.hip, l.foot, KittenMotion.b_len(leg))
-				assert_true(t.y <= KittenMotion.B_STRETCH + 0.001 and t.y > 0.6, "디딘 다리 늘임 %.3f" % t.y)
-		assert_true(absf(lowest * bs) <= GROUND_TOL, "거리 %.1f: 가장 낮은 발 %.2fpx" % [tick * 3.7, lowest * bs])
-	var stand := KittenMotion.b_stand()
-	for leg in KittenMotion.B_LEGS:
-		assert_eq(stand.legs[leg].foot.y, 0.0, "멈칫: 네 발 다 바닥 " + leg)
-
-
-## A: 땅 자세 그림(달리기·웅크림·도약·착지·멈칫)의 발끝이 기준선과 1px 안, 그림 크기가 같음
-func test_A_땅_자세_그림은_발끝이_기준선에() -> void:
-	var base: int = KittenMotionData.A_ANCHOR[1]
-	for frame in KittenView.a_frames():
-		var img: Image = load(KittenView.A_DIR + frame + ".png").get_image()
-		if img.is_compressed():
-			img.decompress()
-		assert_eq(img.get_size(), Vector2i(300, 260), frame)
-		if frame.trim_suffix("_b") in ["rise", "apex", "fall", "flail"] or frame.begins_with("flip_"):
-			continue
-		var bottom := 0
-		for y in img.get_height():
-			for x in img.get_width():
-				if img.get_pixel(x, y).a > 0.5:
-					bottom = y
-					break
-		assert_true(absf(bottom + 1 - base) * KittenMotion.px() <= GROUND_TOL, "%s 발끝 %d / 기준 %d" % [frame, bottom + 1, base])
-
-
-## A: 달린 거리로 장을 넘긴다 (한 바퀴 = a_stride, 32장 차례로)
-func test_A_달린_거리로_장을_넘긴다() -> void:
-	var stride := KittenMotion.a_stride()
-	assert_true(stride > 60.0, "한 바퀴 %.1f" % stride)
-	var seen: Array[int] = []
-	var n := KittenMotionData.A_ADVANCE.size()
-	for i in n * 10:
-		var k := KittenMotion.a_frame(stride * (i + 0.5) / (n * 10.0))
-		if seen.is_empty() or seen[-1] != k:
-			seen.append(k)
+## 달린 거리로 장을 넘긴다 (한 바퀴 = a_stride, 32장 차례로)
+func test_달린_거리로_장을_넘긴다() -> void:
+	var n: int = KittenMotionData.RUN_FRAMES
 	assert_eq(n, 32, "8장 x 사이 장 4")
-	assert_eq(seen, range(n))
-	assert_eq(KittenMotion.a_frame(stride * 2.0 + 0.1), 0, "바퀴가 돌아옴")
+	assert_eq(KittenMotionData.BOB.size(), n, "장마다 윗몸 내려앉음")
+	for look in CatParade.LOOKS:
+		var stride := KittenMotion.a_stride(look)
+		assert_true(stride > 60.0, "%s 한 바퀴 %.1f" % [look, stride])
+		var seen: Array[int] = []
+		for i in n * 10:
+			var k := KittenMotion.a_frame(stride * (i + 0.5) / (n * 10.0), look)
+			if seen.is_empty() or seen[-1] != k:
+				seen.append(k)
+		assert_eq(seen, range(n), look)
+		assert_eq(KittenMotion.a_frame(stride * 2.0 + 0.1, look), 0, "바퀴가 돌아옴")
 
 
 ## 아기 자세는 아기 자신의 상태로: 땅 = 달리기, 오를 때·내릴 때 = 속도 방향, 닿는 순간 = 착지 눌림
@@ -111,7 +74,7 @@ func test_자세는_아기_자신의_상태로() -> void:
 
 ## 공중 자세 따라 하기 (motion2): 주인공 자세마다 맞는 아기 그림, 공중에서 같은 그림이 0.12초를 넘지 않음 (요구)
 func test_공중에서_같은_그림으로_떠_있지_않는다() -> void:
-	var frames := KittenView.a_frames()
+	var frames := KittenView.frames()
 	var dt := 1.0 / 60.0
 	for scene in _air_scenes():
 		var memo := {}
@@ -169,11 +132,31 @@ func _air_scenes() -> Array:
 func test_눌림은_세로만() -> void:
 	var view := KittenView.new()
 	add_child(view)
-	for m in ["a", "b"]:
-		view.show_motion(m, {"kind": "run", "dist": 10.0, "squash": 0.8})
-		var k := KittenMotion.px() if m == "a" else KittenMotion.b_scale()
-		assert_true(is_equal_approx(view.scale.x, k), m + " 가로 배율 그대로")
-		assert_true(is_equal_approx(view.scale.y, k * 0.8), m + " 세로만 눌림")
+	view.show_motion("cheese", {"kind": "run", "dist": 10.0, "squash": 0.8})
+	var k := KittenMotion.px()
+	assert_true(is_equal_approx(view.scale.x, k), "가로 배율 그대로")
+	assert_true(is_equal_approx(view.scale.y, k * 0.8), "세로만 눌림")
+	view.queue_free()
+
+
+## 도망 그림: 움츠림·펄쩍·서서 놀람은 놀란 그림, 달리기는 놀란 윗몸을 덮음 (도망 때 웃는 얼굴, 2026-11-17)
+func test_도망은_내내_놀란_얼굴() -> void:
+	var vx := 600.0
+	var hop := (KittenMotion.STARTLE_CROUCH + KittenMotion.STARTLE) * 0.5
+	assert_eq(WORLD.runaway_pose(KittenMotion.runaway(0.01, vx)), "scared_crouch")
+	assert_eq(WORLD.runaway_pose(KittenMotion.runaway(hop, vx)), "scared_hop", "깜짝 펄쩍은 위로 솟는 그림")
+	assert_eq(WORLD.runaway_pose(KittenMotion.runaway(KittenMotion.STARTLE + 0.02, vx)), "startle")
+	assert_eq(WORLD.runaway_pose(KittenMotion.runaway(0.6, vx)), "run")
+	var view := KittenView.new()
+	add_child(view)
+	var upper: Sprite2D = view.get_child(0).get_child(0).get_child(1)
+	for look in CatParade.LOOKS:
+		view.show_motion(look, {"kind": "run", "dist": 50.0, "surprised": true})
+		assert_true(upper.visible and upper.texture != null, look + " 도망 달리기에 놀란 윗몸")
+		var f := KittenMotion.a_frame(50.0, look)
+		assert_eq(upper.position.y, float(KittenMotionData.BOB[f]), look + " 윗몸은 그 장만큼 내려앉음")
+		view.show_motion(look, {"kind": "run", "dist": 50.0})
+		assert_false(upper.visible, look + " 줄 달리기는 웃는 얼굴 그대로")
 	view.queue_free()
 
 

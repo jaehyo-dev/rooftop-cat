@@ -71,7 +71,7 @@ func update(sim: RunnerSim, dt: float) -> void:
 		strays.remove_at(i)
 		if cats.size() >= Balance.PARADE_MAX:
 			continue  # 그 사이 시험 단추로 줄이 꽉 참
-		var cat := {"look": s.look, "quirk": s.quirk, "from": Vector2(s.x, s.y), "t": 0.0}
+		var cat := {"look": s.look, "quirk": s.quirk, "from": Vector2(s.x, s.y), "t": 0.0, "wait": true}
 		cats.append(cat)
 		met.append(cat)
 		met_total += 1
@@ -192,6 +192,13 @@ func sample(at: float) -> Dictionary:
 func _join_step(cat: Dictionary, i: int, sim: RunnerSim) -> void:
 	if cat.get("joined", false):
 		return
+	if cat.get("wait", false):
+		# 만난 자리에 서서 줄이 지나가길 기다렸다가, 줄 맨 뒤 자리가 오면 일어나 붙음
+		# (바로 붙으면 주인공 바로 뒤에서 깡충 뛰고 줄이 몸을 뚫고 지나가 "맨 앞에 끼어듦"으로 보임, 2026-11-17 검토)
+		if slot_x(i, sim.x) >= cat.from.x:
+			cat.erase("wait")
+			cat.t = 0.0
+		return
 	if not cat.has("gap") and cat.t >= Balance.PARADE_JOIN_RISE + Balance.PARADE_JOIN_HOP_TIME:
 		var gap: float = cat.from.x + Balance.PARADE_JOIN_DX - slot_x(i, sim.x)
 		cat.gap = gap
@@ -211,7 +218,13 @@ func follower(i: int, leader_x: float) -> Dictionary:
 		return sample(slot)
 	var from: Vector2 = cat.from
 	var pose: Dictionary
-	if cat.has("gap"):
+	if cat.get("wait", false):
+		pose = sample(from.x)
+		if not pose.is_empty():
+			pose.x = from.x
+			pose.y = from.y
+			pose.kind = "stand"  # 서서 앞으로 가는 줄을 봄
+	elif cat.has("gap"):
 		var u: float = clampf((leader_x - cat.run_lead) / cat.run_len, 0.0, 1.0)
 		pose = sample(slot + cat.gap * (1.0 - u * u * (3.0 - 2.0 * u)))
 		if not pose.is_empty() and pose.get("ground", true):

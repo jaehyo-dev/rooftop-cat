@@ -407,3 +407,10 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획 2장: 달리기 16장(안내도 `a_guide16.png` 첨부)·공중 자세 13장. 다시 뽑기 0번.
 - 명령: `EXTRA_IMAGE="review/cat-parade/motion/prompts/ref_a_air.png review/cat-parade/motion/prompts/a_guide16.png" bash review/cat-parade/motion/make_sheet.sh a_run16 1`, `EXTRA_IMAGE="review/cat-parade/motion/prompts/ref_a_air.png review/cat-parade/motion/prompts/ref_hero_air.png" bash review/cat-parade/motion/make_sheet.sh a_air2 1`
 - 요청문 전문: `review/cat-parade/motion/prompts/a_run16.txt`, `a_air2.txt`. 달리기 16장은 발 박자가 안내도와 달라 안 쓰고, 예전 8장 다리를 고쳐 24장을 만듦 (`tools/cut_kitten_motion.py a2`).
+
+## 아기 움직임 6마리로 늘리기 + 놀란 얼굴 (2026-11-17, 맥 Codex, cat-parade 브랜치)
+- 계획: 놀람 시트 6장(치즈 먼저 확인), 고등어·턱시도·삼색·젖소·회색마다 달리기 시트 1장 + 공중 시트 1장 = 16장. 무늬·소품이 장마다 어긋나면 그 아기만 다시. 결과: 다시 뽑기 0번 (16장 모두 사용, 이유는 `review/cat-parade/final/README.md`).
+- 명령: `bash review/cat-parade/final/make_sheet.sh <frames|air|scared> <품종> <차례> [덧붙일 말]` (요청문 `prompts/<종류>.txt`의 `{BREED}` 자리에 `review/cat-parade/kitten2/prompts/<품종>.txt`)
+- 첨부: 그 아기 기준 그림 `review/cat-parade/kitten2/prompts/ref_<품종>.png` + frames는 걸음 안내도 `review/cat-parade/motion/prompts/a_guide.png`, air는 그 아기 지금 그림 `review/cat-parade/final/prompts/ref_<품종>_frames.png`(`make_refs.py`)·주인공 자세 `ref_hero_air.png`, scared는 그 아기 달리기·웅크림·멈칫 `ref_<품종>_scared.png`
+- 자르기: `python3 tools/cut_kitten_motion.py frames|a2|scared <품종> <시트>`. 결과 `assets/raw/kitten_motion/<품종>_<종류>_1.png`.
+

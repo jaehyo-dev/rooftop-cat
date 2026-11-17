@@ -28,8 +28,7 @@ const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 �
 const KITTEN_DIR := "res://assets/sprites/kittens/"
 const KITTEN_ANCHOR := Vector2(140, 216)
 const KITTEN_ART := 2.5
-const KITTEN_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail",
-		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "wait", "scared", "flee"]
+const KITTEN_FRAMES := ["wait"]  # 옥상에서 기다리는 길고양이만 (줄·도망 아기는 KittenView)
 const KITTEN_TAILS := 5
 static var _kitten_cache := {}  # 품종 → {"frames": {이름: 그림}, "tails": [그림...]}
 
@@ -162,16 +161,6 @@ func show_sit(t: float) -> void:
 	scale = CatPose.sit_breath(t) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
 	_stand = CatPose.STAND_TIME
-
-
-## 줄줄이 따라오는 아기 고양이: 주인공 기록(프레임·몸 배율·기울기·공중제비)을 그대로 보인다
-func show_pose(frame: String, body: Vector2, rot: float, spin_rad: float) -> void:
-	frame_name = frame if _textures.has(frame) else "run_0"  # 아기에게 없는 주인공 자세(일어남)는 달리기로
-	_sprite.texture = _textures[frame_name]
-	_sprite.rotation = spin_rad
-	_tail.visible = false
-	rotation = rot
-	scale = body * art_scale() * size_k
 
 
 ## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다

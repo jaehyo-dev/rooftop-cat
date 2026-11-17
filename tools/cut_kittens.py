@@ -147,7 +147,8 @@ def cut(sheet: Path, out_dir: Path) -> dict:
     for i, t in enumerate(tails):
         placed[f"wait_tail_{i}"] = t
     for name, img in placed.items():
-        img.save(out_dir / f"{name}.png")
+        if name.startswith("wait"):  # 줄·도망 아기 그림은 이제 kitten_motion (cut_kitten_motion.py), 여기서는 기다리는 길고양이만
+            img.save(out_dir / f"{name}.png")
     face(placed["wait"], FACE_AT[out_dir.name]).save(out_dir / "face.png")
     return {"scale": scale}
 
