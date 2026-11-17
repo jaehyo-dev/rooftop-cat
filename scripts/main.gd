@@ -150,7 +150,7 @@ func _process(delta: float) -> void:
 	$ComboLabel.text = "콤보 %d  x%d" % [combo.count, combo.multiplier()] if combo.count > 0 else ""
 	_pop_hud(combo, delta)
 	_place_dash_bonus(combo)
-	_show_faces($ParadeHud/Faces, _world.sim.parade.cats)
+	_show_faces($ParadeHud/Faces, _world.sim.parade.cats, true)
 	$ParadeHud/Mult.text = "x%.1f" % _world.sim.parade.multiplier()
 	$ParadeHud.modulate.a = 1.0 if _world.sim.parade.cats.size() > 0 else 0.0
 	$BoxIcon.visible = _world.sim.has_box and screen == "run"
@@ -633,13 +633,14 @@ func _face_row(row_name: String) -> HBoxContainer:
 
 
 ## 줄의 아기 수만큼 그 아이 얼굴을 보인다 (tools/cut_kittens.py가 기다리기 그림에서 자른 face.png)
-func _show_faces(faces: HBoxContainer, cats: Array[Dictionary]) -> void:
+func _show_faces(faces: HBoxContainer, cats: Array[Dictionary], rings: bool = false) -> void:
 	for i in faces.get_child_count():
 		var face: TextureRect = faces.get_child(i)
 		face.visible = i < cats.size()
 		if face.visible:
 			face.texture = load(CatView.KITTEN_DIR + cats[i].look + "/face.png")
 			var ring: Control = face.get_node("Ring")
+			ring.visible = rings  # 능력 고리는 판 HUD에만 (결과 카드는 얼굴만)
 			var k := CatParade.charge(cats[i])
 			if not is_equal_approx(ring.get_meta("charge", -2.0), k):
 				ring.set_meta("charge", k)

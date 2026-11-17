@@ -192,3 +192,17 @@ func test_간판은_처음_30초_뒤에만() -> void:
 					assert_true(Balance.SPEED_STAGES[seg.min_stage - 1][0] >= 30.0, "%s는 30초 뒤" % id)
 					assert_eq(o[2], "slide")
 	assert_true(found >= 3 and found <= 4, "간판 구간 3~4개 (%d)" % found)
+
+
+## 내려찍기 뒤 더블점프·줄 튕김은 위로 간다 (내려찍기가 속도를 덮어쓰지 않음, Codex 리뷰)
+func test_내려찍기_뒤_더블점프는_올라간다() -> void:
+	var sim := _flat("pot", 5000.0)
+	sim.on_ground = false
+	sim.set("_jumped", true)
+	sim.y = 800.0  # 높이 (착지 직전 누름으로 남지 않게)
+	sim.step(DT, false, true)
+	assert_true(sim.diving)
+	sim.step(DT, true, false)
+	assert_true(sim.double_jumped and not sim.diving, "더블점프가 내려찍기를 끝냄")
+	sim.step(DT, true, false)
+	assert_true(sim.vy > 0.0, "올라감")

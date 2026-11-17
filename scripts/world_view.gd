@@ -117,7 +117,7 @@ const ALERT_BOB_HZ := 2.2  # 1초에 몇 번
 const OBSTACLE_HINTS := {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!", "sign": "숙여!"}
 ## 슬라이딩 첫 안내 (앱을 켠 뒤 처음 간판이 나오기 전 한 번, 주아 글꼴): 화면 왼쪽에 손가락 + "눌러서 슬라이딩"
 const SLIDE_TEACH_AHEAD := 1.6   # 간판까지 이 시간(초) 남았을 때부터 보여 줌
-const SLIDE_TEACH_AT := Vector2(0.25, 0.62)  # 화면 비율 자리 (왼쪽 절반 가운데쯤)
+const SLIDE_TEACH_AT := Vector2(0.18, 0.84)  # 화면 비율 자리 (왼쪽 아래: 0.25·0.62는 주인공·"숙여!" 말풍선과 겹침, 폰 캡처)
 static var slide_taught := false  # 이번 실행에서 안내를 끝냄 (슬라이딩으로 간판을 한 번 지나면)
 const HINT_TIME := 1.1
 ## 비둘기가 화면에 들어오기 이만큼 전부터 소리와 오른쪽 끝 깃털 표시 (초)
@@ -235,11 +235,11 @@ const SKILL_OUT := 0.25         # 물어 오기·반짝 코: 아기가 대상까
 const SKILL_BACK := 0.3         # 능력 뒤 자리로 돌아오는 시간
 const SKILL_TRAIL := 10         # 능력 궤적 점 수
 const FLY_VIEWS := 3            # 동시에 날아가는 아기 그림 수
-const FLY_TO := Vector2(-300.0, -420.0)  # 날아가는 아기가 이동하는 거리 (화면 위·뒤)
+const FLY_TO := Vector2(-460.0, 30.0)  # 날아가는 아기가 이동하는 거리 (뒤로 빨리 빠지며 살짝 떴다 내려감. -300·-420은 왼쪽 위 HUD 생선 수를 덮음, 처음 보는 눈 상)
 const FLY_TURNS := 1.5          # 날아가며 도는 바퀴
 const SCARED_ANCHOR := Vector2i(150, 236)  # 놀란 그림(scared.png 300x260) 발끝
 const SCARED_CENTER := 70.0     # 도는 축: 발끝에서 그림 픽셀로 이만큼 위
-const SCARED_PX := CatView.KITTEN_ART * 0.4219 * Balance.KITTEN_SIZE  # 그림 픽셀 → 게임 픽셀 (예전 아기와 같은 크기, art_scale = 150/355.5)
+
 const PARADE_FX_TIME := 0.8     # 만남 하트·"냐!"가 떠 있는 시간
 const FEVER_GLOW := Color("#ffd37a")
 const FEVER_ALPHA := 0.28
@@ -1237,7 +1237,7 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 			var pop: float = minf(1.0, _alerts[o.id] / ALERT_POP)  # 처음에 통 뜬다
 			if o.kind == "sign":
 				# 간판: 판 바로 위가 아니라 판 아래 지나갈 자리를 가리키게 "!" 밑에 아래 화살표 (점프 장애물과 구별)
-				at.y = ground - o.base + FOOT_SINK - o.y0 - _obstacle_size("sign").y - ALERT_RISE - bob
+				at.y = ground + FOOT_SINK - o.y0 - _obstacle_size("sign").y - ALERT_RISE - 30.0 - bob  # o.y0는 이미 옥상 높이를 더한 값
 				_draw_down_arrow(at + Vector2(0.0, 44.0), pop)
 			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0, ALERT_COLOR)
 	_draw_slide_teach()
@@ -1489,8 +1489,9 @@ func _build_parade() -> void:
 			var spr := Sprite2D.new()
 			spr.name = "Scared"
 			spr.offset = -Vector2(SCARED_ANCHOR) + Vector2(0, -SCARED_CENTER)  # 몸 가운데 축으로 돎
-			spr.position.y = SCARED_CENTER * SCARED_PX
-			spr.scale = Vector2.ONE * SCARED_PX
+			var px := CatView.KITTEN_ART * CatView.art_scale() * Balance.KITTEN_SIZE  # 그림 픽셀 → 게임 픽셀 (앉은 아기와 같은 크기)
+			spr.position.y = SCARED_CENTER * px
+			spr.scale = Vector2.ONE * px
 			holder.add_child(spr)
 			_fly_views.append(holder)
 	for sound in ["meow", "nya"]:
@@ -1514,7 +1515,10 @@ func _build_parade() -> void:
 func kitten_target(i: int) -> Vector2:
 	var info: Dictionary = sim.parade.cats[i]
 	var at := cat.position + CatParade.slot(i) + CatParade.bob(sim.elapsed, info.quirk) + Vector2(0.0, SLIDE_DIP if sim.sliding else 0.0)
-	at.y = soft_top(at.y, KITTEN_TOP)  # 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게
+	# 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게: 맨 위 자리 기준으로 무리 전체를 같이 내림
+	# (아기마다 따로 누르면 모두 한 줄로 눌려 빽빽해짐, 영상 확인)
+	var top: float = cat.position.y + Balance.KITTEN_SLOTS.map(func(v: Vector2) -> float: return v.y).min()
+	at.y += soft_top(top, KITTEN_TOP) - top
 	return at
 
 
@@ -1628,7 +1632,7 @@ func _place_parade(delta: float = 0.0) -> void:
 		var spr: Sprite2D = holder.get_node("Scared")
 		spr.texture = load(CatView.KITTEN_DIR + r.look + "/scared.png")
 		# 화면 위·뒤로 포물선 (처음 빠르게), 빙글빙글, 끝 40%에 사라짐
-		holder.position = r.from + FLY_TO * (1.0 - (1.0 - u) * (1.0 - u)) + Vector2(0.0, -60.0 * sin(u * PI))
+		holder.position = r.from + FLY_TO * (1.0 - (1.0 - u) * (1.0 - u)) + Vector2(0.0, -30.0 * sin(u * PI))
 		spr.rotation = -FLY_TURNS * TAU * u
 		holder.modulate.a = clampf((1.0 - u) / 0.4, 0.0, 1.0)
 	_stray_view.visible = not waiting and not parade.strays.is_empty()
@@ -1683,8 +1687,8 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 			_draw_twinkle(holder.position + Vector2(30.0, -58.0), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
 	for r in _fly_aways:  # 날아가는 아기 머리 위 "냐!" (처음 반)
 		var i := _fly_aways.find(r)
-		if i < _fly_views.size() and r.t < Balance.KITTEN_FLEE_TIME * 0.6:
-			_parade_fx_draw("nya", _fly_views[i].position + Vector2(0.0, -80.0), r.t, 1.0)
+		if i < _fly_views.size() and r.t < Balance.KITTEN_FLEE_TIME * 0.5:
+			_parade_fx_draw("nya", r.from + Vector2(60.0, -60.0), r.t, 1.0)  # 처음 자리 오른쪽 위에 짧게 (따라가면 HUD를 덮음)
 	for fx in _parade_fx:
 		# 하트는 막 온 그 아기 머리 위에 붙어 떠오름
 		var at := _screen_at(fx.x, fx.y)
@@ -1709,7 +1713,7 @@ static func soft_top(y: float, top: float) -> float:
 	return y if y >= top else top - (top - y) * KITTEN_TOP_SQUEEZE
 
 
-## 하트(만남)·"!"(놀람): 처음 0.12초 크게 찍혔다 줄어듦
+## 하트(만남)·"냐!"(날아감): 처음 0.12초 크게 찍혔다 줄어듦
 func _parade_fx_draw(kind: String, at: Vector2, t: float, alpha: float) -> void:
 	var pop := 1.0 + 0.4 * maxf(0.0, 1.0 - t / 0.12)
 	if kind == "heart":
@@ -1717,7 +1721,7 @@ func _parade_fx_draw(kind: String, at: Vector2, t: float, alpha: float) -> void:
 		draw_texture_rect(HEART_TEXTURES.full, Rect2(at - size * 0.5, size), false, Color(1, 1, 1, alpha))
 	else:
 		var font_size := int(40 * pop)
-		var text := "냐!" if kind == "nya" else "!"
+		var text := "냐!"
 		var left := at - Vector2(HUD_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x * 0.5, 0.0)
 		draw_string_outline(HUD_FONT, left, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 8, Color(HUD_CREAM, alpha))
 		draw_string(HUD_FONT, left, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(ALERT_COLOR, alpha))

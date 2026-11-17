@@ -122,10 +122,11 @@ func _run_flat(ahead: float) -> void:
 	world.set("_roof_looks", {})  # 늘인 옥상 그림을 다시 그리게
 
 
-## 바닥 장애물 하나를 몸 가운데 앞 ahead에 놓음
+## 장애물 하나를 몸 가운데 앞 ahead의 옥상 위에 놓음
 func _put(kind: String, ahead: float, id: int) -> Dictionary:
 	var info: Dictionary = Balance.OBSTACLES[kind]
-	var o := {"id": id, "kind": kind, "x": sim.x + ahead, "w": info.w, "y0": sim.y + info.y0, "y1": sim.y + info.y1, "base": sim.y}
+	var top: float = sim.roof_at(sim.x + ahead).top  # 옥상 높이 (주인공이 뛰는 중이어도)
+	var o := {"id": id, "kind": kind, "x": sim.x + ahead, "w": info.w, "y0": top + info.y0, "y1": top + info.y1, "base": top}
 	if kind == "flock":
 		o.k = Balance.FLOCK_SPEED / sim.vx()
 	sim.obstacles.append(o)
@@ -231,9 +232,12 @@ func _stills() -> void:
 	for i in 2:
 		_advance()
 	await _still("hud_ready")
-	world.set("slide_taught", false)
-	_put("sign", 1000.0, 909)
-	await _run_until(func() -> bool: return sim.obstacles[-1].x - sim.front() < sim.vx() * 1.2, 5.0)
+	for cat in sim.parade.cats:
+		cat.cool = INF  # 냥펀치가 간판을 부수지 않게
+	world.get_script().slide_taught = false
+	var sign := _put("sign", 1000.0, 909)
+	_pilot = func() -> Array: return [false, false]
+	await _run_until(func() -> bool: return sign.x - sim.front() < sim.vx() * 1.2, 5.0)
 	await _still("sign_teach")
 	world.set_process(true)
 	main.set_process(true)

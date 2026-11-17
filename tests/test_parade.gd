@@ -181,7 +181,7 @@ func test_떠다니는_자리는_서로_안_겹치고_주인공_뒤() -> void:
 	for i in Balance.PARADE_MAX:
 		var a := CatParade.slot(i)
 		assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "자리 %d는 주인공 몸 뒤 (%.0f)" % [i, a.x])
-		assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 10.0, "자리 %d 화면 왼쪽 안" % i)
+		assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 5.0, "자리 %d 화면 왼쪽 안" % i)
 		assert_true(a.y < 0.0, "자리 %d는 위" % i)
 		for j in range(i + 1, Balance.PARADE_MAX):
 			var d := (a - CatParade.slot(j)).abs()

@@ -351,6 +351,7 @@ func step(dt: float, pressed: bool, slide: bool = false) -> void:
 		has_box = false
 		rescuing = true
 		rescued = true
+		diving = false
 		_launch_vx = 0.0
 		_holding = false
 		_floating = false
@@ -787,10 +788,10 @@ func _hit_obstacles() -> void:
 				obstacles.remove_at(i)
 		elif o.has("punch"):
 			pass  # 냥펀치가 날아가는 중: 곧 부서짐 (부딪히지 않음)
-		elif _can_stomp(o, left):
+		elif _can_stomp(o):
 			_stomp(o, left)
 			obstacles.remove_at(i)
-		elif not safe and body_hits(o, x, y, body_height()) and not _skims(o, left):
+		elif not safe and body_hits(o, x, y, body_height()) and not _skims(o):
 			safe = true  # 한 step에 하나만
 			hit_obstacle = o
 			obstacles.remove_at(i)
@@ -810,13 +811,13 @@ func _hit_obstacles() -> void:
 
 ## 위에서 밟는지: 내려오는 중, 몸 타원이 STOMP_REACH만 더 내려가면 닿고, 지난 step 발이 윗면 근처 위(STOMP_TOL 안)였음.
 ## 위에서 닿는 피격을 밟기로 바꾸는 것이라 살짝 넘어가는 호(생선 길)는 밟지 않는다. 옆·아래에서 닿으면 지난 발이 윗면보다 낮아 피격
-func _can_stomp(o: Dictionary, _left: float) -> bool:
+func _can_stomp(o: Dictionary) -> bool:
 	return not on_ground and vy < 0.0 and o.kind in Balance.STOMPABLE and _feet_then >= o.y1 - Balance.STOMP_TOL \
 			and body_hits(o, x, y - Balance.STOMP_REACH, body_height())
 
 
 ## 올라가는 중 발이 윗면 바로 아래(STOMP_TOL 안)로 모서리를 스침: 피격 아님 (거의 넘었는데 맞으면 억울함, 사람 기준 검사)
-func _skims(o: Dictionary, _left: float) -> bool:
+func _skims(o: Dictionary) -> bool:
 	return not on_ground and vy >= 0.0 and o.kind in Balance.STOMPABLE and y >= o.y1 - Balance.STOMP_TOL
 
 
@@ -870,6 +871,7 @@ func _feet_over(roof: Dictionary) -> bool:
 
 func _start_jump(pressed: bool) -> void:
 	sliding = false
+	diving = false
 	on_ground = false
 	_coyote = 0.0
 	_buffer = 0.0
@@ -887,6 +889,7 @@ func _start_jump(pressed: bool) -> void:
 
 ## 더블점프: 떨어지던 속도를 지우고 첫 점프와 같은 속도로 다시 올라간다 (누르는 동안 double_max_hold까지 유지)
 func _start_double(pressed: bool) -> void:
+	diving = false  # 위로 가는 전환은 내려찍기를 끝냄 (Codex 리뷰)
 	_double_used = true
 	_floating = true
 	_jumped = true  # 점프 없이 떨어지다 썼어도 모서리 투명화 구제를 받는다
@@ -999,6 +1002,7 @@ func _check_landing(prev_y: float, dt: float) -> void:
 
 ## 줄에 닿음: 닿기 전 누름이면 바로 판정해 튕기고, 아니면 줄에 실려 닿은 뒤 누름을 기다린다. after = 닿은 뒤 이미 지난 시간
 func _touch_line(line: Dictionary, after: float, dt: float) -> void:
+	diving = false
 	y = line.top
 	vy = 0.0
 	_holding = false
