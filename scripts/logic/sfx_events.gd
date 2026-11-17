@@ -22,8 +22,8 @@ static func sounds(sim: RunnerSim, fall_start: bool) -> Array[String]:
 		out.append("double_jump")
 	if sim.landed:
 		out.append("land")
-	if sim.bounced:
-		out.append("boing")
+	if sim.bounced or not sim.stomped.is_empty():
+		out.append("boing")  # 밟기도 통 (음 높이는 stomp_pitch)
 		if sim.bounce_result == "perfect":
 			out.append("perfect")
 	var bite := ""  # 한 step에 여러 개여도 한 번. 생선과 같이 먹으면 아이템 소리
@@ -36,7 +36,7 @@ static func sounds(sim: RunnerSim, fall_start: bool) -> Array[String]:
 			bite = "pickup"
 	if not bite.is_empty():
 		out.append(bite)
-	if not sim.smashed.is_empty() or not sim.canned.is_empty():
+	if not sim.smashed.is_empty() or not sim.canned.is_empty() or not sim.stomped.is_empty():
 		out.append("pang")
 	if sim.bell_blocked:
 		out.append("bell")
@@ -71,3 +71,8 @@ static func combo_sounds(before_count: int, before_mult: int, combo: FishCombo, 
 	if combo.multiplier() > before_mult:
 		out.append("combo_up")
 	return out
+
+
+## 밟기 통 소리 음 높이: 연속 밟을수록 음계로 한 칸씩 (콤보와 같은 음계, 8칸에서 멈춤)
+static func stomp_pitch(chain: int) -> float:
+	return pow(2.0, FISH_SCALE[clampi(chain - 1, 0, FISH_SCALE.size() - 1)] / 12.0)

@@ -414,3 +414,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 첨부: 그 아기 기준 그림 `review/cat-parade/kitten2/prompts/ref_<품종>.png` + frames는 걸음 안내도 `review/cat-parade/motion/prompts/a_guide.png`, air는 그 아기 지금 그림 `review/cat-parade/final/prompts/ref_<품종>_frames.png`(`make_refs.py`)·주인공 자세 `ref_hero_air.png`, scared는 그 아기 달리기·웅크림·멈칫 `ref_<품종>_scared.png`
 - 자르기: `python3 tools/cut_kitten_motion.py frames|a2|scared <품종> <시트>`. 결과 `assets/raw/kitten_motion/<품종>_<종류>_1.png`.
 
+
+## 액션 시험판: 낮은 간판·주인공 슬라이딩 (2026-11-17, 맥 Codex, cat-parade 브랜치)
+- 계획 2장: 간판 1장(첨부 `assets/sprites/obstacles/ac.png`·`pot.png`), 슬라이딩 4칸 1장(첨부 `assets/sprites/cat_base_run.png`·`cat_frames/run_1.png`). 어긋나면 각 1번 더 → 둘 다 1번에 됨(다시 뽑기 0번).
+- 명령: `bash review/cat-parade/action/make_art.sh sign|slide`. 요청문 전문 `review/cat-parade/action/prompts/sign.txt`·`slide.txt`. 결과 `assets/raw/action/`.
+- 자르기: `python3 tools/make_action_art.py sign|slide`.

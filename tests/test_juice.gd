@@ -82,7 +82,7 @@ func test_심장_박동은_1초에_한_번() -> void:
 	assert_false(Juice.beat_crossed(90.0, 0.0), "새 판으로 시각이 되돌아가도 소리 없음")
 
 
-func test_왼쪽_아래_터치도_점프다() -> void:
+func test_왼쪽_터치는_슬라이딩_오른쪽은_점프() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_juice_tune.cfg"
@@ -92,9 +92,15 @@ func test_왼쪽_아래_터치도_점프다() -> void:
 	assert_false(main.has_node("TunePanel"), "손맛 고르기 버튼은 없음")
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = true
-	touch.position = Vector2(60.0, 690.0)  # 예전 고르기 버튼 자리
+	touch.position = Vector2(300.0, 400.0)
 	world._input(touch)
-	assert_true(world.is_pressed(), "왼쪽 아래 터치도 점프")
+	assert_true(world.is_sliding() and not world.is_pressed(), "왼쪽 절반은 슬라이딩 (2026-11-17)")
+	var right := InputEventScreenTouch.new()
+	right.pressed = true
+	right.index = 1
+	right.position = Vector2(1000.0, 400.0)
+	world._input(right)
+	assert_true(world.is_pressed(), "오른쪽 절반은 점프 (두 손가락 함께)")
 	main.queue_free()
 	await wait_frames(1)
 	DirAccess.remove_absolute("user://test_juice_tune.cfg")

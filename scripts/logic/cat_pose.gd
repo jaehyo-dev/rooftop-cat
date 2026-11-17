@@ -12,7 +12,12 @@ const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.04, 0.97), Vector2(1.02, 0.99
 const FLIP_FRAMES := ["flip_tuck", "flip_curl", "flip_ball", "flip_open"]
 const FLIP_FROM_DEG := [0.0, 25.0, 60.0, 300.0]
 const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail",
-		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "sit_body", "sit_body_blink", "sit_up"]
+		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "sit_body", "sit_body_blink", "sit_up",
+		"slide_0", "slide_1", "slide_2", "slide_up"]
+## 슬라이딩 (2026-11-17): 납작 엎드려 미끄러짐 3장을 달린 거리로 돌리고, 떼면 SLIDE_UP_TIME 동안 일어나기 그림
+const SLIDE_FRAMES := ["slide_0", "slide_1", "slide_2"]
+const SLIDE_STRIDE := 90.0   # 슬라이딩 그림 한 바퀴의 거리 (귀·꼬리·목도리 펄럭임)
+const SLIDE_UP_TIME := 0.1
 ## 시작 화면 (2c-polish): 몸 그림 한 장(바닥 고정) 뒤에 꼬리 그림 8장(tools/make_sit_tail.py)을 오가며 흔들고,
 ## 몸은 바닥을 축으로 아주 살짝 숨쉬고, 가끔 눈을 깜빡인다. 예전 sit_0·1·2는 몸 바닥이 달라 위아래로 흔들렸다
 const SIT_TAILS := 8
@@ -93,6 +98,14 @@ static func _pose(sim: RunnerSim) -> Dictionary:
 		# 떨어져서 끝나는 중·트램펄린에서 안 눌러 맥없이 튐: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
 		var wobble := sin(sim.elapsed * TAU * 5.0)
 		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
+	if sim.on_ground and sim.sliding:
+		var k := mini(int(fposmod(sim.x / SLIDE_STRIDE, 1.0) * SLIDE_FRAMES.size()), SLIDE_FRAMES.size() - 1)
+		return {"frame": SLIDE_FRAMES[k], "scale": Vector2.ONE, "tilt": 0.0}
+	if sim.on_ground and sim.time_since_stand < SLIDE_UP_TIME:
+		return {"frame": "slide_up", "scale": Vector2.ONE, "tilt": 0.0}
+	if sim.diving:
+		# 내려찍기: 내려옴 그림을 세로로 늘이고 코를 아래로
+		return {"frame": "fall", "scale": Vector2(0.9, 1.14), "tilt": 14.0}
 	if sim.on_ground:
 		if sim.time_since_land < Balance.CAT_LAND_TIME:
 			# 착지: 앞발부터 닿는 그림 (눌림은 스프링 충격 KICK_LAND)

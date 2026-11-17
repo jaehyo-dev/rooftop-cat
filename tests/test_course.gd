@@ -83,8 +83,8 @@ func test_구간이_있어도_상자가_드물어지지_않는다() -> void:
 		BalanceBot.play_stats({"timing": 0.0, "short_hold": 0.0}, seed_value + 1, 240.0, Balance.RUN_SPEED, true, inputs)
 		var sim := RunnerSim.new(seed_value + 1)
 		var boxes := {}
-		for pressed in inputs:
-			sim.step(1.0 / 120.0, pressed)
+		for input: int in inputs:
+			sim.step(1.0 / 120.0, input & 1 != 0, input & 2 != 0)
 			for item in sim.items:
 				if item.kind == "box":
 					boxes[item.x] = true
@@ -213,7 +213,7 @@ func test_하트_그림과_소품_규칙과_안내() -> void:
 		assert_false(BuildingLayout.PROP_WEIGHTS.has(kind), kind + " 소품은 옥상 위에 안 나옴")
 	assert_eq(BuildingArt.PROP_SCALE, 0.8)
 	assert_eq(BuildingArt.PROP_ALPHA, 0.6)
-	assert_eq(view.OBSTACLE_HINTS, {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!"})
+	assert_eq(view.OBSTACLE_HINTS, {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!", "sign": "숙여!"})
 
 
 func test_화면은_장애물을_알리고_처음_만날_때만_안내한다() -> void:
@@ -438,5 +438,5 @@ func test_구간은_모든_단계에서_사람이_통과한다() -> void:
 	for fail in fails:
 		print("    막힘: ", fail)
 	assert_eq(fails.size(), 0, "막힌 조합")
-	for action in ["톡", "더블", "트램펄린"]:
+	for action in ["톡", "더블", "트램펄린", "슬라이딩"]:
 		assert_true(used.has(action), "%s 경로를 실제로 검사함" % action)

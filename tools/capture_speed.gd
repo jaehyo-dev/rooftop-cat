@@ -50,7 +50,7 @@ func _run(main: Control, world: Node2D, out: String) -> void:
 	var next_shot := 0.0
 	var index := 0
 	for input in inputs:
-		world.set("_touches", {0: true} if input else {})
+		world.set("_touches", ({0: "jump"} if input & 1 else {}).merged({1: "slide"} if input & 2 else {}))
 		world._process(STEP)  # 입력을 step마다 그대로 넣으려고 한 step씩 진행
 		if world.sim.elapsed >= next_shot:
 			main._process(STEP)

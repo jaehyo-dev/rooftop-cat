@@ -1,5 +1,6 @@
 extends TestCase
 ## 게임 화면이 실제로 돌아가고, 화면 터치로 점프하는지.
+const RIGHT_SIDE := Vector2(1000.0, 400.0)  # 판 중 점프 터치 자리 (화면 왼쪽 절반은 슬라이딩)
 
 
 func test_게임_화면이_달리고_터치하면_점프() -> void:
@@ -13,6 +14,7 @@ func test_게임_화면이_달리고_터치하면_점프() -> void:
 
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = true
+	touch.position = get_viewport().get_screen_transform() * RIGHT_SIDE  # 화면 오른쪽 = 점프 (왼쪽은 슬라이딩, 2026-11-17)
 	Input.parse_input_event(touch)
 	await wait_frames(3)
 	assert_true(world.is_pressed(), "터치를 누름으로 인식")
@@ -20,6 +22,7 @@ func test_게임_화면이_달리고_터치하면_점프() -> void:
 
 	touch = InputEventScreenTouch.new()
 	touch.pressed = false
+	touch.position = get_viewport().get_screen_transform() * RIGHT_SIDE
 	Input.parse_input_event(touch)
 	await wait_frames(3)
 	assert_false(world.is_pressed(), "뗌")
@@ -137,6 +140,7 @@ func test_떨어지면_게임_끝_화면과_최고_기록_그리고_다시_시�
 func _touch(pressed: bool) -> void:
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = pressed
+	touch.position = get_viewport().get_screen_transform() * RIGHT_SIDE  # 화면 오른쪽 = 점프
 	Input.parse_input_event(touch)
 
 
@@ -283,9 +287,9 @@ func test_버튼_자리_터치는_점프도_다시_시작도_아니다() -> void
 	tap.call(Vector2(40.0, 630.0))
 	await wait_frames(3)
 	assert_true(world.sim.on_ground, "버튼 자리는 점프 아님")
-	tap.call(Vector2(400.0, 630.0))
+	tap.call(Vector2(900.0, 630.0))
 	await wait_frames(3)
-	assert_false(world.sim.on_ground, "다른 자리는 점프")
+	assert_false(world.sim.on_ground, "다른 자리(오른쪽)는 점프")
 	world.sim.on_ground = false
 	world.sim.y = Balance.FALL_LIMIT + 1.0
 	world.sim.vy = -1000.0

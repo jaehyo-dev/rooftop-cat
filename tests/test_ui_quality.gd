@@ -20,6 +20,7 @@ const EDGE_TIGHT := {
 	"hud/heart_crack.png": 67, "hud/heart_empty.png": 66, "hud/heart_full.png": 72,
 	"items/bell.png": 59, "items/can.png": 98, "items/cookie.png": 79, "items/gold.png": 44, "items/snack.png": 43,
 	"items/yarn.png": 91, "obstacles/ac.png": 278, "obstacles/flock.png": 79, "obstacles/pot.png": 99, "obstacles/tank.png": 126,
+	"obstacles/sign.png": 240,  # 밧줄이 위 끝에서 잘림 (게임이 그 위를 선으로 이음)
 }
 
 

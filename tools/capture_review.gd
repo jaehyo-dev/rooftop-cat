@@ -83,7 +83,7 @@ func _init() -> void:
 				tapped = true
 		# 누름을 실제 입력처럼 넣는다 (터치 한 손가락)
 		if pressed:
-			world.set("_touches", {0: true})
+			world.set("_touches", {0: "jump"})
 			if not world.get("_was_pressed"):
 				world.set("_tap_pending", true)
 		else:

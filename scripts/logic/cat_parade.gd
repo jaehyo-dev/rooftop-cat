@@ -3,25 +3,28 @@ extends RefCounted
 ## 줄줄이 고양이 행렬 시험판 (GAME_SPEC "2026-11-13 게임 정체성", 화면과 분리된 로직). RunnerSim.parade_on일 때 sim.step이 부른다.
 ## - 길고양이(strays): 옥상 위 웅크린 고양이. 처음 STRAY_FIRST초, 그 뒤 STRAY_EVERY초마다 화면 오른쪽 밖 옥상에 놓는다.
 ##   장애물·트램펄린·아이템 둘레(STRAY_CLEAR)는 피하고, 그 자리 땅 생선은 치운다. 주인공 x가 그 자리를 지나면(점프 중이어도) 만남.
-## - 줄(cats): 만난 고양이는 맨 뒤에 붙는다. 따라오는 고양이 i(0부터)는 주인공보다 (i+1) x PARADE_GAP 뒤의 기록(trail)을 그대로 재생한다.
-##   기록은 시간이 아니라 주인공 x 기준이라 빨라져도 간격이 같고, 주인공이 무사히 지난 길을 그대로 지난다.
-## - 부딪힘(scare): 하트도 잃고 맨 뒤 고양이가 놀라 도망간다 (2026-11-13 A로 확정, RunnerSim._hit_obstacles).
+## - 무리(cats): 만난 아기는 주인공 뒤쪽 위 정해진 자리(Balance.KITTEN_SLOTS[i], i = 만난 차례) 하나를 잡고 구름 방석에 앉아 떠다닌다
+##   (2026-11-17 사용자 결정: 줄은 평지에서 빽빽하고 도망이 화면 끝에서 끝나 거슬림). 떠다니는 움직임은 화면(world_view)이 스프링으로,
+##   자리·둥실 박자는 여기 static 함수. 아기는 충돌 판정이 없다.
+## - 능력 (2026-11-17 액션 시험판, 자동 발동): 턱시도 냥펀치(앞 장애물 하나 부숨)·치즈 물어 오기(놓친 필수 생선을 물어 와 콤보 유지)·
+##   삼색 반짝 코(앞 생선 3마리를 황금으로). 나머지 품종은 능력 없음. 아기마다 "cool"(남은 충전 초), 쓰면 skill_used에 알림.
+## - 부딪힘(scare): 하트도 잃고 가장 나중에 온 아기가 날아가 사라진다 (A 규칙, RunnerSim._hit_obstacles).
 
 ## 아기 고양이 품종 (assets/sprites/kittens/<품종>/, GAME_SPEC "줄줄이" 시안 2 확정): 치즈(방울)·고등어(접힌 귀)·턱시도(나비넥타이)·삼색(꽃핀)·젖소(방울 꼬리)·회색(삐친 털)
 const LOOKS := ["cheese", "mackerel", "tuxedo", "calico", "cow", "gray"]
 
-## 줄: {"look", "quirk"(0~1, 개성), "from": 만난 자리 Vector2(x, 발 높이), "t": 붙은 뒤 지난 시간}
+## 무리: {"look", "quirk"(0~1, 개성: 둥실 박자·울음 높이)}. 자리 = 배열 순서
 var cats: Array[Dictionary] = []
 ## 옥상 위에서 기다리는 길고양이: {"x", "y"(옥상 높이), "look", "quirk"}
 var strays: Array[Dictionary] = []
 ## 이번 step에 만난 고양이, 도망간 고양이 (연출용, step마다 지움)
 var met: Array[Dictionary] = []
 var fled: Array[Dictionary] = []
+## 이번 step에 쓴 능력 (연출용, step마다 지움): {"skill", "look", "x", "y"(대상 로직 자리), "target"(부순 장애물·바뀐 생선들)}
+var skill_used: Array[Dictionary] = []
 ## 이번 판에 만난 수, 가장 길었던 줄
 var met_total := 0
 var best := 0
-## 주인공 기록 {"x", "y", ...} (x 오름차순). 화면이 자세까지 넣어 기록하고, 로직 테스트는 높이만 넣는다
-var trail: Array[Dictionary] = []
 
 var _rng := RandomNumberGenerator.new()
 var _next_meet := 0.0  # 다음 길고양이를 만날 시각 (이 시각에 닿도록 놓는다)
@@ -46,24 +49,21 @@ func fever() -> bool:
 	return cats.size() >= Balance.PARADE_FEVER
 
 
-## 따라오는 고양이 i(0부터)가 재생할 주인공 x
-static func slot_x(i: int, leader_x: float) -> float:
-	return leader_x - Balance.PARADE_LEAD_GAP - Balance.PARADE_GAP * i
+## 아기 i(0부터)가 떠 있을 자리: 주인공 발끝 화면 자리에서 (가로, 세로) 픽셀 (세로는 위가 -)
+static func slot(i: int) -> Vector2:
+	return Balance.KITTEN_SLOTS[i]
 
 
-## 줄이 count마리일 때 주인공 화면 x: 맨 뒤 고양이까지 화면 안에 보이게 기본 자리(CAT_SCREEN_X)보다 오른쪽으로
-static func screen_x(count: int) -> float:
-	if count == 0:
-		return Balance.CAT_SCREEN_X
-	return maxf(Balance.CAT_SCREEN_X, Balance.PARADE_EDGE + Balance.CAT_SCREEN_X - slot_x(count - 1, Balance.CAT_SCREEN_X))
+## 아기마다 박자가 조금 다른 둥실둥실 (자리에 더하는 화면 픽셀). quirk 0~1
+static func bob(t: float, quirk: float) -> Vector2:
+	var hz := Balance.KITTEN_BOB_HZ * (0.8 + 0.4 * quirk)
+	var phase := TAU * (hz * t + quirk)
+	return Vector2(0.35 * sin(phase * 0.5), sin(phase)) * Balance.KITTEN_BOB
 
 
-## sim.step이 이동·아이템·장애물 뒤에 부른다: 붙는 시간 진행, 만남, 다음 길고양이 놓기
+## sim.step이 이동·아이템·장애물 뒤에 부른다: 만남, 다음 길고양이 놓기
 func update(sim: RunnerSim, dt: float) -> void:
-	for i in cats.size():
-		var cat := cats[i]
-		cat.t += dt
-		_join_step(cat, i, sim)
+	_skills(sim, dt)
 	for i in range(strays.size() - 1, -1, -1):
 		var s := strays[i]
 		if sim.x < s.x:
@@ -71,7 +71,7 @@ func update(sim: RunnerSim, dt: float) -> void:
 		strays.remove_at(i)
 		if cats.size() >= Balance.PARADE_MAX:
 			continue  # 그 사이 시험 단추로 줄이 꽉 참
-		var cat := {"look": s.look, "quirk": s.quirk, "from": Vector2(s.x, s.y), "t": 0.0, "wait": true}
+		var cat := {"look": s.look, "quirk": s.quirk, "from": Vector2(s.x, s.y), "cool": cooldown(s.look)}
 		cats.append(cat)
 		met.append(cat)
 		met_total += 1
@@ -82,7 +82,7 @@ func update(sim: RunnerSim, dt: float) -> void:
 			_place(sim, from_x)
 
 
-## 맨 뒤 고양이가 놀라 도망간다. 줄이 비었으면 false
+## 가장 나중에 온 아기가 놀라 날아간다. 무리가 비었으면 false
 func scare() -> bool:
 	if cats.is_empty():
 		return false
@@ -95,10 +95,11 @@ func call_now() -> void:
 	_next_meet = -INF
 
 
-## 시험 단추: 줄을 count마리로 (이미 붙은 상태로)
+## 시험 단추: 무리를 count마리로 (이미 자리에 있는 상태로)
 func fill(count: int) -> void:
 	while cats.size() < mini(count, Balance.PARADE_MAX):
-		cats.append({"look": LOOKS[cats.size() % LOOKS.size()], "quirk": _rng.randf(), "from": Vector2.ZERO, "t": 99.0, "joined": true})
+		var look := _new_look()
+		cats.append({"look": look, "quirk": _rng.randf(), "cool": cooldown(look)})
 	best = maxi(best, cats.size())
 
 
@@ -140,109 +141,93 @@ func _put(sim: RunnerSim, at: float, roof: Dictionary) -> void:
 	_next_meet = arrive + _rng.randf_range(Balance.STRAY_EVERY.x, Balance.STRAY_EVERY.y)
 
 
-## 줄에 아직 없는 품종 하나 (같은 아이가 둘 보이지 않게, 줄은 최대 6 = 품종 수)
+## 품종의 능력 충전 시간 (초). 능력 없으면 INF
+static func cooldown(look: String) -> float:
+	return Balance.KITTEN_SKILLS[look].every if Balance.KITTEN_SKILLS.has(look) else INF
+
+
+## 능력 충전 비율 (0 = 막 씀, 1 = 준비). 능력 없으면 -1 (HUD 고리용)
+static func charge(cat: Dictionary) -> float:
+	if not Balance.KITTEN_SKILLS.has(cat.look):
+		return -1.0
+	return 1.0 - cat.cool / cooldown(cat.look)
+
+
+## 시험 단추: 모든 능력 다시 채우기
+func refill() -> void:
+	for cat in cats:
+		if Balance.KITTEN_SKILLS.has(cat.look):
+			cat.cool = 0.0
+
+
+## 충전하고, 준비된 냥펀치·반짝 코는 대상이 있으면 바로 쓴다 (물어 오기는 놓칠 때 RunnerSim이 fetch로 부름)
+func _skills(sim: RunnerSim, dt: float) -> void:
+	# 냥펀치가 날아가는 중인 장애물: 아기가 닿으면 부서짐 (그동안 그대로 보이고 부딪히지 않음)
+	for i in range(sim.obstacles.size() - 1, -1, -1):
+		var o: Dictionary = sim.obstacles[i]
+		if not o.has("punch"):
+			continue
+		o.punch -= dt
+		if o.punch <= 0.0:
+			var was := o.duplicate()
+			was.x = RunnerSim.obstacle_left(o, sim.x)
+			sim.obstacles.remove_at(i)
+			skill_used.append({"skill": "punch_hit", "look": "tuxedo", "x": was.x + was.w * 0.5, "y": (was.y0 + minf(was.y1, was.y0 + 200.0)) * 0.5, "target": was})
+	for cat in cats:
+		if not Balance.KITTEN_SKILLS.has(cat.look):
+			continue
+		cat.cool = maxf(0.0, cat.cool - dt)
+		if cat.cool > 0.0 or sim.dashing:
+			continue
+		match Balance.KITTEN_SKILLS[cat.look].skill:
+			"punch":
+				_punch(sim, cat)
+			"sparkle":
+				_sparkle(sim, cat)
+
+
+## 냥펀치: 앞쪽(화면 안) 가장 가까운 장애물 하나로 날아감 (SKILL_PUNCH_TRAVEL초 뒤 부서짐, punch_hit)
+func _punch(sim: RunnerSim, cat: Dictionary) -> void:
+	var best := {}
+	var best_left := INF
+	for o in sim.obstacles:
+		var left := RunnerSim.obstacle_left(o, sim.x)
+		if not o.has("punch") and left > sim.x + Balance.SKILL_AHEAD.x and left < sim.x + Balance.SKILL_AHEAD.y and left < best_left:
+			best = o
+			best_left = left
+	if best.is_empty():
+		return
+	best.punch = Balance.SKILL_PUNCH_TRAVEL
+	cat.cool = cooldown(cat.look)
+	skill_used.append({"skill": "punch", "look": cat.look, "x": best_left + best.w * 0.5, "y": (best.y0 + minf(best.y1, best.y0 + 200.0)) * 0.5, "target": best})
+
+
+## 반짝 코: 앞쪽 생선 SKILL_GOLD_COUNT마리를 황금으로 (가까운 것부터)
+func _sparkle(sim: RunnerSim, cat: Dictionary) -> void:
+	var ahead := sim.items.filter(func(item: Dictionary) -> bool:
+		return item.kind == "fish" and item.x > sim.x + Balance.SKILL_AHEAD.x and item.x < sim.x + Balance.SKILL_AHEAD.y)
+	if ahead.is_empty():
+		return
+	ahead.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.x < b.x)
+	ahead = ahead.slice(0, Balance.SKILL_GOLD_COUNT)
+	for item in ahead:
+		item.kind = "gold"
+		item.erase("bonus")
+	cat.cool = cooldown(cat.look)
+	skill_used.append({"skill": "sparkle", "look": cat.look, "x": ahead[0].x, "y": ahead[0].y, "target": ahead})
+
+
+## 물어 오기: 필수 생선을 놓친 순간 RunnerSim이 부름. 준비된 치즈가 있으면 쓰고 true (생선은 먹은 것으로)
+func fetch(item: Dictionary) -> bool:
+	for cat in cats:
+		if Balance.KITTEN_SKILLS.get(cat.look, {}).get("skill", "") == "fetch" and cat.cool <= 0.0:
+			cat.cool = cooldown(cat.look)
+			skill_used.append({"skill": "fetch", "look": cat.look, "x": item.x, "y": item.y, "target": item})
+			return true
+	return false
+
+
+## 무리에 아직 없는 품종 하나 (같은 아이가 둘 보이지 않게, 무리는 최대 6 = 품종 수)
 func _new_look() -> String:
 	var free := LOOKS.filter(func(look: String) -> bool: return not cats.any(func(c: Dictionary) -> bool: return c.look == look))
 	return free[_rng.randi() % free.size()] if not free.is_empty() else LOOKS[_rng.randi() % LOOKS.size()]
-
-
-## 주인공 기록 하나 덧붙이기 (x가 앞으로 갔을 때만). 줄 끝보다 뒤인 기록은 지운다
-func record(pose: Dictionary) -> void:
-	if not trail.is_empty() and pose.x < trail[-1].x:
-		return  # 뒤로 간 기록 (벽에 막힘)은 버림
-	if trail.size() >= 2 and pose.x < trail[-2].x + Balance.PARADE_TRAIL_MIN:
-		trail[-1] = pose  # 너무 촘촘하면 마지막 것을 바꿔 씀 (같은 자리에 선 채 바뀐 자세도 반영)
-		return
-	trail.append(pose)
-	var keep := slot_x(Balance.PARADE_MAX, pose.x) - 200.0
-	while trail.size() > 2 and trail[1].x < keep:
-		trail.pop_front()
-
-
-## 주인공이 x를 지날 때의 기록 (사이는 보간). 기록보다 앞(시작 전)이면 첫 기록
-func sample(at: float) -> Dictionary:
-	if trail.is_empty():
-		return {}
-	if at <= trail[0].x:
-		var first := trail[0].duplicate()
-		first.x = at
-		return first
-	for i in range(trail.size() - 1, -1, -1):
-		var a := trail[i]
-		if a.x > at:
-			continue
-		if i == trail.size() - 1:
-			return a.duplicate()
-		var b := trail[i + 1]
-		var k: float = (at - a.x) / (b.x - a.x)
-		var out := a.duplicate()
-		out.x = at
-		for key in a:
-			if key in ["spin", "rot"]:
-				out[key] = lerp_angle(a[key], b[key], k)
-			elif (a[key] is float or a[key] is Vector2) and b.has(key):  # 한쪽에만 있는 값(트램펄린 "mat")은 앞 기록 그대로
-				out[key] = lerp(a[key], b[key], k)
-		return out
-	return trail[0].duplicate()
-
-
-## 붙는 중: 깡충 내려선 순간 줄 자리와의 거리(gap)와, 주인공이 그동안 달릴 거리(run_len)를 정하고, 다 달리면 붙음.
-## 시간이 아니라 주인공이 달린 거리로 붙으므로 아기 세계 속도 = 주인공 속도 x (1 - gap x 곡선 기울기(최대 1.5) / run_len).
-## run_len >= 1.5 x |gap| 이라 주인공이 빨라지든 느려지든 아기는 뒤로 가지 않고 주인공의 2배를 넘지 않는다
-func _join_step(cat: Dictionary, i: int, sim: RunnerSim) -> void:
-	if cat.get("joined", false):
-		return
-	if cat.get("wait", false):
-		# 만난 자리에 서서 줄이 지나가길 기다렸다가, 줄 맨 뒤 자리가 오면 일어나 붙음
-		# (바로 붙으면 주인공 바로 뒤에서 깡충 뛰고 줄이 몸을 뚫고 지나가 "맨 앞에 끼어듦"으로 보임, 2026-11-17 검토)
-		if slot_x(i, sim.x) >= cat.from.x:
-			cat.erase("wait")
-			cat.t = 0.0
-		return
-	if not cat.has("gap") and cat.t >= Balance.PARADE_JOIN_RISE + Balance.PARADE_JOIN_HOP_TIME:
-		var gap: float = cat.from.x + Balance.PARADE_JOIN_DX - slot_x(i, sim.x)
-		cat.gap = gap
-		cat.run_from = cat.t
-		cat.run_lead = sim.x
-		cat.run_len = maxf(Balance.PARADE_JOIN_RUN_MIN * sim.vx(), 1.5 * absf(gap))
-	elif cat.has("gap") and sim.x - cat.run_lead >= cat.run_len:
-		cat.joined = true
-
-
-## 따라오는 고양이 i의 지금 모습: 기록 재생 (아기 x의 주인공 기록). 붙는 중이면 ("joining" = true)
-## 만난 자리에서 일어나(웅크림, "kind" crouch) → 깡충(rise·fall, 앞으로 조금) → 내려서 달리며 줄 자리로 (아기 x만 다르고 높이·자세는 그 x의 기록)
-func follower(i: int, leader_x: float) -> Dictionary:
-	var cat := cats[i]
-	var slot := slot_x(i, leader_x)
-	if cat.get("joined", false):
-		return sample(slot)
-	var from: Vector2 = cat.from
-	var pose: Dictionary
-	if cat.get("wait", false):
-		pose = sample(from.x)
-		if not pose.is_empty():
-			pose.x = from.x
-			pose.y = from.y
-			pose.kind = "stand"  # 서서 앞으로 가는 줄을 봄
-	elif cat.has("gap"):
-		var u: float = clampf((leader_x - cat.run_lead) / cat.run_len, 0.0, 1.0)
-		pose = sample(slot + cat.gap * (1.0 - u * u * (3.0 - 2.0 * u)))
-		if not pose.is_empty() and pose.get("ground", true):
-			pose.since_land = minf(pose.get("since_land", 9.0), cat.t - cat.run_from)  # 깡충에서 내려선 눌림
-	elif cat.t < Balance.PARADE_JOIN_RISE:
-		pose = sample(from.x)
-		if not pose.is_empty():
-			pose.x = from.x
-			pose.y = from.y
-			pose.kind = "crouch"
-	else:
-		var k: float = (cat.t - Balance.PARADE_JOIN_RISE) / Balance.PARADE_JOIN_HOP_TIME
-		var x := from.x + Balance.PARADE_JOIN_DX * k
-		pose = sample(x)
-		if not pose.is_empty():
-			pose.y = lerpf(from.y, pose.y, k) + Balance.PARADE_JOIN_HOP * 4.0 * k * (1.0 - k)
-			pose.kind = "rise" if k < 0.5 else "fall"
-			pose.ground = false
-	if not pose.is_empty():
-		pose.joining = true
-	return pose

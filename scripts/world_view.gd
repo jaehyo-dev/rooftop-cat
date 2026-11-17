@@ -97,7 +97,12 @@ const TRAMP_PRESS_SY := {"miss": 0.95, "early": 0.95, "good": 0.92, "perfect": 0
 const TRAMP_POP_SY := {"miss": 0.05, "early": 0.05, "good": 0.14, "perfect": 0.28}
 ## 장애물 그림 (assets/sprites/obstacles/, 화면 너비는 Balance.OBSTACLES의 art_w)
 const OBSTACLE_TEXTURES := {"pot": preload("res://assets/sprites/obstacles/pot.png"), "ac": preload("res://assets/sprites/obstacles/ac.png"),
-		"tank": preload("res://assets/sprites/obstacles/tank.png"), "flock": preload("res://assets/sprites/obstacles/flock.png")}
+		"tank": preload("res://assets/sprites/obstacles/tank.png"), "flock": preload("res://assets/sprites/obstacles/flock.png"),
+		"sign": preload("res://assets/sprites/obstacles/sign.png")}
+## 낮은 간판: 그림 위 끝에서 화면 위까지 이어 그리는 밧줄 두 가닥 (그림 너비 비율 위치, tools/make_sign_art.py가 잼)
+const SIGN_ROPES := [0.122, 0.872]
+const ROPE_COLOR := Color("#e2b36a")
+const ROPE_LINE := Color("#6b4a2e")
 const OBSTACLE_SHADOW_ALPHA := 0.6
 const OBSTACLE_SHADOW_FLAT := 0.2
 const FLOCK_SHADOW_ALPHA := 0.25  # 비둘기가 옥상에 드리우는 옅은 그림자
@@ -109,7 +114,11 @@ const ALERT_RISE := 24.0
 const ALERT_BOB := 7.0     # 위아래로 움직이는 폭 (픽셀)
 const ALERT_BOB_HZ := 2.2  # 1초에 몇 번
 ## 매 판 처음 만나는 종류마다 고양이 위에 띄우는 안내
-const OBSTACLE_HINTS := {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!"}
+const OBSTACLE_HINTS := {"pot": "뛰어!", "ac": "길게!", "tank": "두 번!", "flock": "그대로!", "sign": "숙여!"}
+## 슬라이딩 첫 안내 (앱을 켠 뒤 처음 간판이 나오기 전 한 번, 주아 글꼴): 화면 왼쪽에 손가락 + "눌러서 슬라이딩"
+const SLIDE_TEACH_AHEAD := 1.6   # 간판까지 이 시간(초) 남았을 때부터 보여 줌
+const SLIDE_TEACH_AT := Vector2(0.25, 0.62)  # 화면 비율 자리 (왼쪽 절반 가운데쯤)
+static var slide_taught := false  # 이번 실행에서 안내를 끝냄 (슬라이딩으로 간판을 한 번 지나면)
 const HINT_TIME := 1.1
 ## 비둘기가 화면에 들어오기 이만큼 전부터 소리와 오른쪽 끝 깃털 표시 (초)
 const FLOCK_WARN_TIME := 1.0
@@ -191,7 +200,9 @@ const SHARD_LIFE := 0.5
 const SPARKLE_LIFE := 0.3
 const GOLD_FLASH_TIME := 0.3
 const GOLD_COLOR := Color("#e8a21a")
-const SHARD_COLORS := {"pot": Color("#c9764f"), "ac": Color("#b9c3c6"), "tank": Color("#9db3c2"), "flock": Color("#d9d4cc")}
+const SHARD_COLORS := {"pot": Color("#c9764f"), "ac": Color("#b9c3c6"), "tank": Color("#9db3c2"), "flock": Color("#d9d4cc"), "sign": Color("#c99a62")}
+const SLIDE_DUST_EVERY := 0.09  # 슬라이딩 중 발밑 먼지 간격 (초)
+const SLIDE_DIP := 22.0         # 슬라이딩 중 떠다니는 아기들도 이만큼 낮아짐
 ## 떠오르는 효과 글자 ("팡!", "펑!", "딸랑!")
 const POP_TEXT_TIME := 0.5
 ## 방울 HUD: 하트 오른쪽. 막으면 두 쪽으로 깨진다. 진행 막대: 하트 아래 아이콘 + 남은 시간
@@ -213,18 +224,23 @@ const SPEED_LINE_FISH_DIM := 0.25
 const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어드는 시간
 const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
-## 줄줄이 (cat-parade 브랜치): 아기 고양이 도망·만남 연출, 골골 피버
-const KITTEN_TOP := 255.0       # 따라오는 아기 발끝 화면 높이: 이보다 위로 가면 부드럽게 눌러 머리가 왼쪽 위 HUD 생선 수(약 160) 아래에 (240은 귀가 생선 아이콘에 닿음)
+## 아기 고양이 무리 (cat-parade 브랜치): 떠다니기·만남·날아감 연출, 골골 피버
+const KITTEN_TOP := 255.0       # 떠다니는 아기 발끝 화면 높이: 이보다 위로 가면 부드럽게 눌러 머리가 왼쪽 위 HUD 생선 수(약 160) 아래에
 const KITTEN_TOP_SQUEEZE := 0.12# 하한을 넘은 높이의 이만큼만 더 올라감 (딱 멈추지 않고 살짝 따라 올라가게)
-const RUNAWAY_ALERT_Y := 82.0   # "!"를 도망 아기 발끝에서 이만큼 위 (아기 머리 바로 위)
-const RUNAWAY_OUT := 120.0      # 도망 아기는 발끝이 화면 왼쪽 밖 이만큼 나가면 끝
-const KITTEN_SHADOW_R := 36.0   # 아기 그림자 반지름 (주인공 그림자 방식, 몸 폭 약 65px의 0.55배)
-const KITTEN_DUST_RING := 26.0  # 아기 착지 먼지 고리 크기
-const KITTEN_HEAD_X := 28.0     # 아기 머리 가운데: 발끝 가운데에서 보는 쪽으로 이만큼
-const MEET_LOOK := 260.0        # 주인공이 길고양이 자리 이만큼 앞까지 오면 일어서서 주인공을 봄
-const SWEAT_COLOR := Color("#bfe3f5")
-const PARADE_FX_TIME := 0.8     # 만남 하트·놀람 "!"가 떠 있는 시간
-const PARADE_SHIFT_RATE := 3.0  # 줄이 길어질 때 주인공 화면 자리가 옮겨 가는 빠르기
+const CLOUD_W := 112.0          # 구름 방석 폭 (아기 몸 약 100px보다 조금 넓게)
+const CLOUD_SINK := 8.0         # 구름 가운데를 발끝보다 이만큼 아래 (엉덩이가 구름에 묻힘)
+const CLOUD_POP := 0.3          # 구름이 퐁 커지는 시간 (넘쳤다 돌아옴)
+const FLINCH := Vector2(5.0, -9.0)  # 한 마리가 날아갈 때 남은 아기 움찔 (스프링 충격, 픽셀)
+const SKILL_OUT := 0.25         # 물어 오기·반짝 코: 아기가 대상까지 날아가는 시간 (냥펀치는 Balance.SKILL_PUNCH_TRAVEL)
+const SKILL_BACK := 0.3         # 능력 뒤 자리로 돌아오는 시간
+const SKILL_TRAIL := 10         # 능력 궤적 점 수
+const FLY_VIEWS := 3            # 동시에 날아가는 아기 그림 수
+const FLY_TO := Vector2(-300.0, -420.0)  # 날아가는 아기가 이동하는 거리 (화면 위·뒤)
+const FLY_TURNS := 1.5          # 날아가며 도는 바퀴
+const SCARED_ANCHOR := Vector2i(150, 236)  # 놀란 그림(scared.png 300x260) 발끝
+const SCARED_CENTER := 70.0     # 도는 축: 발끝에서 그림 픽셀로 이만큼 위
+const SCARED_PX := CatView.KITTEN_ART * 0.4219 * Balance.PARADE_SIZE  # 그림 픽셀 → 게임 픽셀 (예전 아기와 같은 크기, art_scale = 150/355.5)
+const PARADE_FX_TIME := 0.8     # 만남 하트·"냐!"가 떠 있는 시간
 const FEVER_GLOW := Color("#ffd37a")
 const FEVER_ALPHA := 0.28
 const PURR_DB := -12.0          # 골골 소리 층 크기 (효과음보다 작게 깔림)
@@ -232,19 +248,13 @@ const PURR_FADE := 0.6
 const MEOW_DB := -8.0
 
 var sim := RunnerSim.new(randi())
-var _cat_x := Balance.CAT_SCREEN_X  # 주인공 화면 x (줄이 길면 맨 뒤까지 보이게 오른쪽으로)
 var _stray_view := CatView.new()     # 옥상에서 기다리는 길고양이 (앉아 꼬리 살랑)
-var _kittens: Array[KittenView] = []  # 줄 자리마다 아기 (뒤 자리가 위에 그려짐)
-var _runners: Array[KittenView] = []  # 도망가는 아기 (RUNNERS마리까지)
-var _meet: KittenView                 # 주인공이 다가와 일어선 길고양이 (_build_parade에서 만듦)
-const RUNNERS := 4
-var _kitten_tramp := {}              # 아기가 지금 누르고 있는 트램펄린 (그물을 평평하게 그림)
-const NO_MAT := -1.0e6               # 기록 "mat" 없음 (기록 사이를 보간하므로 -INF 대신 유한한 값: -INF와 섞으면 NaN)
-const KITTEN_PRESS := 0.2           # 아기가 트램펄린을 누르는 깊이 = 주인공이 누른 깊이 x 이 값 (몸무게만큼)
-var _kpose_memo := {}                # 기록할 아기 공중 자세의 지금 자세·지난 시간 (KittenMotion.air_pose)
-var _kitten_dusts: Array[Dictionary] = []  # 줄 아기 착지 먼지 {"x", "y", "k"} (로직 좌표, 그릴 때만)
-var _runaways: Array[Dictionary] = []   # 놀라 도망가는 아기 {"look", "x", "y", "t", "vx", "lead0"} (로직 좌표)
-var _parade_fx: Array[Dictionary] = []  # {"kind": "heart"/"alert", "x", "y", "t"} (로직 좌표)
+var _kittens: Array[Node2D] = []     # 무리 자리마다 아기 (원점 = 발끝, 자식 Cloud·View)
+var _springs: Array = []              # 자리마다 화면 위치 스프링 (Spring, 빈 자리 null)
+var _slot_looks: Array = []           # 자리마다 스프링을 시작한 아기 품종 (바뀌면 다시 시작)
+var _fly_views: Array[Node2D] = []    # 날아가는 아기 그림
+var _fly_aways: Array[Dictionary] = []  # 날아가는 아기 {"look", "from"(화면), "t"}
+var _parade_fx: Array[Dictionary] = []  # {"kind": "heart", "x", "y", "t", "look"} (로직 좌표)
 var _purr := AudioStreamPlayer.new()
 var _purr_gain := 0.0
 ## 이번 판 미션 사건 세기 (판이 끝나면 main이 Missions.end_run에 넘김)
@@ -271,6 +281,7 @@ var _was_pressed := false
 var _wait_release := false  # 다시 시작한 손가락을 뗄 때까지 점프로 치지 않음
 ## 누른 신호를 로직이 한 번 볼 때까지 남겨 둔다: 한 프레임 안에 누르고 뗀 짧은 탭(느린 휴대폰)도 놓치지 않게
 var _tap_pending := false
+var _slide_pending := false  # 슬라이딩 짧은 탭도 한 번은 로직이 보게 (공중 내려찍기)
 var _pops: Array[Dictionary] = []  # 먹은 아이템 연출 {"kind", "x", "y", "t"}
 var _was_rescuing := false
 var _bursts: Array[Dictionary] = []  # 발밑 터짐 {"x", "y", "t", "stars"}
@@ -376,14 +387,14 @@ func _process(delta: float) -> void:
 			restart()
 		return
 	_wait_release = _wait_release and pressed
-	sim.view_ahead = _view_size().x - _cat_x
+	sim.view_ahead = _view_size().x - Balance.CAT_SCREEN_X
 	_hitstop_gap = maxf(0.0, _hitstop_gap - delta)
 	_hitstop = maxf(0.0, _hitstop - delta)
 	# 멈춤 중에는 게임 진행 루프를 건너뛴다 (눌린 입력은 _tap_pending에 남아 멈춤 뒤에 처리됨)
 	_accumulator = 0.0 if _hitstop > 0.0 else minf(_accumulator + delta, STEP * MAX_STEPS_PER_FRAME)
 	while _accumulator >= STEP:
 		var combo_before := [sim.combo.count, sim.combo.multiplier()]
-		sim.step(STEP, pressed and not _wait_release)
+		sim.step(STEP, pressed and not _wait_release, is_sliding())
 		tracker.observe(sim)
 		_play_events(combo_before)
 		for item in sim.picked:
@@ -398,6 +409,7 @@ func _process(delta: float) -> void:
 		_item_effects()
 		_parade_events()
 		_tap_pending = false
+		_slide_pending = false
 		pressed = is_pressed()
 		_accumulator -= STEP
 		# 게임 끝을 먼저 알린다: 마지막 하트를 잃은 부딪힘도 멈춤을 걸어 아래 break에 걸리기 때문
@@ -494,6 +506,16 @@ func _item_effects() -> void:
 		if _hitstop_gap <= 0.0:
 			_hitstop = Balance.HITSTOP_TIME
 			_hitstop_gap = Balance.HITSTOP_GAP
+	for o in sim.stomped:
+		# 밟기: 질주 부수기 연출 그대로 + 연속 글자, 발밑 별 터짐
+		_knocked.append({"kind": o.kind, "x": o.x + o.w * 0.5, "y": o.y0, "t": 0.0})
+		_shatter(o, "밟기!" if o.chain == 1 else "밟기 x%d" % o.chain)
+		_shake(Balance.SMASH_SHAKE, Balance.SMASH_SHAKE_TIME)
+		_bursts.append({"x": sim.x, "y": sim.y, "t": 0.0, "stars": true})
+		if _hitstop_gap <= 0.0:
+			_hitstop = Balance.HITSTOP_TIME
+			_hitstop_gap = Balance.HITSTOP_GAP
+		_pop_texts.append({"text": "+%d" % o.points, "x": sim.x, "y": sim.y + 150.0, "t": 0.0, "color": GOLD_COLOR})
 	for o in sim.canned:
 		_shatter(o, "펑!")
 	if sim.bell_blocked:
@@ -588,11 +610,23 @@ func _play_events(combo_before: Array) -> void:
 				continue
 			_fish_sound_at = sim.elapsed
 			_sfx.fish.pitch_scale = SfxEvents.fish_pitch(sim.combo.count)  # 연달아 먹을수록 음계로 한 칸씩
+		if sound == "double_jump":
+			_sfx.double_jump.pitch_scale = 1.0
+		if sound == "boing":
+			_sfx.boing.pitch_scale = SfxEvents.stomp_pitch(sim.stomp_chain) if not sim.stomped.is_empty() else 1.0
 		_sfx[sound].play()
 	if doomed:
 		_fall_sounded = true
 	elif sim.on_ground or sim.bounced:
 		_fall_sounded = false
+	if sim.sliding and fmod(sim.time_since_slide, SLIDE_DUST_EVERY) < STEP:
+		_bursts.append({"x": sim.x - 50.0, "y": sim.y, "t": 0.0, "stars": false, "size": 0.55})  # 슬라이딩 먼지 (몸 뒤 발밑)
+		for o in sim.obstacles:
+			if o.kind == "sign" and absf(o.x + o.w * 0.5 - sim.x) < o.w:
+				o.slid = true  # 슬라이딩으로 지나는 중 (첫 안내 끝내기용)
+	if sim.dived:
+		_sfx.double_jump.pitch_scale = 0.7  # 내려찍기: 더블점프 소리를 낮게 (휙)
+		_sfx.double_jump.play()
 	var bounced_good := sim.bounced and sim.bounce_result in ["good", "perfect"]
 	if sim.double_jumped or bounced_good:
 		_bursts.append({"x": sim.x, "y": sim.y + tramp_cat_lift(sim), "t": 0.0, "stars": sim.double_jumped or sim.bounce_result == "perfect"})
@@ -602,22 +636,12 @@ func _play_events(combo_before: Array) -> void:
 func _place_cat(delta: float) -> void:
 	var lift := tramp_cat_lift(sim)
 	_cat_lift = lift if delta <= 0.0 else lerpf(_cat_lift, lift, 1.0 - exp(-CAT_LIFT_RATE * delta))
-	cat.position = Vector2(_cat_x, _ground_y() - sim.y + FOOT_SINK - _cat_lift)
+	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK - _cat_lift)
 	if waiting:
 		cat.show_sit(_sit_time)  # 시작 화면: 앉아서 꼬리 흔들기
 	else:
 		cat.show_state(sim, delta)
-		# 따라오는 고양이가 재생할 기록: 발 높이 + 그림만 올린 높이(트램펄린·달리기 들썩임), 자세 (비틀거림은 주인공만)
-		var rec := {"x": sim.x, "y": sim.y, "lift": _ground_y() - sim.y + FOOT_SINK - cat.position.y, "frame": cat.frame_name,
-				"kpose": KittenMotion.air_pose(_kpose_memo, cat.frame_name, sim.on_ground, sim.vy, delta,
-						sim.is_riding() or sim.time_since_bounce < sim.time_since_jump), "tlift": _cat_lift,
-				"ground": sim.on_ground, "since_land": sim.time_since_land, "since_jump": sim.time_since_jump,
-				"body": cat.scale / CatView.art_scale(), "rot": cat.rotation - deg_to_rad(CatView.stagger(sim.time_since_hit)), "spin": cat.spin()}
-		var mat := _tramp_mat()
-		if mat != NO_MAT:
-			rec["mat"] = mat  # 트램펄린을 누르는 동안만 (없음과 높이를 섞어 보간하지 않게, Codex 리뷰)
-		sim.parade.record(rec)
-	_place_parade()
+	_place_parade(delta)
 
 
 ## 시작 화면: 강화 없이 판을 만들어 멈춰 둔다 (부스터를 줄이지 않음). [시작]은 같은 시드로 restart해 옥상이 그대로다
@@ -632,8 +656,8 @@ func restart(seed_value: int = randi(), wait: bool = false) -> void:
 	_seed = seed_value
 	sim = RunnerSim.new(seed_value, Balance.RUN_SPEED, true, make_perks.call() if not wait and make_perks.is_valid() else null)
 	sim.parade_on = true
-	_cat_x = Balance.CAT_SCREEN_X
-	_runaways.clear()
+	_fly_aways.clear()
+	_slot_looks.fill("")
 	_parade_fx.clear()
 	_purr_gain = 0.0
 	tracker = MissionTracker.new()
@@ -681,12 +705,19 @@ func _input(event: InputEvent) -> void:
 		if event.pressed and touch_blocked(event.position):
 			return
 		if event.pressed:
-			_touches[event.index] = true
-			_tap_pending = true
+			# 판 중에는 화면 왼쪽 절반 = 슬라이딩, 오른쪽 = 점프 (2026-11-17). 시작 화면·결과 화면은 어디든 누름
+			var left_half: bool = event.position.x < get_viewport_rect().size.x * 0.5
+			_touches[event.index] = "slide" if left_half and not waiting and not sim.game_over else "jump"
+			if _touches[event.index] == "jump":
+				_tap_pending = true
+			else:
+				_slide_pending = true
 		else:
 			_touches.erase(event.index)
-	elif event is InputEventKey and event.physical_keycode == KEY_SPACE and event.pressed and not event.echo:
+	elif event is InputEventKey and event.physical_keycode in [KEY_SPACE, KEY_UP] and event.pressed and not event.echo:
 		_tap_pending = true
+	elif event is InputEventKey and event.physical_keycode in [KEY_DOWN, KEY_S] and event.pressed and not event.echo:
+		_slide_pending = true
 
 
 func touch_blocked(at: Vector2) -> bool:
@@ -702,9 +733,14 @@ func _notification(what: int) -> void:
 		_touches.clear()
 
 
-## 지금 누르고 있는지 (화면 어디든 터치, 마우스 클릭, 스페이스바)
+## 지금 점프를 누르고 있는지 (화면 오른쪽 터치, 마우스 클릭, 스페이스바·위)
 func is_pressed() -> bool:
-	return _tap_pending or not _touches.is_empty() or Input.is_physical_key_pressed(KEY_SPACE)
+	return _tap_pending or _touches.values().has("jump") or Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_UP)
+
+
+## 지금 슬라이딩을 누르고 있는지 (화면 왼쪽 터치, 아래·S)
+func is_sliding() -> bool:
+	return _slide_pending or _touches.values().has("slide") or Input.is_physical_key_pressed(KEY_DOWN) or Input.is_physical_key_pressed(KEY_S)
 
 
 ## 로직 높이 0이 그려지는 화면 y (화면 맨 아래 + 세로 카메라)
@@ -715,7 +751,7 @@ func _ground_y() -> float:
 func _draw() -> void:
 	var size := _view_size()
 	var ground := _ground_y()  # 로직 높이 0 = 화면 맨 아래 (+ 세로 카메라)
-	var offset := _cat_x - sim.x  # 로직 x → 화면 x
+	var offset := Balance.CAT_SCREEN_X - sim.x  # 로직 x → 화면 x
 
 	# 하늘 (위아래 두 색). 화면이 멀어지면 y 0 위까지 보인다
 	var sky_top := size.y * (1.0 - 1.0 / _zoom)
@@ -750,7 +786,7 @@ func _draw() -> void:
 	var floors: Array = sim.roofs + ([sim.line_touch_eta(0.0).line] if riding else [])
 	var shadow := CatShadow.under(floors, sim.x, sim.y)
 	if not shadow.is_empty() and not sim.rescuing:
-		_draw_shadow(Vector2(_cat_x, ground - shadow.top + FOOT_SINK - (_cat_lift if riding else 0.0)), shadow)
+		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top + FOOT_SINK - (_cat_lift if riding else 0.0)), shadow)
 
 	_draw_parade(offset, ground)
 	for burst in _bursts:
@@ -777,7 +813,7 @@ func _draw() -> void:
 	if sim.rescuing:
 		# 고양이 발밑에서 상자가 받쳐 올린다 (고양이는 자식 노드라 상자 위에 그려짐)
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
-		draw_texture_rect(BOX_TEXTURE, Rect2(_cat_x - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
+		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
 
 
@@ -792,7 +828,7 @@ func _draw_dash_look(offset: float, ground: float) -> void:
 	var center := cat.position + Vector2(0.0, -Balance.CAT_BODY_SIZE.y * 0.5)
 	var r := DASH_GLOW_RADIUS * (1.0 + 0.08 * sin(sim.elapsed * 18.0))
 	draw_texture_rect(_shadow_texture, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(DASH_GLOW, DASH_GLOW_ALPHA))
-	draw_line(Vector2(_cat_x - 110.0, cat.position.y + 3.0), Vector2(_cat_x + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.55), 5.0, true)
+	draw_line(Vector2(Balance.CAT_SCREEN_X - 110.0, cat.position.y + 3.0), Vector2(Balance.CAT_SCREEN_X + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.55), 5.0, true)
 
 
 ## 조각 하나 (별은 _draw_star, 나머지는 작은 사각 조각)
@@ -869,7 +905,7 @@ func _draw_burst(pos: Vector2, burst: Dictionary) -> void:
 	var k: float = burst.t / BURST_TIME
 	var out := 1.0 - (1.0 - k) * (1.0 - k)  # 빠르게 퍼졌다가 천천히
 	draw_set_transform(pos, 0.0, Vector2(1.0, BURST_FLAT))
-	draw_arc(Vector2.ZERO, BURST_RING * out, 0.0, TAU, 28, Color(BURST_COLOR, 0.85 * (1.0 - k)), 10.0 * (1.0 - k) + 1.0, true)
+	draw_arc(Vector2.ZERO, BURST_RING * out * burst.get("size", 1.0), 0.0, TAU, 28, Color(BURST_COLOR, 0.85 * (1.0 - k)), 10.0 * (1.0 - k) + 1.0, true)
 	draw_set_transform(Vector2.ZERO)
 	if not burst.stars:
 		return
@@ -971,6 +1007,17 @@ func _draw_obstacle(o: Dictionary, offset: float, ground: float) -> void:
 		draw_texture_rect(OBSTACLE_TEXTURES.flock, Rect2(at - art_size.x * 0.5, fly_y - art_size.y * 0.5, art_size.x, art_size.y), false)
 		return
 	var feet: float = ground - o.base + FOOT_SINK
+	if o.kind == "sign":
+		# 판 아래 끝 = 판정 아래 끝(y0), 그림 위에서 화면 위까지 밧줄. 옥상에는 옅은 그림자만
+		var bottom: float = ground - o.y0 + FOOT_SINK
+		_draw_flat_shadow(Vector2(at, feet), art_size.x, FLOCK_SHADOW_ALPHA)
+		for r in SIGN_ROPES:
+			var rx: float = at - art_size.x * 0.5 + art_size.x * r
+			var rope_top := Vector2(rx, -position.y / scale.y - 20.0)  # 화면 위 끝 너머까지
+			draw_line(Vector2(rx, bottom - art_size.y + 6.0), rope_top, ROPE_LINE, 10.0, true)
+			draw_line(Vector2(rx, bottom - art_size.y + 6.0), rope_top, ROPE_COLOR, 5.0, true)
+		draw_texture_rect(OBSTACLE_TEXTURES.sign, Rect2(at - art_size.x * 0.5, bottom - art_size.y, art_size.x, art_size.y), false)
+		return
 	_draw_flat_shadow(Vector2(at, feet), art_size.x, OBSTACLE_SHADOW_ALPHA)
 	draw_texture_rect(OBSTACLE_TEXTURES[o.kind], Rect2(at - art_size.x * 0.5, feet - art_size.y, art_size.x, art_size.y), false)
 
@@ -1055,8 +1102,6 @@ func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
 	if left > _view_size().x + 100.0 or left + Balance.TRAMP_WIDTH < -100.0:
 		return
 	var look := tramp_look(sim, tramp)
-	if is_same(tramp, _kitten_tramp):
-		look = {"frame": "rest", "sy": 1.0}  # 아기가 누르는 동안은 주인공 반동(불룩·출렁임)을 끝낸 평평한 그물 (motion2 12차 검토)
 	var tex: Texture2D = TRAMP_TEXTURES[look.frame]
 	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
 	var feet: float = ground - tramp.base + FOOT_SINK
@@ -1137,7 +1182,7 @@ func _draw_overlay() -> void:
 	if input_off:
 		return  # 상점·미션 화면: 맨 앞 층(top_level)이 메뉴 위에 그려지지 않게
 	var ground := _ground_y()
-	var offset := _cat_x - sim.x
+	var offset := Balance.CAT_SCREEN_X - sim.x
 	_overlay.draw_set_transform(position, 0.0, scale)
 	var touch := sim.line_touch_eta(GUIDE_TIME)
 	if not touch.is_empty() and not sim.game_over:
@@ -1150,13 +1195,13 @@ func _draw_overlay() -> void:
 			_overlay.draw_arc(at, GUIDE_PAW, 0.0, TAU, 32, Color(HUD_BROWN, 0.45), 3.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
-			_draw_bubble(Vector2(_cat_x, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
 	if not sim.game_over:
 		_draw_obstacle_signs(ground, offset)  # 결과 카드 위에 "!"가 뜨지 않게 (이 층은 카드보다 위)
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
-		var at := Vector2(_cat_x, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
+		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 	for pop in _pop_texts:
 		var k: float = pop.t / POP_TEXT_TIME
@@ -1182,7 +1227,7 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 	for o in sim.obstacles:
 		var left: float = RunnerSim.obstacle_left(o, sim.x)
 		if o.kind == "flock" and not sim.game_over:
-			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - _cat_x)
+			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - Balance.CAT_SCREEN_X)
 			if eta > 0.0 and eta <= FLOCK_WARN_TIME:
 				_draw_feather(Vector2(view_w - 34.0, ground - (o.y0 + o.y1) * 0.5))
 		if alert_showing(o, sim.x, _alerts):
@@ -1190,9 +1235,53 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 			var bob: float = ALERT_BOB * absf(sin(PI * ALERT_BOB_HZ * sim.elapsed + o.id))  # 튀어 오르는 느낌: 바닥에서 위로만
 			var at := Vector2(minf(left + o.w * 0.5 + offset, view_w - 40.0), maxf(44.0, ground - o.base + FOOT_SINK - height - ALERT_RISE - bob))
 			var pop: float = minf(1.0, _alerts[o.id] / ALERT_POP)  # 처음에 통 뜬다
+			if o.kind == "sign":
+				# 간판: 판 바로 위가 아니라 판 아래 지나갈 자리를 가리키게 "!" 밑에 아래 화살표 (점프 장애물과 구별)
+				at.y = ground - o.base + FOOT_SINK - o.y0 - _obstacle_size("sign").y - ALERT_RISE - bob
+				_draw_down_arrow(at + Vector2(0.0, 44.0), pop)
 			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0, ALERT_COLOR)
+	_draw_slide_teach()
 	if not _hint.is_empty() and not sim.game_over:
-		_draw_bubble(Vector2(_cat_x, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
+		_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
+
+
+## 빨간 아래 화살표 (크림 테두리), 간판 "!" 밑
+func _draw_down_arrow(at: Vector2, pop: float) -> void:
+	var k := 0.6 + 0.4 * pop
+	var pts := PackedVector2Array([at + Vector2(-18, -10) * k, at + Vector2(18, -10) * k, at + Vector2(0, 14) * k])
+	_overlay.draw_polyline(pts + PackedVector2Array([pts[0]]), HUD_CREAM, 9.0, true)
+	_overlay.draw_colored_polygon(pts, ALERT_COLOR)
+
+
+## 슬라이딩 첫 안내: 화면 왼쪽 손가락이 누르는 모양 + "눌러서 슬라이딩" (이번 실행에서 간판을 슬라이딩으로 한 번 지날 때까지)
+func _draw_slide_teach() -> void:
+	if slide_taught or sim.game_over or waiting:
+		return
+	var near := false
+	for o in sim.obstacles:
+		if o.kind == "sign":
+			var eta: float = (o.x - sim.front()) / maxf(sim.vx(), 1.0)
+			if eta < SLIDE_TEACH_AHEAD and o.x + o.w > sim.x - Balance.CAT_BODY_SIZE.x * 0.5:
+				near = true
+			elif o.x + o.w < sim.x - Balance.CAT_BODY_SIZE.x * 0.5 and o.get("slid", false):
+				slide_taught = true
+	if not near:
+		return
+	var size := get_viewport_rect().size
+	var at := Vector2(size.x * SLIDE_TEACH_AT.x, size.y * SLIDE_TEACH_AT.y)
+	var press := 0.5 + 0.5 * sin(sim.elapsed * TAU * 1.6)  # 누름 박자
+	_overlay.draw_arc(at, 30.0 + 26.0 * press, 0.0, TAU, 40, Color(HUD_CREAM, 0.9 - 0.6 * press), 6.0, true)
+	# 손가락: 아래를 가리키는 둥근 막대 + 손등 (코드 도형, 크림 + 갈색 선)
+	var tip := at + Vector2(0.0, -6.0 * press)
+	var finger := Rect2(tip + Vector2(-13.0, -70.0), Vector2(26.0, 70.0))
+	var box := StyleBoxFlat.new()
+	box.bg_color = HUD_CREAM
+	box.border_color = HUD_BROWN
+	box.set_border_width_all(4)
+	box.set_corner_radius_all(13)
+	_overlay.draw_style_box(box, Rect2(tip + Vector2(-34.0, -112.0), Vector2(68.0, 56.0)))
+	_overlay.draw_style_box(box, finger)
+	_draw_text(at + Vector2(0.0, 62.0), "눌러서 슬라이딩", 40, 1.0)
 
 
 ## "!"를 보여 줄 때: 화면에 들어왔고 몸 뒤쪽이 아직 장애물을 다 지나지 않았을 때 (부순 장애물은 목록에서 빠져 같이 사라짐)
@@ -1316,7 +1405,7 @@ func _draw_speed_lines() -> void:
 func _fish_on_screen() -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var ground := _ground_y()
-	var offset := _cat_x - sim.x
+	var offset := Balance.CAT_SCREEN_X - sim.x
 	var view_w := _view_size().x
 	for item in sim.items:
 		var x: float = item.x + offset
@@ -1368,29 +1457,42 @@ func _draw_text(center: Vector2, text: String, size: int, alpha: float, color: C
 	_overlay.draw_string(HUD_FONT, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(color, alpha))
 
 
-# --- 줄줄이 고양이 행렬 시험판 (cat-parade 브랜치) ---
+# --- 아기 고양이 무리 시험판 (cat-parade 브랜치) ---
 
-## 따라오는 아기 6마리·길고양이·도망가는 아기 그림 (주인공보다 먼저 = 뒤에 그림), 소리
-## 겹치는 순서는 오리 새끼 줄처럼: 뒤 아기가 앞 아기 위에 그려져 뒤 아기 머리가 앞 아기 엉덩이 위로 보인다
+## 떠다니는 아기 6자리(구름 방석 + 앉은 아기, 주인공보다 먼저 = 뒤에 그림)·날아가는 아기·길고양이, 소리
 func _build_parade() -> void:
 	_stray_view.name = "Stray"
 	_stray_view.size_k = Balance.PARADE_SIZE
 	_stray_view.visible = false
 	add_child(_stray_view)
-	for i in Balance.PARADE_MAX + RUNNERS + 1:  # 줄 자리 (앞 = 아래) → 도망 아기 → 만남 아기
-		var view := KittenView.new()
-		view.visible = false
-		add_child(view)
-		move_child(view, i)  # 주인공·효과보다 아래
+	for i in Balance.PARADE_MAX + FLY_VIEWS:
+		var holder := Node2D.new()  # 원점 = 아기 발끝
+		holder.visible = false
+		add_child(holder)
+		move_child(holder, i)  # 주인공·효과보다 아래
 		if i < Balance.PARADE_MAX:
-			view.name = "Kitten%d" % i
-			_kittens.append(view)
-		elif i < Balance.PARADE_MAX + RUNNERS:
-			view.name = "Runaway%d" % (i - Balance.PARADE_MAX)
-			_runners.append(view)
+			holder.name = "Kitten%d" % i
+			var cloud := Sprite2D.new()
+			cloud.name = "Cloud"
+			cloud.texture = CLOUD_TEXTURES[0]
+			cloud.position.y = CLOUD_SINK
+			holder.add_child(cloud)
+			var view := CatView.new()
+			view.name = "View"
+			view.size_k = Balance.PARADE_SIZE
+			holder.add_child(view)
+			_kittens.append(holder)
+			_springs.append(null)
+			_slot_looks.append("")
 		else:
-			view.name = "Meet"
-			_meet = view
+			holder.name = "FlyAway%d" % (i - Balance.PARADE_MAX)
+			var spr := Sprite2D.new()
+			spr.name = "Scared"
+			spr.offset = -Vector2(SCARED_ANCHOR) + Vector2(0, -SCARED_CENTER)  # 몸 가운데 축으로 돎
+			spr.position.y = SCARED_CENTER * SCARED_PX
+			spr.scale = Vector2.ONE * SCARED_PX
+			holder.add_child(spr)
+			_fly_views.append(holder)
 	for sound in ["meow", "nya"]:
 		var player := AudioStreamPlayer.new()
 		player.name = "Sfx_" + sound
@@ -1408,32 +1510,81 @@ func _build_parade() -> void:
 	add_child(_purr)
 
 
-## 이번 step에 만나고 놓친 고양이: 야옹·하트, 냐!·"!"·뒤로 달아남
+## 아기 i가 지금 가려는 화면 자리 (주인공 발끝 + 자리 + 둥실)
+func kitten_target(i: int) -> Vector2:
+	var info: Dictionary = sim.parade.cats[i]
+	var at := cat.position + CatParade.slot(i) + CatParade.bob(sim.elapsed, info.quirk) + Vector2(0.0, SLIDE_DIP if sim.sliding else 0.0)
+	at.y = soft_top(at.y, KITTEN_TOP)  # 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게
+	return at
+
+
+## 이번 step에 만나고 놓친 아기: 야옹·하트·구름 퐁·자리로 날아옴, 냐!·빙글 날아감·남은 아기 움찔
 func _parade_events() -> void:
 	var parade := sim.parade
 	for cat_info in parade.met:
-		_sfx.meow.pitch_scale = 0.88 + 0.3 * cat_info.quirk  # 고양이마다 음 높이 조금씩
+		_sfx.meow.pitch_scale = 0.88 + 0.3 * cat_info.quirk  # 아기마다 음 높이 조금씩
 		_sfx.meow.play()
 		_parade_fx.append({"kind": "heart", "x": cat_info.from.x, "y": cat_info.from.y + 90.0, "t": 0.0, "look": cat_info.look})
+		var i := parade.cats.find(cat_info)
+		if i >= 0:
+			_start_kitten(i, _screen_at(cat_info.from.x, cat_info.from.y))  # 기다리던 자리에서 날아옴
 	for cat_info in parade.fled:
-		var pose := parade.sample(CatParade.slot_x(parade.cats.size(), sim.x))  # 도망간 고양이가 있던 줄 자리
+		var i := parade.cats.size()  # 날아간 아기가 있던 자리 (맨 나중 = 맨 끝)
 		_sfx.nya.pitch_scale = 0.95 + 0.25 * cat_info.quirk
 		_sfx.nya.play()
-		_runaways.append({"look": cat_info.look, "x": pose.x, "y": pose.y, "t": 0.0, "vx": sim.vx(), "lead0": sim.x})
-	_runaways = _runaways.slice(-RUNNERS)
+		_fly_aways.append({"look": cat_info.look, "from": _kittens[i].position, "t": 0.0})
+		_slot_looks[i] = ""
+		for k in parade.cats.size():
+			if _springs[k] != null:
+				_springs[k].kick(FLINCH * Vector2(-1.0 if k % 2 == 0 else 1.0, 1.0))  # 남은 아기 움찔
+	_fly_aways = _fly_aways.slice(-FLY_VIEWS)
+	for ev in parade.skill_used:
+		_skill_event(ev)
 
 
-## 연출 시간, 주인공 화면 자리(줄 길이), 골골 소리
+## 아기 능력 연출: 그 아기가 대상으로 날아갔다 돌아옴(궤적), 짧은 울음, 대상 효과
+func _skill_event(ev: Dictionary) -> void:
+	var at := Vector2(ev.x, ev.y)
+	var i := sim.parade.cats.map(func(c: Dictionary) -> String: return c.look).find(ev.look)
+	if ev.skill == "punch_hit":
+		var o: Dictionary = ev.target
+		_knocked.append({"kind": o.kind, "x": o.x + o.w * 0.5, "y": o.y0, "t": 0.0})
+		_shatter(o, "냥펀치!")
+		_shake(Balance.SMASH_SHAKE, Balance.SMASH_SHAKE_TIME)
+		_sfx.pang.play()
+		return
+	if i >= 0:
+		_kittens[i].set_meta("act", {"t": 0.0, "to": at, "out": Balance.SKILL_PUNCH_TRAVEL if ev.skill == "punch" else SKILL_OUT})
+		_kittens[i].set_meta("trail", [])
+	_sfx.meow.pitch_scale = 1.35  # 짧고 높은 울음 (만남 야옹보다 높게)
+	_sfx.meow.play()
+	if ev.skill == "fetch":
+		_pops.append({"kind": "fish", "x": ev.x, "y": ev.y, "t": 0.0})
+		_sparkle(at, 4, 10.0, 200.0)
+		_pop_texts.append({"text": "물어 왔다!", "x": sim.x - 60.0, "y": sim.y + 190.0, "t": 0.0, "color": GOLD_COLOR})
+	elif ev.skill == "sparkle":
+		for item in ev.target:
+			_sparkle(Vector2(item.x, item.y), 6, 14.0, 240.0)
+		_pop_texts.append({"text": "반짝!", "x": ev.x, "y": ev.y + 70.0, "t": 0.0, "color": GOLD_COLOR})
+
+
+## 아기 i가 자리를 잡음: from 화면 자리에서 스프링으로 자리까지 (구름이 퐁 생김)
+func _start_kitten(i: int, from: Vector2) -> void:
+	var info: Dictionary = sim.parade.cats[i]
+	_springs[i] = Spring.new(Balance.KITTEN_FOLLOW_HZ * (0.85 + 0.3 * info.quirk), Balance.KITTEN_FOLLOW_DAMP, from)
+	_slot_looks[i] = info.look
+	_kittens[i].set_meta("since", 0.0)
+
+
+## 연출 시간, 골골 소리
 func _update_parade(delta: float) -> void:
-	for r in _runaways:
+	for r in _fly_aways:
 		r.t += delta
-	# 도망 아기는 세계에 멈춰 섰다 뒤로 달려 화면 왼쪽 밖으로 나가면 끝
-	_runaways = _runaways.filter(func(r: Dictionary) -> bool: return runaway_at(r).x > -RUNAWAY_OUT)
+	_fly_aways = _fly_aways.filter(func(r: Dictionary) -> bool: return r.t < Balance.KITTEN_FLEE_TIME)
 	for fx in _parade_fx:
 		fx.t += delta
 		fx.y += 40.0 * delta
 	_parade_fx = _parade_fx.filter(func(fx: Dictionary) -> bool: return fx.t < PARADE_FX_TIME)
-	_cat_x = lerpf(_cat_x, CatParade.screen_x(sim.parade.cats.size()), 1.0 - exp(-PARADE_SHIFT_RATE * delta))
 	_purr_gain = Juice.fade(_purr_gain, sim.parade.fever() and not sim.game_over, delta, PURR_FADE, PURR_FADE)
 	if _purr_gain > 0.0 and not _purr.playing:
 		_purr.play()
@@ -1444,207 +1595,118 @@ func _update_parade(delta: float) -> void:
 
 ## 화면 x (로직 x → 화면)
 func _screen_at(at_x: float, feet: float, lift: float = 0.0) -> Vector2:
-	return Vector2(_cat_x + at_x - sim.x, _ground_y() - feet + FOOT_SINK - lift)
+	return Vector2(Balance.CAT_SCREEN_X + at_x - sim.x, _ground_y() - feet + FOOT_SINK - lift)
 
 
-## 따라오는 아기(기록 재생), 길고양이(웅크려 꼬리 → 주인공이 오면 일어섬), 도망가는 아기
-func _place_parade() -> void:
+## 떠다니는 아기(스프링으로 자리 따라감, 구름 위에 앉아 꼬리 살랑), 날아가는 아기, 기다리는 길고양이
+func _place_parade(delta: float = 0.0) -> void:
 	var parade := sim.parade
-	_kitten_tramp = {}
-	_kitten_dusts.clear()
-	var behind := 0  # 아직 줄에 안 붙은 아기는 줄 아기들 뒤에 그림: 줄이 그 앞을 지나가 보임 (위에 그리면 줄이 몸을 뚫고 지나감, 2026-11-17 검토)
 	for i in _kittens.size():
-		_kittens[i].visible = false
-		if waiting or i >= parade.cats.size():
+		var holder := _kittens[i]
+		holder.visible = not waiting and i < parade.cats.size()
+		if not holder.visible:
 			continue
-		var pose := parade.follower(i, sim.x)
-		if not pose.is_empty():
-			_place_kitten(_kittens[i], pose, parade.cats[i])
-		if not parade.cats[i].get("joined", false):
-			move_child(_kittens[i], behind)
-			behind += 1
-	for i in _kittens.size():
-		if i >= parade.cats.size() or parade.cats[i].get("joined", false):
-			move_child(_kittens[i], behind)  # 붙은 아기는 자리 순서대로 (뒤 아기가 위)
-			behind += 1
-	for i in _runners.size():
-		_runners[i].visible = not waiting and i < _runaways.size()
-		if _runners[i].visible:
-			_place_kitten_runaway(_runners[i], _runaways[i])
-	_meet.visible = false
+		var info: Dictionary = parade.cats[i]
+		if _slot_looks[i] != info.look:
+			_start_kitten(i, kitten_target(i))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
+		var since: float = holder.get_meta("since", 9.0) + delta
+		holder.set_meta("since", since)
+		holder.position = _springs[i].step(kitten_target(i), delta) if delta > 0.0 else _springs[i].value
+		_act(holder, delta)
+		var k := clampf(since / CLOUD_POP, 0.0, 1.0) - 1.0
+		holder.get_node("Cloud").scale = Vector2(CLOUD_W, CLOUD_W * 0.8) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k)
+		var view: CatView = holder.get_node("View")
+		view.set_breed(info.look)
+		view.show_sit(sim.elapsed + info.quirk * 5.0)
+	for i in _fly_views.size():
+		var holder := _fly_views[i]
+		holder.visible = not waiting and i < _fly_aways.size()
+		if not holder.visible:
+			continue
+		var r: Dictionary = _fly_aways[i]
+		var u: float = r.t / Balance.KITTEN_FLEE_TIME
+		var spr: Sprite2D = holder.get_node("Scared")
+		spr.texture = load(CatView.KITTEN_DIR + r.look + "/scared.png")
+		# 화면 위·뒤로 포물선 (처음 빠르게), 빙글빙글, 끝 40%에 사라짐
+		holder.position = r.from + FLY_TO * (1.0 - (1.0 - u) * (1.0 - u)) + Vector2(0.0, -60.0 * sin(u * PI))
+		spr.rotation = -FLY_TURNS * TAU * u
+		holder.modulate.a = clampf((1.0 - u) / 0.4, 0.0, 1.0)
 	_stray_view.visible = not waiting and not parade.strays.is_empty()
 	if _stray_view.visible:
 		var s: Dictionary = parade.strays[0]
 		_stray_view.position = _screen_at(s.x, s.y)
 		_stray_view.set_breed(s.look)
 		_stray_view.show_sit(sim.elapsed + s.quirk * 5.0)
-		if s.x - sim.x < MEET_LOOK:
-			# 주인공이 다가오면 일어서서 주인공 쪽을 보고 신나서 들썩 (1차 검토: 웅크린 채 꼼짝 안 함)
-			_stray_view.visible = false
-			_meet.position = _stray_view.position
-			_meet.show_motion(s.look, {"kind": "stand", "dist": 0.0, "facing": -1.0,
-					"squash": 1.0 - 0.06 * absf(sin(sim.elapsed * 14.0))})
-			_meet.visible = true
 
 
-## 그림자·피버 빛 (고양이 그림 아래), 하트·"!" (위)
+## 능력 쓰는 아기: 대상까지 out초에 날아갔다 SKILL_BACK초에 자리로 돌아옴 (그동안 지나간 자리를 궤적으로)
+func _act(holder: Node2D, delta: float) -> void:
+	if not holder.has_meta("act"):
+		return
+	var act: Dictionary = holder.get_meta("act")
+	act.t += delta
+	var to := _screen_at(act.to.x, act.to.y)
+	var home := holder.position
+	if act.t < act.out:
+		var u: float = act.t / act.out
+		holder.position = home.lerp(to, u * u * (3.0 - 2.0 * u)) + Vector2(0.0, -50.0 * sin(u * PI))
+	elif act.t < act.out + SKILL_BACK:
+		var u: float = (act.t - act.out) / SKILL_BACK
+		holder.position = to.lerp(home, u * u * (3.0 - 2.0 * u)) + Vector2(0.0, -40.0 * sin(u * PI))
+	else:
+		holder.remove_meta("act")
+	var trail: Array = holder.get_meta("trail", [])
+	trail.push_front(holder.position + Vector2(0.0, -30.0))
+	holder.set_meta("trail", trail.slice(0, SKILL_TRAIL if holder.has_meta("act") else 0))
+
+
+## 길고양이 그림자·피버 빛 (그림 아래), 하트·"냐!" (위)
 func _draw_parade(_offset: float, _ground: float) -> void:
 	var fever := sim.parade.fever()
 	if _stray_view.visible:
-		var shadow := CatShadow.under(sim.roofs, _stray_view.position.x - _cat_x + sim.x, _ground_y() + FOOT_SINK - _stray_view.position.y)
+		var shadow := CatShadow.under(sim.roofs, _stray_view.position.x - Balance.CAT_SCREEN_X + sim.x, _ground_y() + FOOT_SINK - _stray_view.position.y)
 		if not shadow.is_empty():
 			_draw_shadow(Vector2(_stray_view.position.x, _ground_y() - shadow.top + FOOT_SINK), shadow, _stray_view)
-	for kv in _kittens + _runners + [_meet]:
-		if kv.visible:
-			_draw_kitten_shadow(kv)
-			if fever and kv in _kittens:
-				_draw_fever_glow(kv.position, Balance.PARADE_SIZE)
-	for d in _kitten_dusts:
-		_draw_kitten_dust(_screen_at(d.x, d.y), d.k)
 	if fever:
+		for holder in _kittens:
+			if holder.visible:
+				_draw_fever_glow(holder.position, Balance.PARADE_SIZE)
 		_draw_fever_glow(cat.position, 1.0)
-	for r in _runaways:  # 놀란 아기 머리 위 "!"·땀방울 (같이 움직임)
-		# 머리는 몸 가운데보다 보는 쪽으로 (몸을 돌리면 "!"·땀방울도 따라 옮김, 1차 검토)
-		var facing: float = signf(KittenMotion.runaway(r.t, r.vx).facing)
-		var head := runaway_at(r) + Vector2(KITTEN_HEAD_X * facing, -RUNAWAY_ALERT_Y)
-		if r.t < KittenMotion.STARTLE + KittenMotion.STAND + KittenMotion.TURN + 0.35:
-			_parade_fx_draw("alert", head, r.t, 1.0)
-		_draw_sweat(head + Vector2(26.0 * facing, 24.0), r.t)
+	for i in _kittens.size():
+		var holder := _kittens[i]
+		if not holder.visible:
+			continue
+		var trail: Array = holder.get_meta("trail", [])
+		for k in trail.size():  # 능력 궤적: 뒤로 갈수록 작고 옅은 금빛 점
+			draw_circle(trail[k], 14.0 * (1.0 - float(k) / SKILL_TRAIL), Color(FEVER_GLOW, 0.75 * (1.0 - float(k) / SKILL_TRAIL)))
+		if i < sim.parade.cats.size() and CatParade.charge(sim.parade.cats[i]) >= 1.0 and not holder.has_meta("act"):
+			_draw_twinkle(holder.position + Vector2(36.0, -70.0), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
+	for r in _fly_aways:  # 날아가는 아기 머리 위 "냐!" (처음 반)
+		var i := _fly_aways.find(r)
+		if i < _fly_views.size() and r.t < Balance.KITTEN_FLEE_TIME * 0.6:
+			_parade_fx_draw("nya", _fly_views[i].position + Vector2(0.0, -80.0), r.t, 1.0)
 	for fx in _parade_fx:
-		# 하트는 막 줄에 붙은 그 아기 머리 위에 붙어 떠오름 (2차 검토: 하트가 자리에 남아 둥둥)
+		# 하트는 막 온 그 아기 머리 위에 붙어 떠오름
 		var at := _screen_at(fx.x, fx.y)
-		for kv in _kittens:
-			if kv.visible and kv.breed == fx.look:
-				at = kv.position + Vector2(0.0, -95.0 - 40.0 * fx.t)
+		for holder in _kittens:
+			if holder.visible and holder.get_node("View").breed == fx.look:
+				at = holder.position + Vector2(0.0, -85.0 - 40.0 * fx.t)
 		_parade_fx_draw(fx.kind, at, fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
 
 
-## 줄의 아기: 기록의 위치에, 자세는 아기 자신의 상태로 (땅 위에서는 들어 올리지 않음, 공중에서만 기록의 그림 높이)
-func _place_kitten(view: KittenView, pose: Dictionary, info: Dictionary) -> void:
-	var parade := sim.parade
-	var slope: float = (parade.sample(pose.x + 6.0).y - parade.sample(pose.x - 6.0).y) / 12.0
-	var st := KittenMotion.state(pose, slope)
-	var ground: bool = st.kind == "run"  # 기록이 땅 (아래에서 웅크림·오르는 길 자세로 바뀌어도)
-	var tlift: float = pose.get("tlift", 0.0)
-	var ahead := parade.sample(pose.x + sim.vx() * KittenMotion.PRE_CROUCH)
-	# 앞에서 주인공이 뛴 자리·트램펄린으로 뛰어오른 자리: 미리 웅크림
-	# (주인공 웅크림 0.03초는 아기에게 너무 짧아 안 보임 1차, 트램펄린 앞만 웅크림 없이 뜸 4차 검토)
-	if ground and not pose.has("kind") and (KittenMotion.jumps_soon(ahead) or (tlift <= 2.0 and ahead.get("tlift", 0.0) > 2.0)):
-		st.kind = "crouch"
-	if ground and not pose.has("kind") and tlift > 2.0:
-		# 트램펄린 오르는 길: 땅이지만 몸이 떠 있어 달리기 그림이면 공중을 달림 (3차 검토) → 오를 때·내릴 때 자세
-		st.kind = "rise" if parade.sample(pose.x + 6.0).get("tlift", 0.0) >= tlift else "fall"
-	# 트램펄린 들어 올림(오르는 길·매트 위)은 기록 그대로 (예전엔 땅 위에서 버려 매트 밑을 지나감, motion2 1차 검토).
-	# 주인공 달리기 들썩임은 빼고 ("lift"에는 들어 있어 땅 위에서 몸이 4px 떴다 내려옴, 2차 검토).
-	# 그물은 주인공 무게로만 눌려 그려지므로 아기는 주인공이 누른 깊이를 KITTEN_PRESS배로만 따라 내려감
-	# (그대로 따라가면 그물 밑으로 꺼짐 2차, 매트 높이로 붙잡으면 멈췄다 툭 떨어짐 4차 검토)
-	var lift: float = 0.0 if pose.has("kind") else pose.get("tlift", 0.0)
-	var mat: float = pose.get("mat", NO_MAT)
-	if not pose.has("kind") and pose.y + lift < mat:
-		lift = mat - KITTEN_PRESS * (mat - pose.y - lift) - pose.y
-		for s in sim.structures:
-			if s.kind == "tramp" and pose.x >= s.left - 20.0 and pose.x <= s.right + 20.0:
-				_kitten_tramp = s
-	view.position = _screen_at(pose.x, pose.y, lift)
-	view.position.y = soft_top(view.position.y, KITTEN_TOP)  # 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게 (그림만, 길은 그대로)
-	var stride := KittenMotion.a_stride(info.look)
-	view.show_motion(info.look, {"kind": st.kind, "dist": pose.x, "tilt": st.tilt, "land_k": st.land_k,
-			"squash": KittenMotion.squash(st.land_k, fposmod(pose.x / stride, 1.0), info.quirk) if st.kind == "run" else 1.0,
-			"widen": KittenMotion.widen(st.land_k) if st.kind == "run" else 1.0})
-	view.visible = true
-	var since: float = pose.get("since_land", 9.0)
-	if ground and since < KittenMotion.DUST_TIME:
-		_kitten_dusts.append({"x": pose.x - since * sim.vx(), "y": pose.y, "k": since / KittenMotion.DUST_TIME})
-
-
-## 주인공이 트램펄린을 누르는 중·튕긴 직후면 그 트램펄린 매트(눌리지 않은) 높이, 아니면 NO_MAT (아기 높이 맞춤용)
-func _tramp_mat() -> float:
-	var line: Dictionary = sim.line_touch_eta(0.0).get("line", {}) if sim.is_riding() else {}
-	if line.is_empty() and sim.bounced_line.get("kind", "") == "tramp" and sim.time_since_bounce < sim.time_since_land \
-			and sim.time_since_bounce < Balance.TRAMP_PUSH + TRAMP_RELEASE:
-		line = sim.bounced_line
-	return line.base + tramp_height(TRAMP_SRC_NET.rest, 1.0) if line.get("kind", "") == "tramp" else NO_MAT
-
-
-## 도망가는 아기: 놀라 움츠림(끼익 멈춤) → 깜짝 펄쩍 → 서서 놀람 → 몸 돌림 → 뒤로 달림. 내내 놀란 얼굴 (2026-11-17)
-func _place_kitten_runaway(view: KittenView, r: Dictionary) -> void:
-	var run := KittenMotion.runaway(r.t, r.vx)
-	view.position = runaway_at(r)
-	var x := _runaway_x(r, run)  # 그림 자리와 같은 x (예전엔 끼익 거리를 줄이기 전 x로 발밑을 봐 틈 위로 착각, 9차 검토)
-	var under := CatShadow.under(sim.roofs, x, r.y)
-	var falling: bool = not under.is_empty() and KittenMotion.runaway_y(r.y, under.top, r.t) > under.top + 1.0
-	var kind: String = runaway_pose(run)
-	if falling:
-		kind = "flail"  # 공중에서 놀라 내려앉음 (놀란 얼굴)
-	view.show_motion(r.look, {"kind": kind, "dist": run.back, "facing": run.facing, "surprised": true,
-			"tilt": KittenMotion.FLEE_LEAN if kind == "run" else 0.0})
-
-
-## 도망 단계 → 아기 그림 (달리기는 놀란 윗몸을 덮음)
-static func runaway_pose(run: Dictionary) -> String:
-	if run.kind == "crouch":
-		return "scared_crouch"
-	if run.kind == "run":
-		return "run"
-	return "scared_hop" if run.lift > 2.0 else "startle"  # 깜짝 펄쩍은 위로 솟는 그림 (예전 허우적은 앞으로 뛰어드는 것처럼, 5차 검토)
-
-
-## 아기 그림자 (주인공 그림자 방식 축소: 발밑 옥상 위, 높이 뜰수록 작고 옅게)
-func _draw_kitten_shadow(view: KittenView) -> void:
-	var feet_x := view.position.x - _cat_x + sim.x
-	var feet_y := _ground_y() + FOOT_SINK - view.position.y
-	var shadow := CatShadow.under(sim.roofs, feet_x, feet_y)
-	if shadow.is_empty():
-		return
-	var r: float = KITTEN_SHADOW_R * shadow.scale
-	draw_set_transform(Vector2(view.position.x, _ground_y() - shadow.top + FOOT_SINK), 0.0, Vector2(1.0, CatShadow.FLAT))
-	draw_texture_rect(_shadow_texture, Rect2(-r, -r, r * 2.0, r * 2.0), false, Color(SHADOW_COLOR, minf(1.0, shadow.alpha * SHADOW_PEAK)))
-	draw_set_transform(Vector2.ZERO)
-
-
-## 아기 착지 먼지: 발밑에서 납작하게 퍼지는 작은 고리 두 개 (k = 0~1)
-func _draw_kitten_dust(pos: Vector2, k: float) -> void:
-	var out := 1.0 - (1.0 - k) * (1.0 - k)
-	draw_set_transform(pos, 0.0, Vector2(1.0, BURST_FLAT))
-	draw_arc(Vector2.ZERO, KITTEN_DUST_RING * out, 0.0, TAU, 20, Color(BURST_COLOR, 0.7 * (1.0 - k)), 6.0 * (1.0 - k) + 1.0, true)
-	draw_set_transform(Vector2.ZERO)
-
-
-## 놀란 땀방울 하나 (머리 옆, 처음 0.1초 톡 커짐, 살짝 흔들림)
-func _draw_sweat(at: Vector2, t: float) -> void:
-	var s := 1.0 + 0.4 * maxf(0.0, 1.0 - t / 0.1)
-	at.y += 2.0 * sin(t * 18.0)
-	var outline := Color("#5a4636")
-	var tip := at + Vector2(0.0, -13.0) * s
-	var l := at + Vector2(-5.2, -3.0) * s
-	var r := at + Vector2(5.2, -3.0) * s
-	draw_circle(at, 6.0 * s + 1.0, outline)  # 테두리 (원 + 뾰족 끝)
-	draw_line(l, tip, outline, 3.0, true)
-	draw_line(r, tip, outline, 3.0, true)
-	draw_colored_polygon(PackedVector2Array([l, tip, r]), SWEAT_COLOR)  # 삼각형은 늘 나뉨 (예전 15각형은 가끔 삼각분할 실패)
-	draw_circle(at, 6.0 * s, SWEAT_COLOR)
+## 반짝 별 하나 (네 갈래, phase로 커졌다 작아짐)
+func _draw_twinkle(at: Vector2, phase: float) -> void:
+	var r := 9.0 + 4.0 * sin(phase)
+	var pts := PackedVector2Array()
+	for k in 8:
+		var a := TAU * k / 8.0 - PI * 0.5
+		pts.append(at + Vector2(cos(a), sin(a)) * (r if k % 2 == 0 else r * 0.35))
+	draw_colored_polygon(pts, Color(1.0, 0.93, 0.55, 0.8 + 0.2 * sin(phase)))
 
 
 ## 화면 y가 top보다 위(작음)면 넘은 만큼의 KITTEN_TOP_SQUEEZE배만 올라가게
 static func soft_top(y: float, top: float) -> float:
 	return y if y >= top else top - (top - y) * KITTEN_TOP_SQUEEZE
-
-
-## 도망 아기의 세계 x: 놀라 움츠림·펄쩍·몸 돌림 동안은 줄과 같이 가서 화면 같은 자리에서 연기하고, 돌아선 뒤 뒤로 달림
-## (맨 뒤 아기는 화면 왼쪽 끝이라 세계에 멈춰 서면 몸을 돌리기 전에 화면 밖으로 나감, 2026-11-17 검토)
-func _runaway_x(r: Dictionary, run: Dictionary) -> float:
-	if r.t < KittenMotion.STARTLE + KittenMotion.STAND + KittenMotion.TURN:
-		r.carried = sim.x - r.lead0
-	return r.x + r.get("carried", 0.0) - run.back
-
-
-## 도망가는 아기 발끝 화면 자리
-func runaway_at(r: Dictionary) -> Vector2:
-	var run := KittenMotion.runaway(r.t, r.vx)
-	var x := _runaway_x(r, run)
-	var under := CatShadow.under(sim.roofs, x, r.y)
-	# shortcut: 틈 위면 높이 그대로 달림 (화면 밖까지 0.5초 남짓), 줄이 길어 틈을 자주 지나면 그때 떨어지게
-	return _screen_at(x, KittenMotion.runaway_y(r.y, under.top if not under.is_empty() else r.y, r.t), run.lift)
 
 
 ## 하트(만남)·"!"(놀람): 처음 0.12초 크게 찍혔다 줄어듦
@@ -1654,9 +1716,11 @@ func _parade_fx_draw(kind: String, at: Vector2, t: float, alpha: float) -> void:
 		var size := Vector2(34.0, 29.0) * pop
 		draw_texture_rect(HEART_TEXTURES.full, Rect2(at - size * 0.5, size), false, Color(1, 1, 1, alpha))
 	else:
-		var font_size := int(44 * pop)
-		draw_string_outline(HUD_FONT, at + Vector2(-8, 0), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 8, Color(HUD_CREAM, alpha))
-		draw_string(HUD_FONT, at + Vector2(-8, 0), "!", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(ALERT_COLOR, alpha))
+		var font_size := int(40 * pop)
+		var text := "냐!" if kind == "nya" else "!"
+		var left := at - Vector2(HUD_FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x * 0.5, 0.0)
+		draw_string_outline(HUD_FONT, left, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 8, Color(HUD_CREAM, alpha))
+		draw_string(HUD_FONT, left, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(ALERT_COLOR, alpha))
 
 
 ## 골골 피버: 고양이 몸 뒤 은은한 금빛 (천천히 숨쉬듯)

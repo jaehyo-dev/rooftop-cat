@@ -4,6 +4,7 @@ class_name CourseData
 ## 비둘기는 뛰지 않는 게 정답이라 동작이 없다 (화분과 함께 있으면 화분의 동작). 생선 길은 동작대로 FishRoad가 깐다.
 ## gap = 최대 점프 거리의 비율, rise = 앞 옥상과의 높이 차, jump = 그 틈을 건너는 동작 (없으면 가장 쉬운 동작). items = ["slot", 초, 옥상 위 높이]: 아이템 자리 (무엇이 놓일지는 ItemSlots).
 ## min_stage = 나오기 시작하는 속도 단계.
+## 동작 "slide" = 낮은 간판: 뛰지 않고 슬라이딩으로 밑을 지남 (2026-11-17, 처음 30초 뒤 단계 4(45초)부터, S1~S3에만)
 
 const SEGMENTS := {
 	"E1": {"name": "첫 화분", "level": 0, "min_stage": 1, "roofs": [
@@ -75,6 +76,12 @@ const SEGMENTS := {
 		{"t": 7.0, "obs": [["ac", 1.8, "long"], ["pot", 3.4, "tok"], ["flock", 3.4], ["pot", 4.8, "tok"], ["flock", 4.8]]}]},
 	"X7": {"name": "낮게 다섯", "level": 2, "min_stage": 12, "roofs": [
 		{"t": 9.6, "obs": [["pot", 1.9, "tok"], ["flock", 1.9], ["pot", 3.2, "tok"], ["flock", 3.2], ["pot", 4.5, "tok"], ["flock", 4.5], ["pot", 5.8, "tok"], ["flock", 5.8], ["pot", 7.1, "tok"], ["flock", 7.1]]}]},
+	"S1": {"name": "간판 밑으로", "level": 1, "min_stage": 4, "roofs": [
+		{"t": 3.6, "obs": [["sign", 1.9, "slide"]], "items": [["slot", 0.9, 46.0]]}]},
+	"S2": {"name": "화분 뒤 간판", "level": 1, "min_stage": 5, "roofs": [
+		{"t": 5.0, "obs": [["pot", 1.8, "mid"], ["sign", 3.5, "slide"]]}]},
+	"S3": {"name": "간판 뒤 비둘기", "level": 2, "min_stage": 6, "roofs": [
+		{"t": 5.0, "obs": [["sign", 1.9, "slide"], ["flock", 3.4]], "items": [["slot", 0.9, 46.0]]}]},
 	"H8": {"name": "물탱크 뒤 비둘기와 화분", "level": 2, "min_stage": 8, "roofs": [
 		{"t": 6.4, "obs": [["tank", 2.1, "double"], ["flock", 3.9], ["pot", 5.0, "mid"]]}]},
 }

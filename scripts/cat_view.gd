@@ -28,7 +28,7 @@ const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 �
 const KITTEN_DIR := "res://assets/sprites/kittens/"
 const KITTEN_ANCHOR := Vector2(140, 216)
 const KITTEN_ART := 2.5
-const KITTEN_FRAMES := ["wait"]  # 옥상에서 기다리는 길고양이만 (줄·도망 아기는 KittenView)
+const KITTEN_FRAMES := ["wait"]  # 기다리는 길고양이·떠다니는 아기 (구름 위에 앉음). 날아가는 아기는 scared.png
 const KITTEN_TAILS := 5
 static var _kitten_cache := {}  # 품종 → {"frames": {이름: 그림}, "tails": [그림...]}
 

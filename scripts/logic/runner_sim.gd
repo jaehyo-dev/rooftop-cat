@@ -35,6 +35,9 @@ extends RefCounted
 ## 생선 길(FishRoad)과 콤보(combo): 필수 생선(bonus 없음)이 먹는 타원 뒤로 지나가면 콤보가 끊긴다. 질주·털실·구제·투명화 중과 질주 직후는 끊지 않는다.
 ## 털실(magnet_time): 반경 안 생선이 날아옴. 황금 생선: 생선 +GOLD_FISH. 쿠키: 하트 +1. 통조림: 화면 안 장애물이 생선으로 바뀜.
 ## 방울(has_bell): 다음 한 번의 부딪힘을 막는다 (하트보다 먼저 쓰임, 하나만 가짐).
+## 슬라이딩 (2026-11-17 액션 시험판, step의 slide): 땅에서 누르는 동안 몸을 낮춤(장애물 판정 높이 SLIDE_BODY배, 속도 그대로), 떼면 일어남,
+##   슬라이딩 중 점프 가능. 공중에서 새로 누르면 내려찍기(DIVE_SPEED로 빠르게 내려감, 밟기 됨), 땅에 닿을 때 누르고 있으면 슬라이딩으로 이어짐.
+## 밟기 (stomped): 내려오며 장애물(STOMPABLE) 윗면을 밟으면 부수고 튕김·더블점프 다시·연속 점수 (_can_stomp).
 ## 줄줄이 고양이(parade, 시험판): parade_on일 때만. 점수(거리·생선)에 줄 배수, 부딪히면 맨 뒤가 도망 (A: 하트도 잃음, B: 줄이 있으면 하트 대신).
 
 ## 이번 step에서 일어난 일 (화면 연출용). step마다 지워진다.
@@ -53,7 +56,9 @@ var picked: Array[Dictionary] = []
 var dash_started := false
 var dash_ended := false
 var bell_blocked := false  # 방울이 부딪힘을 막음 (막힌 장애물은 hit_obstacle)
-var scared := false  # 부딪혀 맨 뒤 고양이가 도망감 (줄줄이 시험판)
+var scared := false  # 부딪혀 가장 나중에 온 아기가 날아감 (아기 무리 시험판)
+## 이번 step에 위에서 밟아 부순 장애물 (질주로 부순 smashed와 따로: 미션 "질주로 부수기"에 세지 않음)
+var stomped: Array[Dictionary] = []
 ## 이번 step에 질주로 부순 장애물들, 통조림으로 바뀐 장애물들 (x는 그 순간 판정 왼쪽 끝)
 var smashed: Array[Dictionary] = []
 var canned: Array[Dictionary] = []
@@ -109,6 +114,15 @@ var has_bell := false
 var parade_on := false
 var parade: CatParade
 var parade_bonus := 0.0
+## 밟기 (2026-11-17 액션 시험판): 땅에 닿기 전까지 연속 밟은 수, 밟기 점수 합
+var stomp_chain := 0
+## 슬라이딩 중 (땅에서 몸을 낮춤), 내려찍기 중 (공중에서 빠르게 내려감)
+var sliding := false
+var diving := false
+var dived := false  # 이번 step에 내려찍기를 시작함 (연출용)
+var time_since_slide := 99.0  # 슬라이딩을 시작한 뒤 지난 시간 (그림용)
+var time_since_stand := 99.0  # 땅에서 슬라이딩을 떼고 일어난 뒤 지난 시간 (그림용)
+var stomp_points := 0
 ## 고양이 앞으로 화면 끝까지 거리 (통조림 범위). 화면 너비에 따라 world_view가 넘겨준다
 var view_ahead := 940.0
 ## 투명화 남은 시간 (0이면 보통 상태)
@@ -134,9 +148,12 @@ var perks: Perks
 var _dash_boost := false  # "질주로 출발" 부스터: BOOSTER_DASH_AT초에 질주를 아직 시작하지 않음
 var _course: CoursePlacer  # 손으로 짠 구간 배치. null이면 옥상 생성기만 쓴다 (옥상·구조물만 보는 테스트용)
 var _start_x := 0.0
+var _feet_then := 0.0       # 지난 step 시작 때 발 높이 (밟기: 위에서 윗면을 지나 내려왔는지)
+var _feet_now := 0.0        # 이번 step 시작 때 발 높이
 var _ground_roof := {}      # 지금 서 있는 옥상
 var _ghost_roof := {}       # 투명화로 통과해 올라설 옥상 (부딪힌 벽의 옥상)
 var _was_pressed := false
+var _slide_held := false    # 슬라이딩 입력을 누르고 있음 (착지 때 슬라이딩으로 이어짐)
 var _jumped := false        # 마지막으로 옥상에 선 뒤 점프했는지
 var _holding := false       # 점프 중 아직 누르고 있어 속도를 유지하는 중
 var _hold_time := 0.0
@@ -184,8 +201,8 @@ func _init(seed_value: int, start_speed: float = Balance.RUN_SPEED, use_course: 
 	_fill_roofs()
 
 
-## 시간 dt만큼 진행. pressed = 지금 화면(또는 스페이스바)을 누르고 있는지
-func step(dt: float, pressed: bool) -> void:
+## 시간 dt만큼 진행. pressed = 지금 점프(화면 오른쪽·스페이스·위)를 누르고 있는지, slide = 슬라이딩(화면 왼쪽·아래·S)을 누르고 있는지
+func step(dt: float, pressed: bool, slide: bool = false) -> void:
 	jumped = false
 	landed = false
 	fell = false
@@ -200,14 +217,19 @@ func step(dt: float, pressed: bool) -> void:
 	dash_ended = false
 	bell_blocked = false
 	scared = false
+	stomped.clear()
+	dived = false
 	parade.met.clear()
 	parade.fled.clear()
+	parade.skill_used.clear()
 	smashed.clear()
 	canned.clear()
 	passed.clear()
 	if game_over:
 		return
 	elapsed += dt
+	_feet_then = _feet_now
+	_feet_now = y
 	time_since_stage_rise += dt
 	if accelerate:
 		speed = SpeedCurve.speed_at(elapsed)
@@ -223,6 +245,24 @@ func step(dt: float, pressed: bool) -> void:
 	time_since_hit += dt
 	var press_started := pressed and not _was_pressed
 	_was_pressed = pressed
+	var slide_started := slide and not _slide_held
+	_slide_held = slide
+	time_since_slide += dt
+	var was_sliding := sliding
+	sliding = slide and on_ground and not dashing and not rescuing and _ride_line.is_empty() and ghost_time <= 0.0
+	time_since_stand += dt
+	if sliding and not was_sliding:
+		time_since_slide = 0.0
+	elif was_sliding and not sliding and on_ground and not pressed:
+		time_since_stand = 0.0
+	if slide_started and not on_ground and not dashing and not rescuing and _ride_line.is_empty() and not (ghost_time > 0.0 and not _ghost_roof.is_empty()):
+		# 내려찍기: 올라가던 것도 끊고 빠르게 아래로 (밟으면 튕겨 끝남)
+		diving = true
+		dived = true
+		_holding = false
+		_floating = false
+		_held_top = NAN
+		_buffer = 0.0
 	time_since_land += dt
 	time_since_jump += dt
 	time_since_bounce += dt
@@ -290,6 +330,8 @@ func step(dt: float, pressed: bool) -> void:
 		return
 
 	_coyote = maxf(0.0, _coyote - dt)
+	if diving:
+		vy = minf(vy, -Balance.DIVE_SPEED)
 	dt = _hold_rise(dt, pressed)
 	if dt > 0.0:
 		# 등가속도 운동을 정확히 적분해 프레임 간격과 상관없이 같은 높이가 나오게 한다 (떠 있는 구간 경계에서 쪼갬)
@@ -347,9 +389,9 @@ func distance() -> int:
 	return int(maxf(0.0, x - _start_x) / Balance.PX_PER_METER)
 
 
-## 점수: 거리 + 생선 점수 (+ 줄 배수로 더 받은 거리 점수)
+## 점수: 거리 + 생선 점수 + 밟기 점수 (+ 아기 배수로 더 받은 거리 점수)
 func score() -> int:
-	return distance() + combo.points + int(parade_bonus)
+	return distance() + combo.points + stomp_points + int(parade_bonus)
 
 
 ## 생선 점수에 곱할 줄 배수 (줄줄이 시험판이 아니면 1)
@@ -495,6 +537,12 @@ func _pick_items(dt: float) -> void:
 			if item.kind == "fish" and not item.has("bonus"):
 				item.bonus = true
 				if not (dashing or rescuing or magnet_time > 0.0 or ghost_time > 0.0 or _dash_ease > 0.0):
+					if parade_on and parade.fetch(item):
+						# 치즈 아기가 물어 옴: 먹은 것과 같음 (생선 수·점수, 콤보 이어짐)
+						fish += 1
+						bites.append(roundi(perks.fish_points() * bonus * parade_mult()))
+						items.remove_at(i)
+						continue
 					combo.cut()
 		if rescuing:
 			continue
@@ -737,7 +785,12 @@ func _hit_obstacles() -> void:
 				was.x = left
 				smashed.append(was)
 				obstacles.remove_at(i)
-		elif not safe and body_hits(o, x, y):
+		elif o.has("punch"):
+			pass  # 냥펀치가 날아가는 중: 곧 부서짐 (부딪히지 않음)
+		elif _can_stomp(o, left):
+			_stomp(o, left)
+			obstacles.remove_at(i)
+		elif not safe and body_hits(o, x, y, body_height()) and not _skims(o, left):
 			safe = true  # 한 step에 하나만
 			hit_obstacle = o
 			obstacles.remove_at(i)
@@ -755,6 +808,37 @@ func _hit_obstacles() -> void:
 				end_reason = "hearts"
 
 
+## 위에서 밟는지: 내려오는 중, 몸 타원이 STOMP_REACH만 더 내려가면 닿고, 지난 step 발이 윗면 근처 위(STOMP_TOL 안)였음.
+## 위에서 닿는 피격을 밟기로 바꾸는 것이라 살짝 넘어가는 호(생선 길)는 밟지 않는다. 옆·아래에서 닿으면 지난 발이 윗면보다 낮아 피격
+func _can_stomp(o: Dictionary, _left: float) -> bool:
+	return not on_ground and vy < 0.0 and o.kind in Balance.STOMPABLE and _feet_then >= o.y1 - Balance.STOMP_TOL \
+			and body_hits(o, x, y - Balance.STOMP_REACH, body_height())
+
+
+## 올라가는 중 발이 윗면 바로 아래(STOMP_TOL 안)로 모서리를 스침: 피격 아님 (거의 넘었는데 맞으면 억울함, 사람 기준 검사)
+func _skims(o: Dictionary, _left: float) -> bool:
+	return not on_ground and vy >= 0.0 and o.kind in Balance.STOMPABLE and y >= o.y1 - Balance.STOMP_TOL
+
+
+## 밟음: 부수고 통 튕겨 오르고 더블점프 다시, 연속 점수 (기본 x 연속 수 x 콤보 배수 x 아기 배수)
+func _stomp(o: Dictionary, left: float) -> void:
+	var was := o.duplicate()
+	was.x = left
+	stomp_chain += 1
+	was.chain = stomp_chain
+	was.points = roundi(Balance.STOMP_POINTS * stomp_chain * combo.multiplier() * parade_mult())  # 생선처럼 콤보·아기 배수를 받음
+	stomped.append(was)
+	stomp_points += was.points
+	y = maxf(y, o.y1)
+	vy = RoofGenerator.line_bounce_speed(Balance.STOMP_BOUNCE_HEIGHT)
+	_double_used = false
+	_floating = false
+	_holding = false
+	_held_top = NAN
+	_jumped = true
+	diving = false
+
+
 ## 장애물 판정 왼쪽 끝. 비둘기는 고양이 x의 함수라 시간·속도가 달라도 고양이 가운데가 o.x에 올 때 항상 그 자리에서 만난다
 static func obstacle_left(o: Dictionary, cat_x: float) -> float:
 	return o.x - o.get("k", 0.0) * (cat_x - o.x)
@@ -765,12 +849,17 @@ static func flock_eta(o: Dictionary, cat_x: float, run_vx: float, ahead: float) 
 	return (obstacle_left(o, cat_x) - cat_x - ahead) / (run_vx * (1.0 + o.k))
 
 
-## 고양이(가운데 cat_x, 발끝 feet)의 작은 타원이 장애물 상자에 닿는지
-static func body_hits(o: Dictionary, cat_x: float, feet: float) -> bool:
+## 장애물 판정 몸 높이 (슬라이딩이면 낮음)
+func body_height() -> float:
+	return Balance.CAT_BODY_SIZE.y * (Balance.SLIDE_BODY if sliding else 1.0)
+
+
+## 고양이(가운데 cat_x, 발끝 feet, 몸 높이 height)의 작은 타원이 장애물 상자에 닿는지
+static func body_hits(o: Dictionary, cat_x: float, feet: float, height: float = Balance.CAT_BODY_SIZE.y) -> bool:
 	var left := obstacle_left(o, cat_x)
-	var center_y := feet + Balance.CAT_BODY_SIZE.y * 0.5
+	var center_y := feet + height * 0.5
 	var near := Vector2(clampf(cat_x, left, left + o.w), clampf(center_y, o.y0, o.y1))
-	var radius := Balance.CAT_BODY_SIZE * 0.5 * Balance.OBSTACLE_HIT_SCALE
+	var radius := Vector2(Balance.CAT_BODY_SIZE.x, height) * 0.5 * Balance.OBSTACLE_HIT_SCALE
 	return ((near - Vector2(cat_x, center_y)) / radius).length_squared() < 1.0
 
 
@@ -780,6 +869,7 @@ func _feet_over(roof: Dictionary) -> bool:
 
 
 func _start_jump(pressed: bool) -> void:
+	sliding = false
 	on_ground = false
 	_coyote = 0.0
 	_buffer = 0.0
@@ -976,6 +1066,11 @@ func _bounce(line: Dictionary, result: String) -> void:
 
 
 func _land_on(roof: Dictionary) -> void:
+	stomp_chain = 0
+	diving = false
+	if _slide_held and not sliding and not dashing:
+		sliding = true  # 내려찍기 → 슬라이딩 이어짐 (누르고 있으면)
+		time_since_slide = 0.0
 	y = roof.top
 	vy = 0.0
 	on_ground = true

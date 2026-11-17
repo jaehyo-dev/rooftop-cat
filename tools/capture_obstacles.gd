@@ -82,7 +82,7 @@ func _play(main: Control, world: Node2D, out: String, hit: bool) -> void:
 		if sim.elapsed >= double_at:
 			double_at = INF
 			double_left = JumpModel.double_max_hold()
-		world.set("_touches", {0: true} if left > 0.0 or double_left > 0.0 else {})
+		world.set("_touches", {0: "jump"} if left > 0.0 or double_left > 0.0 else {})
 		left -= STEP
 		double_left -= STEP
 		world._process(STEP)

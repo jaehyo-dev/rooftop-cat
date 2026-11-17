@@ -2,6 +2,7 @@ extends RefCounted
 ## 사람 기준 통과 검사 (PLAN 맨 앞 "통과"의 뜻, 4번 3~5): 진짜 RunnerSim으로 구간을 위험마다 차례로 넘는다.
 ## 위험마다 누름 창 100ms 이상(가운데서 ±50ms 흔들려도 통과), 누름 길이가 흔들려도, 착지 깊이가 달라도, 판정을 8픽셀 넓혀도 통과해야 한다.
 ## 벽에 닿아 투명화로 구제되는 길은 인정하지 않는다. 트램펄린은 닿는 때 ±50ms 누름, 전봇대는 판을 거쳐 건넌다.
+## 간판(2026-11-17)은 슬라이딩: 누르기 시작하는 때가 100ms 이상 연속으로 통과해야 하고, 점프 동작으로는 모두 맞아야 한다.
 
 const DT := 1.0 / 60.0
 const GROW := 8.0            # 장애물 판정을 이만큼 넓혀 본다
@@ -96,7 +97,9 @@ func walk_road(shift: float, variant: int, depth: float, press_at_all: bool = tr
 			var picked: Array = FishRoad.variants(flying.name)[mini(variant, FishRoad.variants(flying.name).size() - 1)]
 			pressed = since < picked[0] or (picked[1] >= 0.0 and since >= picked[1] and since < picked[1] + JumpModel.double_max_hold())
 			since += DT
-		sim.step(DT, pressed)
+		var slide := obstacles.any(func(o: Dictionary) -> bool:  # 간판은 몸 앞이 0.25초 앞에 오면 슬라이딩, 다 지나면 뗌
+			return o.kind == "sign" and sim.front() >= o.x - 0.25 * run_speed and sim.x - Balance.CAT_BODY_SIZE.x * 0.5 <= o.x + o.w)
+		sim.step(DT, pressed, slide)
 		for item in sim.picked:
 			required.erase(item.x)
 			result.eaten += 1
@@ -139,7 +142,13 @@ func walk(depth: float) -> bool:
 		var hazard := _run_free(x, roof)
 		if hazard.kind == "done":
 			return true
-		var landed: Dictionary = _pass_tramp(x, roof, hazard) if hazard.kind == "tramp" else _pass_hazard(x, roof, hazard)
+		var landed: Dictionary
+		if hazard.kind == "tramp":
+			landed = _pass_tramp(x, roof, hazard)
+		elif hazard.get("obstacle", {}).get("kind", "") == "sign":
+			landed = _pass_slide(x, roof, hazard)
+		else:
+			landed = _pass_hazard(x, roof, hazard)
 		if landed.is_empty():
 			return false
 		x = landed.x
@@ -157,7 +166,7 @@ func _run_free(x: float, roof: Dictionary) -> Dictionary:
 		t += DT
 		if not sim.hit_obstacle.is_empty():
 			var o := sim.hit_obstacle
-			return {"kind": "hit", "x": sim.x, "clear": RunnerSim.obstacle_left(o, sim.x) + o.w + Balance.CAT_BODY_SIZE.x * 0.5 * Balance.OBSTACLE_HIT_SCALE}
+			return {"kind": "hit", "x": sim.x, "clear": RunnerSim.obstacle_left(o, sim.x) + o.w + Balance.CAT_BODY_SIZE.x * 0.5 * Balance.OBSTACLE_HIT_SCALE, "obstacle": o}
 		if sim.is_riding() or sim.bounced:
 			return {"kind": "tramp", "x": sim.x, "t": t}
 		if sim.ghosted:
@@ -202,6 +211,45 @@ func _pass_hazard(x: float, roof: Dictionary, hazard: Dictionary) -> Dictionary:
 	return {}
 
 
+## 간판: 슬라이딩을 누르기 시작하는 자리(1/30초 간격)를 훑어 100ms 이상 연속 통과하는 창의 가운데로 지난다.
+## 점프 동작(톡·중간·길게·더블)은 어느 때 눌러도 모두 맞아야 한다 (점프로 넘으면 간판이 아님)
+func _pass_slide(x: float, roof: Dictionary, hazard: Dictionary) -> Dictionary:
+	var count := int(minf((hazard.x - x) / run_speed, MAX_LOOK) * SCAN_RATE)
+	for action: Array in action_list():
+		for k in count + 1:
+			for variant: Array in action[1]:
+				var land := _flight(hazard.x - k / SCAN_RATE * run_speed, roof, variant[0], variant[1])
+				if not land.is_empty() and land.x > hazard.clear:
+					why = "간판 x=%.0f: %s 점프로 넘어감" % [hazard.x, action[0]]
+					return {}
+	var streak := 0
+	for k in count + 2:
+		var ok := k <= count and not _slide_from(hazard.x - k / SCAN_RATE * run_speed, roof, hazard).is_empty()
+		if ok:
+			streak += 1
+		elif streak >= WINDOW_POINTS:
+			var land := _slide_from(hazard.x - (k - 1 - (streak - 1) * 0.5) / SCAN_RATE * run_speed, roof, hazard)
+			if not land.is_empty():
+				actions.append("슬라이딩")
+				return land
+			break
+		else:
+			streak = 0
+	why = "간판 x=%.0f: 슬라이딩 100ms 창 없음" % hazard.x
+	return {}
+
+
+## x에서 슬라이딩을 누르기 시작해 간판을 다 지나면 뗀다. 안 맞고 같은 옥상에 서 있으면 {"x", "roof"}
+func _slide_from(start_x: float, roof: Dictionary, hazard: Dictionary) -> Dictionary:
+	_place(start_x, roof)
+	var o: Dictionary = hazard.obstacle
+	while sim.x - Balance.CAT_BODY_SIZE.x * 0.5 <= o.x + o.w + 1.0:
+		sim.step(DT, false, true)
+		if sim.hearts < Balance.HEARTS_MAX or sim.game_over or not sim.on_ground:
+			return {}
+	return {"x": sim.x, "roof": roof}
+
+
 ## press_x에서 hold초 누른 점프 (double_at >= 0이면 그때 더블점프 최대). 맞거나 벽·떨어짐·트램펄린에 실리면 빈 Dictionary
 func _flight(press_x: float, roof: Dictionary, hold: float, double_at: float) -> Dictionary:
 	_place(press_x, roof)
@@ -210,7 +258,8 @@ func _flight(press_x: float, roof: Dictionary, hold: float, double_at: float) ->
 	while t < 6.0:
 		sim.step(DT, t < hold or (double_at >= 0.0 and t >= double_at and t < double_end))
 		t += DT
-		if sim.hearts < Balance.HEARTS_MAX or sim.ghosted or sim.game_over or sim.is_riding() or sim.bounced:
+		# 밟기는 따로 검사 (tests/test_stomp.gd): 여기서는 설계한 넘기 동작만 통과로 친다 (밟고 튕기면 다음 위험까지 거리가 달라짐)
+		if sim.hearts < Balance.HEARTS_MAX or sim.ghosted or sim.game_over or sim.is_riding() or sim.bounced or not sim.stomped.is_empty():
 			return {}
 		if sim.landed:
 			return {"x": sim.x, "roof": sim.get("_ground_roof")}
@@ -274,3 +323,9 @@ func _place(x: float, roof: Dictionary) -> void:
 	sim._launch_vx = 0.0
 	sim._buffer = 0.0
 	sim._coyote = 0.0
+	sim._slide_held = false
+	sim.sliding = false
+	sim.diving = false
+	sim.stomp_chain = 0
+	sim._feet_now = roof.top
+	sim._feet_then = roof.top

@@ -10,6 +10,7 @@ extends RefCounted
 ##   전봇대 틈은 판 가운데로 뛰어 올라선 뒤 판에서 다음 옥상으로 뛴다. 착지할 때마다 다시 계획한다.
 ## 장애물(v0.6.0): 서 있는 옥상의 다음 장애물을 보고 그 종류에 가장 넓은 창이 나오는 동작(톡·중간·길게, 물탱크는 더블)을 골라 창 가운데에서 누른다.
 ##   비둘기가 함께 있으면 낮게(톡). 비둘기만 있으면 그대로 달린다. 맞아도 계속 달린다.
+## 간판(동작 slide, 2026-11-17): 몸 앞이 간판 왼쪽 SLIDE_LEAD초(+ timing 실수) 앞에 오면 슬라이딩을 누르고 간판을 다 지나면 뗀다.
 ## 실력(skill)은 두 가지 실수로 나타낸다 (시드로 고정된 무작위 값):
 ## - timing: 누르는 순간이 어긋나는 정도 (초, 표준편차). 빠를수록 같은 시간 실수가 더 먼 거리가 된다
 ## - short_hold: 손을 일찍 떼는 정도 (최대로 누를 시간에 대한 비율, 표준편차)
@@ -18,6 +19,8 @@ extends RefCounted
 const DT := 1.0 / 120.0
 ## 줄·트램펄린에 닿는 때를 이만큼 앞에서 보고 누를 때를 정한다 (초)
 const LINE_LOOK := 0.6
+## 간판 앞 이만큼(초) 앞에서 슬라이딩을 누르기 시작 (실수가 커도 대부분 늦지 않게)
+const SLIDE_LEAD := 0.3
 
 ## 실력별 실수 크기. 초보 = 처음 해 보는 사람, 익숙함 = 몇 판 해 본 사람, 숙련 = 많이 해 본 사람
 const SKILLS := {
@@ -35,19 +38,20 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 
 ## play와 같지만 특수 틈 성적도 돌려준다: time, tramp_try/tramp_ok(트램펄린 틈 들어감/건넘), line_try/line_ok(줄 틈), pole_try/pole_ok(전봇대 틈),
 ## touch_try/touch_ok(줄·트램펄린에 닿은 횟수/누름·퍼펙트로 튕긴 횟수), doubles(더블점프 쓴 횟수), death(떨어진 곳: tramp/line/pole/plain).
-## inputs를 주면 step마다 누름 여부를 담는다 (캡처 도구가 같은 판을 다시 재생하는 데 씀).
+## inputs를 주면 step마다 입력을 담는다: 1 = 점프 누름, 2 = 슬라이딩 누름 (비트 합). 캡처 도구가 같은 판을 다시 재생하는 데 씀.
 ## 특수 틈 하나 = 틈 시작(앞 옥상 끝)을 지나면 시도, 구제 없이 다음 옥상(no_ghost)에 내려서면 성공
 ## 아이템 성적: dash_count/dash_smashed/dash_seconds/dash_fall(끝난 뒤 3초 안에 떨어짐), first_dash(첫 질주 먹은 시각, 못 먹으면 -1), eaten(종류별 먹은 수),
 ## score(판 점수), dash_points(질주 중 생선 점수, 2배 포함), made(종류별 놓인 수), yarn_fish/yarn_time·plain_fish/plain_time(털실·평소의 생선과 시간), blocks(방울이 막은 수), canned(통조림으로 바뀐 장애물 수), cookie_full(하트 3개에서 먹은 쿠키).
 ## missions: 이 판의 미션 기록 (MissionTracker.result, v0.7.0 2b).
 ## off: 끌 아이템 종류 (효과 비교용). perks: 강화·부스터 (null = 0단계, v0.7.0). dash_at: 질주를 시작한 시각들
-## parade: 줄줄이 고양이 시험판 켬. met_at(만난 시각들)·line_sum(마리 x 초)·scared(도망 수)·line_end(끝날 때 줄)
-static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: bool = false) -> Dictionary:
+## parade: 아기 고양이 무리 시험판 켬. met_at(만난 시각들)·line_sum(마리 x 초)·scared(날아간 수)·line_end(끝날 때 마리)
+## stomp: 밟기를 노리는 봇 (화분·실외기는 넘는 대신 최대로 뛰어 내려오며 윗면 가운데를 밟으려 함). stomps(밟은 수)·stomp_points
+static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: bool = false, stomp: bool = false) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
 			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {},
 			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "dash_at": [], "eaten": {}, "made": {},
 			"yarn_fish": 0, "yarn_time": 0.0, "plain_fish": 0, "plain_time": 0.0, "blocks": 0, "canned": 0, "cookie_full": 0,
-			"score": 0, "dash_points": 0, "met_at": [], "line_sum": 0.0, "scared": 0, "line_end": 0}
+			"score": 0, "dash_points": 0, "met_at": [], "line_sum": 0.0, "scared": 0, "line_end": 0, "stomps": 0}
 	var dash_began := 0.0
 	var dash_over := -99.0
 	var seg_roof := {}     # 지금 지나는 구간 옥상 (단계별 통과율)
@@ -72,6 +76,9 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 	var dj_at := INF         # 더블점프를 누를 시각 (sim.elapsed)
 	var tap_at := INF        # 줄에 닿을 때 누를 시각
 	var tapped := false      # 이번 닿음에 이미 눌렀는지
+	var slide_miss := {}     # 간판 번호 → 슬라이딩 누르는 때 실수 (초)
+	var slide_rng := RandomNumberGenerator.new()  # 따로 (점프 계획의 무작위 순서를 바꾸지 않게)
+	slide_rng.seed = seed_value * 31 + 7
 	while not sim.game_over and sim.elapsed < max_time:
 		var ground: Dictionary = sim.get("_ground_roof")
 		if sim.dashing:
@@ -89,7 +96,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		# 트램펄린 뒤 긴 옥상은 내려설 때 다음 옥상이 아직 안 만들어졌을 수 있다: 생길 때까지 계획을 미룬다
 		var next_known := sim.roofs.find(ground) + 1 < sim.roofs.size()
 		var unplanned: bool = sim.on_ground and not sim.dashing and not is_same(ground, planned_roof)
-		var hop := _obstacle_plan(sim, ground) if unplanned else {}
+		var hop := _obstacle_plan(sim, ground, stomp) if unplanned else {}
 		if unplanned and not next_known and hop.is_empty():
 			press_x = INF
 		if unplanned and (next_known or not hop.is_empty()):
@@ -122,18 +129,20 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			if not touch.is_empty() and not sim.is_riding():
 				tap_at = sim.elapsed + touch.t + rng.randfn(0.0, skill.timing)
 		var tap := not tapped and sim.elapsed >= tap_at
+		var slide := _slide_wanted(sim, slide_rng, slide_miss, skill.timing)
 		tapped = tapped or tap  # 이번 닿음에는 한 번만 누른다 (튕기면 다시)
 		var fish_before := sim.fish
 		var hearts_before := sim.hearts
 		var yarn_on := sim.magnet_time > 0.0
 		var points_before := sim.combo.points
 		var dashing_before := sim.dashing
-		sim.step(DT, hold_left > 0.0 or tap)
+		sim.step(DT, hold_left > 0.0 or tap, slide)
+		stats.slides = stats.get("slides", 0) + (1 if sim.sliding and sim.time_since_slide == 0.0 else 0)
 		tracker.observe(sim)
 		if dashing_before:
 			stats.dash_points += sim.combo.points - points_before  # 질주 중 생선 점수 (2배 포함)
 			stats.dash_fish = stats.get("dash_fish", 0) + sim.fish - fish_before
-		inputs.append(hold_left > 0.0 or tap)
+		inputs.append((1 if hold_left > 0.0 or tap else 0) + (2 if slide else 0))
 		if sim.parade_on:
 			if not sim.parade.met.is_empty():
 				stats.met_at.append(sim.elapsed)
@@ -154,6 +163,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			stats.yarn_time += DT if yarn_on else 0.0
 			stats.plain_time += 0.0 if yarn_on else DT
 		stats.dash_smashed += sim.smashed.size()
+		stats.stomps += sim.stomped.size()
 		stats.canned += sim.canned.size()
 		stats.blocks += 1 if sim.bell_blocked else 0
 		if sim.dash_started:
@@ -209,6 +219,7 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			gap_roof = {}
 	stats.time = minf(sim.elapsed, max_time)
 	stats.score = sim.score()
+	stats.stomp_points = sim.stomp_points
 	stats.fish = sim.fish  # 이번 판에 번 생선 (v0.7.0 경제 계산)
 	stats.meters = sim.distance()
 	stats.combo_best = sim.combo.best
@@ -228,13 +239,18 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 
 
 ## 서 있는 옥상의 다음 장애물(비둘기 제외)을 구간에 적힌 동작으로 넘는 계획 {"x", "hold", "dj"}. 없으면 빈 Dictionary
-static func _obstacle_plan(sim: RunnerSim, ground: Dictionary) -> Dictionary:
+static func _obstacle_plan(sim: RunnerSim, ground: Dictionary, stomp: bool = false) -> Dictionary:
 	var next := {}
 	for o in sim.obstacles:
-		if o.has("action") and o.x >= ground.left and o.x <= ground.right and o.x + o.w > sim.x and (next.is_empty() or o.x < next.x):
+		if o.has("action") and o.action != "slide" and o.x >= ground.left and o.x <= ground.right and o.x + o.w > sim.x and (next.is_empty() or o.x < next.x):
 			next = o
 	if next.is_empty():
 		return {}
+	var flock_near := sim.obstacles.any(func(o: Dictionary) -> bool: return o.kind == "flock" and absf(o.x - next.x) < 400.0)
+	if stomp and next.kind in ["pot", "ac"] and not flock_near:  # 비둘기가 같이 있으면 높이 뛰면 머리를 박으니 낮게 넘음
+		# 밟기: 최대로 뛰어 내려오는 길이 윗면 높이를 지날 때 몸 가운데가 장애물 가운데 (물탱크·비둘기는 한 번 점프로 위에 못 가 그대로)
+		var hold := JumpModel.max_hold_time()
+		return {"x": next.x + next.w * 0.5 - sim.speed * JumpModel.air_time(hold, next.y1 - ground.top), "hold": hold, "dj": false}
 	var lead := FishRoad.press_lead(next.kind, next.action, roundf(sim.speed / 10.0) * 10.0)
 	return {"x": next.x - lead * sim.speed, "hold": FishRoad.center_variant(next.action)[0], "dj": next.action == "double"}
 
@@ -307,3 +323,16 @@ static func _plate_hold(sim: RunnerSim, press_x: float, with_double: bool) -> fl
 		else:
 			hi = mid
 	return lo
+
+
+## 앞 간판을 슬라이딩으로 지날 때인지: 몸 앞이 간판 왼쪽 (SLIDE_LEAD + 실수)초 앞 ~ 몸 뒤가 간판 오른쪽을 지날 때까지
+static func _slide_wanted(sim: RunnerSim, rng: RandomNumberGenerator, miss: Dictionary, timing: float) -> bool:
+	for o in sim.obstacles:
+		if o.kind != "sign":
+			continue
+		if not miss.has(o.id):
+			miss[o.id] = rng.randfn(0.0, timing)
+		var lead: float = (SLIDE_LEAD + miss[o.id]) * sim.vx()
+		if sim.front() >= o.x - lead and sim.x - Balance.CAT_BODY_SIZE.x * 0.5 <= o.x + o.w:
+			return true
+	return false

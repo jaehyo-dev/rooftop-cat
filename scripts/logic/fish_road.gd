@@ -171,7 +171,7 @@ func extend(prev: Dictionary, roof: Dictionary, speeds: Array) -> Array[Dictiona
 static func _sorted_obstacles(roof: Dictionary) -> Array:
 	var list: Array = []
 	for o: Dictionary in roof.get("obs", []):
-		if o.has("action"):
+		if o.has("action") and o.action != "slide":  # 간판은 뛰지 않음: 땅 줄 그대로 (밑을 슬라이딩으로)
 			list.append(o)
 	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.x < b.x)
 	return list

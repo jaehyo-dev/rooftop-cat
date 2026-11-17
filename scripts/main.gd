@@ -580,7 +580,7 @@ func _build_parade_ui() -> void:
 	hud.add_theme_constant_override("separation", 2)
 	var mult: Label = $ComboLabel.duplicate()  # 콤보 글자와 같은 모양 (갈색 + 밝은 테두리)
 	mult.name = "Mult"
-	mult.add_theme_font_size_override("font_size", 30)
+	mult.add_theme_font_size_override("font_size", 22)  # 아기 배수는 작은 글자 (눈에 띄는 배수는 콤보 하나, 2026-11-17)
 	mult.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	mult.custom_minimum_size = Vector2.ZERO
 	mult.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -616,6 +616,18 @@ func _face_row(row_name: String) -> HBoxContainer:
 	for i in Balance.PARADE_MAX:
 		var face := UiKit.icon(null, FACE_SIZE)
 		face.name = "Face%d" % i
+		var ring := Control.new()  # 능력 충전 고리 (능력 있는 아기만, 다 차면 금빛 굵게)
+		ring.name = "Ring"
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+		ring.draw.connect(func() -> void:
+			var k: float = ring.get_meta("charge", -1.0)
+			if k < 0.0:
+				return
+			var c := ring.size * 0.5
+			ring.draw_arc(c, FACE_SIZE * 0.5 + 2.0, 0.0, TAU, 32, Color(1, 1, 1, 0.45), 4.0, true)
+			ring.draw_arc(c, FACE_SIZE * 0.5 + 2.0, -PI * 0.5, -PI * 0.5 + TAU * k, 32, Color("#f2b01e"), 6.0 if k >= 1.0 else 4.0, true))
+		face.add_child(ring)
 		faces.add_child(face)
 	return faces
 
@@ -627,6 +639,11 @@ func _show_faces(faces: HBoxContainer, cats: Array[Dictionary]) -> void:
 		face.visible = i < cats.size()
 		if face.visible:
 			face.texture = load(CatView.KITTEN_DIR + cats[i].look + "/face.png")
+			var ring: Control = face.get_node("Ring")
+			var k := CatParade.charge(cats[i])
+			if not is_equal_approx(ring.get_meta("charge", -2.0), k):
+				ring.set_meta("charge", k)
+				ring.queue_redraw()
 
 
 ## 시험 단추는 로컬 빌드(데스크톱·github.io가 아닌 웹 주소)에만
@@ -634,22 +651,24 @@ static func is_local_build() -> bool:
 	return not OS.has_feature("web") or not str(JavaScriptBridge.eval("location.hostname")).ends_with("github.io")
 
 
-## 왼쪽 아래 "시험판 임시": 길고양이 바로 나오기, 줄 6마리 (이 자리 터치는 점프가 아님)
+## 왼쪽 아래 "시험판 임시" (한곳에 모음): 아기 6마리로 시작, 능력 다시 채우기, 아기 바로 나오기 (이 자리 터치는 점프가 아님)
 func _build_parade_dev() -> void:
 	var dev := VBoxContainer.new()
 	dev.name = "ParadeDev"
 	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	dev.offset_left = 16
-	dev.offset_top = -184
+	dev.offset_top = -232
 	dev.offset_right = 248
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
 	dev.add_child(UiKit.label("시험판 임시", UiKit.FONT_MIN, UiKit.RED))
-	var summon := UiKit.button("길고양이 바로 나오기", "cream", null, UiKit.FONT_MIN)
+	var summon := UiKit.button("아기 바로 나오기", "cream", null, UiKit.FONT_MIN)
 	summon.pressed.connect(func() -> void: _world.sim.parade.call_now())
-	var fill := UiKit.button("줄 6마리로 시작", "cream", null, UiKit.FONT_MIN)
+	var fill := UiKit.button("아기 6마리로 시작", "cream", null, UiKit.FONT_MIN)
 	fill.pressed.connect(func() -> void: _world.sim.parade.fill(Balance.PARADE_MAX))
-	for b: Control in [summon, fill]:
+	var refill := UiKit.button("능력 다시 채우기", "cream", null, UiKit.FONT_MIN)
+	refill.pressed.connect(func() -> void: _world.sim.parade.refill())
+	for b: Control in [fill, refill, summon]:
 		b.custom_minimum_size = Vector2(232, 44)
 		dev.add_child(b)
 	dev.visible = false

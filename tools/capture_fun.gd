@@ -79,7 +79,7 @@ func _pressed() -> bool:
 
 
 func _advance() -> void:
-	world.set("_touches", {0: true} if _pressed() else {})
+	world.set("_touches", {0: "jump"} if _pressed() else {})
 	_since += STEP
 	world._process(STEP)
 

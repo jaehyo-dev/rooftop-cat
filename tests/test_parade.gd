@@ -1,5 +1,5 @@
 extends TestCase
-## 줄줄이 고양이 행렬 시험판 (CatParade): 배수·피버, 기록 재생(거리 기준), 길고양이 자리·만남, 부딪힘(하트 -1 + 맨 뒤 도망), 점수 배수.
+## 아기 고양이 무리 시험판 (CatParade): 배수·피버, 떠다니는 자리, 길고양이 자리·만남, 부딪힘(하트 -1 + 나중 아기 날아감), 점수 배수.
 
 const BalanceBot := preload("res://tests/balance_bot.gd")
 const DT := 1.0 / 120.0
@@ -29,40 +29,6 @@ func test_배수와_피버() -> void:
 	assert_true(parade.fever(), "5마리부터 골골")
 	parade.fill(9)
 	assert_eq(parade.cats.size(), Balance.PARADE_MAX, "최대 6마리")
-
-
-## 주인공이 뛴 자리에서 따라오는 고양이도 뛴다: 속도가 달라도 뛰기 시작하는 x가 같다 (시간이 아니라 거리 기준)
-func test_따라오는_고양이는_주인공이_뛴_자리에서_뛴다() -> void:
-	for speed in [Balance.RUN_SPEED, 900.0]:
-		var sim := RunnerSim.new(3, speed, false)
-		sim.accelerate = false
-		var parade := CatParade.new(1)
-		var takeoff := INF
-		var ground := sim.y
-		var follow_off := [INF, INF, INF]
-		for i in 240:
-			var y_before := sim.y
-			sim.step(DT, i >= 5 and i < 25)
-			if sim.jumped:
-				takeoff = sim.x
-				ground = y_before
-			parade.record({"x": sim.x, "y": sim.y})
-			# 줄의 각 고양이가 처음 뜨는 자리 (화면처럼 기록하면서 재생)
-			for n in 3:
-				if follow_off[n] == INF and parade.sample(CatParade.slot_x(n, sim.x)).y > ground + 1.0:
-					follow_off[n] = CatParade.slot_x(n, sim.x)
-		assert_true(takeoff < INF, "주인공이 뜀 (%d)" % speed)
-		for n in 3:
-			assert_true(absf(follow_off[n] - takeoff) <= speed * DT + 1.0, "%d번째가 같은 자리에서 뜀 (속도 %d, %.1f / %.1f)" % [n + 1, speed, follow_off[n], takeoff])
-
-
-func test_기록은_줄_길이만큼만_남긴다() -> void:
-	var parade := CatParade.new(1)
-	for i in 3000:
-		parade.record({"x": i * 3.0, "y": 0.0})
-	assert_true(parade.trail[1].x >= CatParade.slot_x(Balance.PARADE_MAX, 2999 * 3.0) - 200.0, "오래된 기록 지움")
-	assert_true(parade.trail.size() < 400, "기록 수 %d" % parade.trail.size())
-	assert_eq(parade.sample(-50.0).y, 0.0, "기록 앞은 첫 기록 높이")
 
 
 ## 길고양이는 장애물·구조물·아이템과 떨어진 옥상 위, 그 자리 땅 생선은 치움
@@ -113,61 +79,6 @@ func test_줄이_꽉_차면_길고양이가_안_나온다() -> void:
 	sim.parade.call_now()
 	sim.parade.update(sim, DT)
 	assert_true(sim.parade.strays.is_empty())
-
-
-## 붙는 중에는 만난 자리에서 줄 맨 뒤로 옮겨 가고, 다 붙으면 기록 그대로
-func test_붙는_중에는_만난_자리에서_일어나_깡충_뛰고_달려_줄_뒤로() -> void:
-	var sim := _sim()
-	sim.accelerate = false
-	for i in 120:
-		sim.step(DT, false)
-		sim.parade.record({"x": sim.x, "y": sim.y, "ground": true})
-	var parade := sim.parade
-	var from := Vector2(sim.x, sim.y)
-	parade.cats.append({"look": "cow", "quirk": 0.5, "from": from, "t": 0.0})
-	var first := parade.follower(0, sim.x)
-	assert_eq(first.x, from.x, "처음엔 만난 자리")
-	assert_eq(first.kind, "crouch", "일어나 웅크림")
-	var flew := false
-	var last_x: float = first.x
-	var slowest := INF
-	var fastest := 0.0
-	for i in 400:
-		sim.step(DT, false)
-		sim.parade.record({"x": sim.x, "y": sim.y, "ground": true})
-		var p := parade.follower(0, sim.x)
-		flew = flew or (p.get("kind", "") == "rise" and p.y > from.y + 1.0)
-		if parade.cats[0].has("gap") and not parade.cats[0].get("joined", false):
-			slowest = minf(slowest, (p.x - last_x) / DT)
-			fastest = maxf(fastest, (p.x - last_x) / DT)
-		last_x = p.x
-	assert_true(flew, "깡충 뜀")
-	assert_true(parade.cats[0].get("joined", false), "다 붙음")
-	assert_eq(parade.follower(0, sim.x).x, CatParade.slot_x(0, sim.x), "다 붙으면 줄 자리")
-	assert_false(parade.follower(0, sim.x).has("joining"))
-	assert_true(slowest >= -1.0 and fastest <= sim.vx() * 2.0 + 1.0, "달려 붙는 동안 뒤로 밀려나지 않고 너무 빠르지 않음 (%.0f~%.0f)" % [slowest, fastest])
-
-
-## 붙으러 달리는 중에 주인공이 느려져도 (질주 끝 등) 아기는 뒤로 가지 않는다 (주인공이 달린 거리로 붙음, Codex 리뷰)
-func test_붙는_중_주인공이_느려져도_아기는_뒤로_가지_않는다() -> void:
-	var parade := CatParade.new(1)
-	for i in 2000:
-		parade.record({"x": i * 4.0, "y": 100.0, "ground": true})
-	var cat := {"look": "cow", "quirk": 0.5, "from": Vector2(3000.0, 100.0), "t": 0.0}
-	parade.cats.append(cat)
-	var sim := RunnerSim.new(1, 900.0, false)
-	sim.x = 3000.0
-	var last := -INF
-	for i in 300:
-		var speed := 900.0 if i < 60 else 300.0  # 빠르다가 갑자기 느려짐
-		sim.x += speed * DT
-		cat.t += DT
-		parade._join_step(cat, 0, sim)
-		var x: float = parade.follower(0, sim.x).x
-		if cat.has("gap"):
-			assert_true(x >= last - 0.01, "%d: 뒤로 감 %.2f → %.2f" % [i, last, x])
-		last = x
-	assert_true(cat.get("joined", false), "다 붙음")
 
 
 func test_첫_만남과_간격() -> void:
@@ -231,12 +142,6 @@ func test_점수_배수() -> void:
 	assert_eq(off.parade_bonus, 0.0, "줄을 끄면 배수 없음")
 
 
-func test_6마리일_때_PC_앞_시야_0_75초_이상() -> void:
-	var ahead := 1280.0 - CatParade.screen_x(Balance.PARADE_MAX)  # PC 화면 폭에서 주인공 오른쪽
-	assert_true(ahead / Balance.SPEED_MAX >= 0.75, "앞 시야 %.2f초" % (ahead / Balance.SPEED_MAX))
-	assert_eq(CatParade.screen_x(2), Balance.CAT_SCREEN_X, "2마리까지는 주인공 자리 그대로 (3마리부터 오른쪽으로)")
-
-
 func test_새_길고양이는_줄에_없는_품종() -> void:
 	for seed_value in TestCase.pick([1, 2, 3, 4, 5, 6], 3):
 		var sim := _sim(seed_value)
@@ -249,7 +154,7 @@ func test_새_길고양이는_줄에_없는_품종() -> void:
 
 
 ## 기다리는 길고양이 그림 (tools/cut_kittens.py): 품종마다 기다리기 몸·꼬리·얼굴이 있고 캔버스 크기가 같다.
-## 줄·도망 아기 그림은 tests/test_kitten_motion.gd
+## 날아가는 아기 그림 scared.png도 품종마다
 func test_기다리는_아기_그림이_품종마다_다_있다() -> void:
 	for look in CatParade.LOOKS:
 		var names: Array = CatView.KITTEN_FRAMES.duplicate()
@@ -261,6 +166,7 @@ func test_기다리는_아기_그림이_품종마다_다_있다() -> void:
 			if ResourceLoader.exists(path):
 				assert_eq(load(path).get_size(), Vector2(256, 240), path)
 		assert_true(ResourceLoader.exists(CatView.KITTEN_DIR + look + "/face.png"), look + " 얼굴")
+		assert_true(ResourceLoader.exists(CatView.KITTEN_DIR + look + "/scared.png"), look + " 놀람")
 
 
 func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
@@ -269,48 +175,107 @@ func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
 	assert_true(WORLD.soft_top(-300.0, WORLD.KITTEN_TOP) > 150.0, "아주 높아도 HUD 아래")
 
 
-## 6마리 줄 (새 움직임): 모두 그려지고, 뒤 아기가 앞 아기 위(오리 새끼 줄), 주인공은 맨 위, 품종이 줄 순서대로
-func test_6마리_줄은_뒤_아기가_위에_그려진다() -> void:
+## 떠다니는 자리 (2026-11-17): 6자리가 서로 안 겹치고, 모두 주인공 몸 뒤쪽(앞 길을 안 가림), 화면 안
+func test_떠다니는_자리는_서로_안_겹치고_주인공_뒤() -> void:
+	var body := Vector2(100.0, 75.0)  # 앉은 아기 몸 (구름 포함 대략)
+	for i in Balance.PARADE_MAX:
+		var a := CatParade.slot(i)
+		assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "자리 %d는 주인공 몸 뒤 (%.0f)" % [i, a.x])
+		assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 10.0, "자리 %d 화면 왼쪽 안" % i)
+		assert_true(a.y < 0.0, "자리 %d는 위" % i)
+		for j in range(i + 1, Balance.PARADE_MAX):
+			var d := (a - CatParade.slot(j)).abs()
+			assert_true(d.x >= body.x or d.y >= body.y, "자리 %d·%d 겹침 %s" % [i, j, d])
+
+
+func test_둥실_박자는_아기마다_다르다() -> void:
+	var a := CatParade.bob(1.0, 0.1)
+	var b := CatParade.bob(1.0, 0.7)
+	assert_false(a.is_equal_approx(b), "같은 때 다른 높이")
+	for t in [0.0, 0.5, 1.3, 7.0]:
+		assert_true(absf(CatParade.bob(t, 0.4).y) <= Balance.KITTEN_BOB + 0.01)
+
+
+## 카메라: 아기 수와 상관없이 주인공 화면 자리는 그대로 (줄 때문에 옮기던 카메라 지움, 앞 시야 v0.7.0과 같음)
+func test_6마리여도_주인공_자리와_앞_시야는_그대로() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.show_start = false
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	world.sim.parade.fill(Balance.PARADE_MAX)
 	await wait_frames(40)
+	assert_eq(world.cat.position.x, Balance.CAT_SCREEN_X, "주인공 화면 x")
 	var last := -1
 	for i in Balance.PARADE_MAX:
-		var view: KittenView = world.get_node("Kitten%d" % i)
-		assert_true(view.visible, "아기 %d 보임" % i)
-		assert_eq(view.breed, world.sim.parade.cats[i].look, "자리 %d 품종" % i)
-		assert_true(view.get_index() > last, "아기 %d가 앞 아기보다 위" % i)
-		last = view.get_index()
+		var holder: Node2D = world.get_node("Kitten%d" % i)
+		assert_true(holder.visible, "아기 %d 보임" % i)
+		assert_eq(holder.get_node("View").breed, world.sim.parade.cats[i].look, "자리 %d 품종" % i)
+		assert_true(holder.position.distance_to(world.kitten_target(i)) < 40.0, "자리 %d 근처에 떠 있음" % i)
+		last = maxi(last, holder.get_index())
 	assert_true(world.cat.get_index() > last, "주인공이 아기들 위")
 	main.queue_free()
 
 
-## 만난 아기는 줄이 지나갈 때까지 서서 기다렸다가 줄 맨 뒤 자리가 오면 붙는다 (줄 앞에 끼어들지 않음)
-func test_만난_아기는_줄_맨_뒤가_올_때까지_기다린다() -> void:
-	var parade := CatParade.new(1)
-	for i in 3000:
-		parade.record({"x": i * 4.0, "y": 100.0, "ground": true})
-	parade.fill(3)
-	var cat := {"look": "cow", "quirk": 0.5, "from": Vector2(3000.0, 100.0), "t": 0.0, "wait": true}  # update()가 만날 때 만드는 모양
-	parade.cats.append(cat)
-	var sim := RunnerSim.new(1, 600.0, false)
-	sim.x = 3000.0
-	var waited := false
-	for i in 600:
-		sim.x += 600.0 * DT
-		cat.t += DT
-		parade._join_step(cat, 3, sim)
-		var pose := parade.follower(3, sim.x)
-		if cat.get("wait", false):
-			waited = true
-			assert_eq(pose.x, cat.from.x, "만난 자리에 서 있음")
-			assert_eq(pose.kind, "stand")
-			assert_true(CatParade.slot_x(3, sim.x) < cat.from.x, "줄 맨 뒤 자리가 아직 안 옴")
-		elif not cat.get("joined", false):
-			assert_true(pose.x < CatParade.slot_x(2, sim.x), "붙는 동안 앞 아기 자리를 앞지르지 않음")
-	assert_true(waited, "먼저 서서 기다림")
-	assert_true(cat.get("joined", false), "줄 맨 뒤에 붙음")
-	assert_eq(parade.follower(3, sim.x).x, CatParade.slot_x(3, sim.x))
+## 능력 (2026-11-17): 준비된 아기만, 쓰면 다시 충전
+func _with(look: String) -> RunnerSim:
+	var sim := _sim()
+	sim.accelerate = false
+	sim.items.clear()
+	sim.obstacles.clear()
+	sim.parade.cats.append({"look": look, "quirk": 0.5, "cool": 0.0})
+	return sim
+
+
+func test_냥펀치는_앞_장애물로_날아가_부순다() -> void:
+	var sim := _with("tuxedo")
+	sim.obstacles.append({"id": 901, "kind": "ac", "x": sim.x + 500.0, "w": 110.0, "y0": sim.y, "y1": sim.y + 88.0, "base": sim.y})
+	sim.step(DT, false)
+	assert_eq(sim.parade.skill_used[0].skill, "punch", "날아감")
+	assert_true(sim.obstacles[0].has("punch"), "곧 부서질 장애물")
+	var hit := false
+	for i in int(Balance.SKILL_PUNCH_TRAVEL / DT) + 2:
+		sim.step(DT, false)
+		hit = hit or sim.parade.skill_used.any(func(e: Dictionary) -> bool: return e.skill == "punch_hit")
+	assert_true(hit, "닿아서 부숨")
+	assert_true(sim.obstacles.is_empty(), "장애물 없어짐")
+	assert_eq(sim.hearts, Balance.HEARTS_MAX)
+	assert_true(sim.parade.cats[0].cool > Balance.KITTEN_SKILLS.tuxedo.every - 1.0, "다시 충전")
+	assert_eq(CatParade.charge({"look": "cow", "cool": INF}), -1.0, "능력 없는 아기")
+
+
+func test_물어_오기는_놓친_생선을_먹은_것으로() -> void:
+	var sim := _with("cheese")
+	sim.combo.count = 7
+	sim.items.append({"kind": "fish", "x": sim.x - 200.0, "y": sim.y + 300.0})  # 이미 지나친 필수 생선
+	var fish := sim.fish
+	sim.step(DT, false)
+	assert_eq(sim.fish, fish + 1, "생선 수 +1")
+	assert_eq(sim.combo.count, 8, "콤보 이어짐")
+	assert_eq(sim.parade.skill_used[0].skill, "fetch")
+	sim.items.append({"kind": "fish", "x": sim.x - 200.0, "y": sim.y + 300.0})
+	sim.step(DT, false)
+	assert_eq(sim.combo.count, 0, "충전 중이면 끊김")
+
+
+func test_반짝_코는_앞_생선_3마리를_황금으로() -> void:
+	var sim := _with("calico")
+	for k in 5:
+		sim.items.append({"kind": "fish", "x": sim.x + 300.0 + 60.0 * k, "y": sim.y + 40.0})
+	sim.step(DT, false)
+	var golds := sim.items.filter(func(item: Dictionary) -> bool: return item.kind == "gold")
+	assert_eq(golds.size(), Balance.SKILL_GOLD_COUNT, "3마리")
+	assert_true(sim.items.filter(func(item: Dictionary) -> bool: return item.kind == "fish").all(func(item: Dictionary) -> bool: return item.x > golds.back().x), "가까운 것부터")
+	assert_eq(sim.parade.skill_used[0].skill, "sparkle")
+
+
+func test_능력_없는_아기와_다시_채우기() -> void:
+	var sim := _with("cow")
+	sim.obstacles.append({"id": 902, "kind": "pot", "x": sim.x + 500.0, "w": 48.0, "y0": sim.y, "y1": sim.y + 38.0, "base": sim.y})
+	sim.step(DT, false)
+	assert_true(sim.parade.skill_used.is_empty(), "젖소는 능력 없음")
+	sim.parade.cats.append({"look": "tuxedo", "quirk": 0.1, "cool": 5.0})
+	sim.step(DT, false)
+	assert_true(sim.parade.skill_used.is_empty(), "충전 중")
+	sim.parade.refill()
+	sim.step(DT, false)
+	assert_eq(sim.parade.skill_used.size(), 1, "다시 채우면 바로 씀")

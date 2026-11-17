@@ -400,7 +400,7 @@ func test_깨진_미션_목록과_옛_저장은_새로_뽑고_다른_값은_그�
 
 func test_추적기가_판_안_사건을_센다() -> void:
 	# 밸런스 봇 한 판 (봇이 따로 센 값과 비교)
-	var stats: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS["익숙함"], 3, 200.0)
+	var stats: Dictionary = BalanceBot.play_stats(BalanceBot.SKILLS["익숙함"], 2, 200.0)  # 시드 3은 간판 구간이 들어온 뒤 100초에 떨어져 짧음 (2026-11-17)
 	var run: Dictionary = stats.missions
 	assert_eq(run.get("double", 0), stats.doubles)
 	assert_eq(run.get("smash", 0), stats.dash_smashed)
@@ -411,7 +411,7 @@ func test_추적기가_판_안_사건을_센다() -> void:
 	assert_eq(run.get("bell", 0), stats.blocks)
 	assert_eq([run.meters, run.fish, run.combo, run.runs], [stats.meters, stats.fish, stats.combo_best, 1])
 	var passes := 0
-	for kind in ["flock", "pot", "tank", "ac"]:
+	for kind in ["flock", "pot", "tank", "ac", "sign"]:
 		passes += run.get("pass_" + kind, 0)
 	assert_true(passes > 20 and run.double > 0 and run.stage >= 4 and run.mult >= 2, "센 것이 있음 %s" % run)
 	assert_true(run.get("smash_one", 0) <= run.get("smash", 0))
