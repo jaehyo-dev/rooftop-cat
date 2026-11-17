@@ -177,7 +177,7 @@ func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
 
 ## 떠다니는 자리 (2026-11-17): 6자리가 서로 안 겹치고, 모두 주인공 몸 뒤쪽(앞 길을 안 가림), 화면 안
 func test_떠다니는_자리는_서로_안_겹치고_주인공_뒤() -> void:
-	var body := Vector2(100.0, 75.0)  # 앉은 아기 몸 (구름 포함 대략)
+	var body := Vector2(80.0, 80.0)  # 앉은 아기 몸 (0.46배, 구름 포함 대략)
 	for i in Balance.PARADE_MAX:
 		var a := CatParade.slot(i)
 		assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "자리 %d는 주인공 몸 뒤 (%.0f)" % [i, a.x])

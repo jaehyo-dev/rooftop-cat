@@ -227,7 +227,7 @@ const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 �
 ## 아기 고양이 무리 (cat-parade 브랜치): 떠다니기·만남·날아감 연출, 골골 피버
 const KITTEN_TOP := 255.0       # 떠다니는 아기 발끝 화면 높이: 이보다 위로 가면 부드럽게 눌러 머리가 왼쪽 위 HUD 생선 수(약 160) 아래에
 const KITTEN_TOP_SQUEEZE := 0.12# 하한을 넘은 높이의 이만큼만 더 올라감 (딱 멈추지 않고 살짝 따라 올라가게)
-const CLOUD_W := 112.0          # 구름 방석 폭 (아기 몸 약 100px보다 조금 넓게)
+const CLOUD_W := 92.0           # 구름 방석 폭 (아기 몸 약 80px보다 조금 넓게)
 const CLOUD_SINK := 8.0         # 구름 가운데를 발끝보다 이만큼 아래 (엉덩이가 구름에 묻힘)
 const CLOUD_POP := 0.3          # 구름이 퐁 커지는 시간 (넘쳤다 돌아옴)
 const FLINCH := Vector2(5.0, -9.0)  # 한 마리가 날아갈 때 남은 아기 움찔 (스프링 충격, 픽셀)
@@ -239,7 +239,7 @@ const FLY_TO := Vector2(-300.0, -420.0)  # 날아가는 아기가 이동하는 �
 const FLY_TURNS := 1.5          # 날아가며 도는 바퀴
 const SCARED_ANCHOR := Vector2i(150, 236)  # 놀란 그림(scared.png 300x260) 발끝
 const SCARED_CENTER := 70.0     # 도는 축: 발끝에서 그림 픽셀로 이만큼 위
-const SCARED_PX := CatView.KITTEN_ART * 0.4219 * Balance.PARADE_SIZE  # 그림 픽셀 → 게임 픽셀 (예전 아기와 같은 크기, art_scale = 150/355.5)
+const SCARED_PX := CatView.KITTEN_ART * 0.4219 * Balance.KITTEN_SIZE  # 그림 픽셀 → 게임 픽셀 (예전 아기와 같은 크기, art_scale = 150/355.5)
 const PARADE_FX_TIME := 0.8     # 만남 하트·"냐!"가 떠 있는 시간
 const FEVER_GLOW := Color("#ffd37a")
 const FEVER_ALPHA := 0.28
@@ -1479,7 +1479,7 @@ func _build_parade() -> void:
 			holder.add_child(cloud)
 			var view := CatView.new()
 			view.name = "View"
-			view.size_k = Balance.PARADE_SIZE
+			view.size_k = Balance.KITTEN_SIZE
 			holder.add_child(view)
 			_kittens.append(holder)
 			_springs.append(null)
@@ -1670,7 +1670,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 	if fever:
 		for holder in _kittens:
 			if holder.visible:
-				_draw_fever_glow(holder.position, Balance.PARADE_SIZE)
+				_draw_fever_glow(holder.position, Balance.KITTEN_SIZE)
 		_draw_fever_glow(cat.position, 1.0)
 	for i in _kittens.size():
 		var holder := _kittens[i]
@@ -1680,7 +1680,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 		for k in trail.size():  # 능력 궤적: 뒤로 갈수록 작고 옅은 금빛 점
 			draw_circle(trail[k], 14.0 * (1.0 - float(k) / SKILL_TRAIL), Color(FEVER_GLOW, 0.75 * (1.0 - float(k) / SKILL_TRAIL)))
 		if i < sim.parade.cats.size() and CatParade.charge(sim.parade.cats[i]) >= 1.0 and not holder.has_meta("act"):
-			_draw_twinkle(holder.position + Vector2(36.0, -70.0), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
+			_draw_twinkle(holder.position + Vector2(30.0, -58.0), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
 	for r in _fly_aways:  # 날아가는 아기 머리 위 "냐!" (처음 반)
 		var i := _fly_aways.find(r)
 		if i < _fly_views.size() and r.t < Balance.KITTEN_FLEE_TIME * 0.6:
@@ -1690,7 +1690,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 		var at := _screen_at(fx.x, fx.y)
 		for holder in _kittens:
 			if holder.visible and holder.get_node("View").breed == fx.look:
-				at = holder.position + Vector2(0.0, -85.0 - 40.0 * fx.t)
+				at = holder.position + Vector2(0.0, -72.0 - 40.0 * fx.t)
 		_parade_fx_draw(fx.kind, at, fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
 
 
