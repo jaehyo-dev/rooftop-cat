@@ -202,7 +202,6 @@ const GOLD_FLASH_TIME := 0.3
 const GOLD_COLOR := Color("#e8a21a")
 const SHARD_COLORS := {"pot": Color("#c9764f"), "ac": Color("#b9c3c6"), "tank": Color("#9db3c2"), "flock": Color("#d9d4cc"), "sign": Color("#c99a62")}
 const SLIDE_DUST_EVERY := 0.09  # 슬라이딩 중 발밑 먼지 간격 (초)
-const SLIDE_LIFT := 30.0        # 슬라이딩 중 떠다니는 아기들은 이만큼 비켜 올라감 (뒤로 길어진 슬라이딩 몸·꼬리 위에 맨 앞 아기가 앉지 않게, 영상 확인)
 ## 떠오르는 효과 글자 ("팡!", "펑!", "딸랑!")
 const POP_TEXT_TIME := 0.5
 ## 방울 HUD: 하트 오른쪽. 막으면 두 쪽으로 깨진다. 진행 막대: 하트 아래 아이콘 + 남은 시간
@@ -226,6 +225,10 @@ const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 �
 
 ## 아기 고양이 무리 (cat-parade 브랜치): 떠다니기·만남·날아감 연출, 골골 피버
 const CLOUD_SINK := 8.0         # 구름 가운데를 발끝보다 이만큼 아래 (엉덩이가 구름에 묻힘)
+const CUSHION_TINT := Color(1.0, 0.96, 0.88)            # 구름 방석: 하늘 구름(같은 그림)보다 조금 따뜻한 크림색
+const CUSHION_RIM := Color(0.63, 0.45, 0.33, 0.45)      # 방석 뒤에 깐 조금 큰 사본 = 옅은 갈색 테두리·그림자 (하늘 구름 앞에서도 구별)
+const CUSHION_RIM_SIZE := 1.1
+const CUSHION_RIM_DROP := 1.5                           # 테두리 사본을 이만큼 아래로 (픽셀, 0.46배 기준)
 const CLOUD_POP := 0.3          # 구름이 퐁 커지는 시간 (넘쳤다 돌아옴)
 const FLINCH := Vector2(5.0, -9.0)  # 한 마리가 날아갈 때 남은 아기 움찔 (스프링 충격, 픽셀)
 const SKILL_OUT := 0.25         # 물어 오기·반짝 코: 아기가 대상까지 날아가는 시간 (냥펀치는 Balance.SKILL_PUNCH_TRAVEL)
@@ -1476,9 +1479,15 @@ func _build_parade() -> void:
 		move_child(holder, 0 if i < Balance.PARADE_MAX else i)  # 주인공·효과보다 아래, 앞 아기(번호 작은)가 뒤 아기 위
 		if i < Balance.PARADE_MAX:
 			holder.name = "Kitten%d" % i
+			var rim := Sprite2D.new()
+			rim.name = "CloudRim"
+			rim.texture = CLOUD_TEXTURES[0]
+			rim.modulate = CUSHION_RIM
+			holder.add_child(rim)
 			var cloud := Sprite2D.new()
 			cloud.name = "Cloud"
 			cloud.texture = CLOUD_TEXTURES[0]
+			cloud.modulate = CUSHION_TINT
 			cloud.position.y = CLOUD_SINK
 			holder.add_child(cloud)
 			var view := CatView.new()
@@ -1510,9 +1519,14 @@ func _build_parade() -> void:
 	add_child(_purr)
 
 
-## 아기들이 따라가는 주인공 발끝 화면 자리 (슬라이딩 중엔 조금 높게)
+## 아기들이 따라가는 주인공 발끝 화면 자리
 func kitten_lead() -> Vector2:
-	return cat.position - Vector2(0.0, SLIDE_LIFT if sim.sliding else 0.0)
+	return cat.position
+
+
+## 주인공이 뒤로 길게 엎드린 그림(슬라이딩·일어나기)인가: 아기 줄이 꼬리를 비킴 (KittenFlock.SLIDE_BACK)
+func long_pose() -> bool:
+	return cat.frame_name.begins_with("slide")
 
 
 ## 화면 x 아래 지붕의 화면 y (없으면 INF, 아기가 지붕 아래로 안 내려가게)
@@ -1607,7 +1621,7 @@ func _place_parade(delta: float = 0.0) -> void:
 	for i in mini(parade.cats.size(), _kittens.size()):
 		if _slot_looks[i] != parade.cats[i].look:
 			_start_kitten(i, kitten_lead() + KittenFlock.rest(i, parade.cats.size()))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
-	_flock.step(delta, kitten_lead(), parade.cats, _roof_screen_y)
+	_flock.step(delta, kitten_lead(), parade.cats, _roof_screen_y, long_pose())
 	_life.step(delta, sim.sliding, parade.cats.size())
 	for i in _kittens.size():
 		var holder := _kittens[i]
@@ -1623,6 +1637,9 @@ func _place_parade(delta: float = 0.0) -> void:
 		var cloud_w := KittenFlock.CLOUD_W * size_ratio()
 		holder.get_node("Cloud").scale = Vector2(cloud_w, cloud_w * KittenFlock.CLOUD_H) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * _flock.cloud[i]
 		holder.get_node("Cloud").position.y = CLOUD_SINK * size_ratio()
+		var rim: Sprite2D = holder.get_node("CloudRim")
+		rim.scale = holder.get_node("Cloud").scale * CUSHION_RIM_SIZE
+		rim.position.y = (CLOUD_SINK + CUSHION_RIM_DROP) * size_ratio()
 		var view: CatView = holder.get_node("View")
 		view.size_k = CatParade.size_k()
 		view.set_breed(info.look)

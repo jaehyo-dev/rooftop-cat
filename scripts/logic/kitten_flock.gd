@@ -3,8 +3,9 @@ extends RefCounted
 ## 떠다니는 아기 배치와 움직임 (2026-11-19, 화면 좌표, 화면과 분리된 순수 계산). world_view가 프레임마다 step을 부른다.
 ## (피라미드 자리는 진열장처럼 보이고 구름이 한 덩어리가 되며 무리가 덩어리째 늦게 따라와 바꿈, 디렉터 확인)
 ## - 줄줄이(기본): 주인공 발끝 높이를 기록해 두고 아기 i는 (i+1) x KITTEN_CHAIN_DELAY초 전 높이를 따라간다 → 점프하면 앞에서부터 차례로 출렁.
-##   간격은 구름 폭보다 조금 넓게. 줄이 화면 왼쪽을 넘으면 가로 간격을 줄이는 만큼 위로 비스듬히 올려 구름끼리 안 겹치게
-##   (끝을 둥글게 말면 끝 아기들이 위아래로 쌓여 출렁일 때 부딪혀서 곧은 비탈, 이웃은 늘 가로로 떨어져 있음).
+##   간격은 구름 폭보다 조금 넓게. 줄이 화면 왼쪽을 넘으면 위로 굽혀 구름끼리 안 겹치게. 굽힐 때는 곧은 비탈(계단처럼 보임, 디렉터 확인)
+##   대신 앞은 가파르고 뒤로 갈수록 덜 올라가는 활 모양 (끝을 아래로 말지는 않음: 끝 아기들이 위아래로 쌓여 출렁일 때 부딪힘).
+##   슬라이딩 동안(과 일어나는 그림 동안)은 줄을 SLIDE_BACK만큼 뒤로 물려 길어진 주인공 꼬리와 안 겹치게: 들어갈 때 바로, 나올 때 SLIDE_OUT초에.
 ## - 요정 무리(비교용): 주인공 뒤쪽 위 둥근 구역의 자리마다 작은 원·8자 궤도를 다른 박자로, 아기마다 다른 빠르기의 스프링으로 따라감.
 ## - 공통: 구름끼리 겹치면 밀어냄, 지붕 아래·왼쪽 위 생선 수 위로 못 감, 움직이는 방향으로 기울기, 내려올 때 구름 납작.
 ## 길이 값은 0.46배 아기 기준이고 지금 크기 비율(r = 크기 / 0.46)을 곱해 쓴다.
@@ -27,6 +28,9 @@ const SQUASH_SPEED := 800.0
 const JOIN_TIME := 0.6     # 새로 온 아기는 이 시간 동안 천천히 따라가다 (날아오는 게 보이게) 제 빠르기로
 const JOIN_SPEED := 900.0  # 날아오는 동안 가장 빠른 속도 (픽셀/초, 순간이동처럼 안 보이게)
 const MAX_SPEED := 1600.0  # 보이는 자리가 움직이는 가장 빠른 속도 (픽셀/초, 밀어내기로 튀지 않게. 주인공 점프 약 1100)
+const BEND := 0.5         # 활 모양: 맨 뒤 칸의 올라가는 각도 = 맨 앞 칸의 (1 - BEND)배 (0.6이면 앞쪽이 거의 세로로 쌓여 점프 때 구름이 닿음)
+const SLIDE_BACK := 52.0   # 슬라이딩 때 줄을 뒤로 물리는 픽셀 (꼬리 끝 x -141, 작게 맨 앞 구름 오른쪽 끝 -101 → -153)
+const SLIDE_OUT := 0.25    # 슬라이딩이 끝나고 제자리로 돌아오는 시간 (초)
 const HISTORY := 1.0       # 주인공 높이 기록 길이 (초, 6마리 x 0.12 보다 길게)
 
 ## 아기마다 {발끝 화면 자리, 기울기(라디안, + = 앞으로), 구름 배율}. 자리 수 = Balance.PARADE_MAX
@@ -39,6 +43,8 @@ var _age: Array[float] = []    # 자리 잡기 시작한 뒤 지난 시간
 var _landed: Array[bool] = []  # 날아와 자리 근처에 닿았는지 (닿기 전엔 다른 아기를 밀지 않고 지나감)
 var _hist: Array[Vector2] = [] # (시각, 주인공 발끝 화면 y), 오래된 것부터
 var _t := 0.0
+var _dodge := 0.0              # 슬라이딩 비키기 (0 = 제자리, 1 = SLIDE_BACK만큼 뒤로)
+var _off: Array[Vector2] = []  # 아기마다 지난 프레임 비키기 이동량 (스프링·보이는 자리를 함께 옮겨 늦지 않게)
 
 
 func _init() -> void:
@@ -50,6 +56,7 @@ func _init() -> void:
 		_clouds.append(null)
 		_age.append(0.0)
 		_landed.append(true)
+		_off.append(Vector2.ZERO)
 
 
 static func ratio() -> float:
@@ -66,8 +73,8 @@ static func soft_top(y: float, limit: float) -> float:
 	return y if y >= limit else limit - (limit - y) * TOP_SQUEEZE
 
 
-## 아기 i(0부터)가 n마리일 때 쉬는 자리: 주인공 발끝에서 (가로, 세로) 픽셀 (세로는 위가 -)
-static func rest(i: int, n: int) -> Vector2:
+## 아기 i(0부터)가 n마리일 때 쉬는 자리: 주인공 발끝에서 (가로, 세로) 픽셀 (세로는 위가 -). back = 줄을 뒤로 물린 픽셀 (슬라이딩)
+static func rest(i: int, n: int, back: float = 0.0) -> Vector2:
 	var r := ratio()
 	if mode_pick == 1:
 		var center := Vector2(-Balance.KITTEN_CHAIN_BACK, 0.0) + Balance.KITTEN_FLOCK_CENTER * r
@@ -75,12 +82,35 @@ static func rest(i: int, n: int) -> Vector2:
 			return center
 		var a := deg_to_rad(Balance.KITTEN_FLOCK_ANGLES[i])
 		return center + Vector2(cos(a), sin(a) * 0.85) * Balance.KITTEN_FLOCK_RADIUS * r
-	var first := Vector2(-Balance.KITTEN_CHAIN_BACK, 0.0) + Balance.KITTEN_CHAIN_FIRST * r
+	var first := Vector2(-Balance.KITTEN_CHAIN_BACK - back, 0.0) + Balance.KITTEN_CHAIN_FIRST * r
 	var gap := Balance.KITTEN_CHAIN_GAP * r
 	var room := Balance.CAT_SCREEN_X + first.x - EDGE - CLOUD_W * r * 0.5  # 맨 앞에서 화면 왼쪽 끝까지
-	var dx := minf(gap, room / maxf(n - 1, 1))
-	var dy := CLOUD_H * sqrt(gap * gap - dx * dx)  # 구름 타원 거리로 gap이 되게 위로
-	return first + Vector2(-dx, -dy) * i
+	var a := _bend_angle(n - 1, room / gap)
+	var at := first
+	for k in i:  # 칸 k는 각도 a x (1 - BEND x k/(칸 수-1))로 위로, 구름 타원 거리로 gap
+		var t := a * (1.0 - BEND * k / maxf(n - 2, 1))
+		at += Vector2(-cos(t), -CLOUD_H * sin(t)) * gap
+	return at
+
+
+## 칸 m개의 가로 합(gap 단위)이 room 안에 들어가는 가장 작은 첫 칸 각도 (넉넉하면 0 = 한 줄)
+static func _bend_angle(m: int, room: float) -> float:
+	var width := func(a: float) -> float:
+		var sum := 0.0
+		for k in m:
+			sum += cos(a * (1.0 - BEND * k / maxf(m - 1, 1)))
+		return sum
+	if width.call(0.0) <= room:
+		return 0.0
+	var lo := 0.0
+	var hi := PI * 0.5
+	for _k in 30:
+		var mid := (lo + hi) * 0.5
+		if width.call(mid) > room:
+			lo = mid
+		else:
+			hi = mid
+	return hi
 
 
 ## 요정 무리 궤도: 짝수는 작은 원, 홀수는 8자 (아기마다 다른 박자)
@@ -96,6 +126,7 @@ func place(i: int, at: Vector2) -> void:
 	_clouds[i] = Spring.new(Balance.KITTEN_CLOUD_HZ, Balance.KITTEN_CLOUD_DAMP)
 	_age[i] = 0.0
 	_landed[i] = false
+	_off[i] = Vector2.ZERO  # at은 물리지 않은 자리
 	pos[i] = at
 	tilt[i] = 0.0
 	cloud[i] = Vector2.ONE
@@ -107,8 +138,9 @@ func kick(i: int, offset: Vector2) -> void:
 		_springs[i].kick(offset)
 
 
-## dt초 진행. lead = 주인공 발끝 화면 자리, cats = CatParade.cats (자리 잡은 아기만, place 뒤), floor_at(화면 x) = 그 아래 지붕 화면 y (없으면 INF)
-func step(dt: float, lead: Vector2, cats: Array, floor_at: Callable) -> void:
+## dt초 진행. lead = 주인공 발끝 화면 자리, cats = CatParade.cats (자리 잡은 아기만, place 뒤), floor_at(화면 x) = 그 아래 지붕 화면 y (없으면 INF),
+## sliding = 주인공이 길게 엎드린 그림(슬라이딩·일어나기)일 때 (줄을 뒤로 물림)
+func step(dt: float, lead: Vector2, cats: Array, floor_at: Callable, sliding: bool = false) -> void:
 	if dt <= 0.0:
 		return
 	var shown := pos.duplicate()  # 지난 프레임에 보인 자리
@@ -119,10 +151,12 @@ func step(dt: float, lead: Vector2, cats: Array, floor_at: Callable) -> void:
 	var n := cats.size()
 	var r := ratio()
 	var chain := mode_pick == 0
+	_dodge = 1.0 if sliding else maxf(0.0, _dodge - dt / SLIDE_OUT)  # 꼬리는 그림이 바뀌는 순간 길어지니 들어갈 때는 바로
+	var back := SLIDE_BACK * smoothstep(0.0, 1.0, _dodge) if chain else 0.0
 	# 높이 뛰면 맨 위 자리가 생선 수에 닿을 때부터 무리 모양 그대로 부드럽게 눌림 (아기마다 따로 누르면 위에 한 줄로 쌓여 겹침)
 	var rest_top := 0.0
 	for i in n:
-		rest_top = minf(rest_top, rest(i, n).y - Balance.KITTEN_BOB)
+		rest_top = minf(rest_top, rest(i, n, back).y - Balance.KITTEN_BOB)
 	var limit := top()
 	for i in n:
 		var q: float = cats[i].quirk
@@ -133,7 +167,11 @@ func step(dt: float, lead: Vector2, cats: Array, floor_at: Callable) -> void:
 		spring.damping = Balance.KITTEN_CHAIN_DAMP if chain else Balance.KITTEN_FOLLOW_DAMP
 		var lead_y := _lead_y(_t - (i + 1) * Balance.KITTEN_CHAIN_DELAY) if chain else lead.y
 		lead_y = soft_top(lead_y + rest_top, limit) - rest_top
-		var to := Vector2(lead.x, lead_y) + rest(i, n) + CatParade.bob(_t, fmod(q + 0.381 * i, 1.0))  # 둥실 박자가 아기마다 다름 (자리 번호로도 어긋남)
+		var off := rest(i, n, back) - rest(i, n)
+		spring.value += off - _off[i]  # 비키는 만큼은 스프링·줄 지연 없이 바로 (늦으면 시작·끝에 꼬리와 겹침)
+		shown[i] += off - _off[i]
+		_off[i] = off
+		var to := Vector2(lead.x, lead_y) + rest(i, n, back) + CatParade.bob(_t, fmod(q + 0.381 * i, 1.0))  # 둥실 박자가 아기마다 다름 (자리 번호로도 어긋남)
 		if not chain:
 			to += orbit(i, q, _t)
 		to.y = minf(to.y, floor_at.call(to.x) - FLOOR_LIFT * r)
@@ -150,6 +188,7 @@ func step(dt: float, lead: Vector2, cats: Array, floor_at: Callable) -> void:
 	_separate(n, r, Rect2(EDGE + CLOUD_W * r * 0.5, limit - 20.0 * r, INF, INF), low)
 	for i in n:
 		pos[i] = shown[i] + (pos[i] - shown[i]).limit_length(MAX_SPEED * dt)  # 기다리던 옥상에서 막 뜬 아기도 바닥 위로 튀지 않게
+		pos[i].y = maxf(pos[i].y, limit - 20.0 * r)  # 슬라이딩으로 바로 물러날 때도 생선 수 위로 안 감
 		var vy: float = _springs[i].velocity.y
 		var want := clampf(vy / TILT_SPEED, -1.0, 1.0) * MAX_TILT  # 올라가면(-) 뒤로, 내려오면(+) 앞으로
 		tilt[i] += (want - tilt[i]) * (1.0 - exp(-TILT_RATE * dt))

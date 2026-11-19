@@ -18,7 +18,7 @@ func _floor(_x: float) -> float:
 	return GROUND
 
 
-## 점프(0.15초), 꼭대기 근처 더블점프, 착지 뒤 슬라이딩: 주인공 발끝 높이 (화면 y)
+## 점프(0.15초), 꼭대기 근처 더블점프: 주인공 발끝 높이 (화면 y). 착지 뒤 슬라이딩은 _sliding
 func _lead_y(t: float) -> float:
 	var g := 2600.0
 	if t < 0.15:
@@ -31,8 +31,12 @@ func _lead_y(t: float) -> float:
 		var v1 := 900.0
 		y = y1 + v1 * w - 0.5 * g * w * w
 	if y <= 0.0:
-		return GROUND - (30.0 if t > 1.6 and t < 2.2 else 0.0)  # 착지 뒤 잠깐 슬라이딩 (화면 SLIDE_LIFT)
+		return GROUND
 	return GROUND - y
+
+
+func _sliding(t: float) -> bool:
+	return t > 1.6 and t < 2.2
 
 
 func _flock(n: int) -> KittenFlock:
@@ -71,8 +75,48 @@ func test_쉬는_자리는_주인공_뒤_화면_안에_안_겹치게() -> void:
 					assert_true(_gap(a, KittenFlock.rest(j, n)) >= cloud, name + " 구름이 %d와 안 겹침" % j)
 	KittenFlock.mode_pick = 0
 	assert_eq(KittenFlock.rest(3, 4).y, KittenFlock.rest(0, 4).y, "4마리는 한 줄")
-	assert_true(KittenFlock.rest(5, 6).y < KittenFlock.rest(1, 6).y, "6마리는 위로 비스듬히")
+	assert_true(KittenFlock.rest(5, 6).y < KittenFlock.rest(1, 6).y, "6마리는 위로 굽음")
 	KittenFlock.mode_pick = keep
+
+
+## 줄 모양 (2026-11-19): 굽을 때 곧은 비탈(계단) 대신 뒤로 갈수록 덜 올라가는 활. 슬라이딩 때 물린 줄도 같은 규칙, 화면 안·안 겹침
+func test_굽은_줄은_뒤로_갈수록_덜_올라간다() -> void:
+	var keep := KittenFlock.mode_pick
+	KittenFlock.mode_pick = 0
+	var r := KittenFlock.ratio()
+	for c in [[5, 0.0], [6, 0.0], [4, KittenFlock.SLIDE_BACK], [6, KittenFlock.SLIDE_BACK]]:
+		var n: int = c[0]
+		var rises := []
+		for i in range(1, n):
+			var a := KittenFlock.rest(i - 1, n, c[1])
+			var b := KittenFlock.rest(i, n, c[1])
+			rises.append(a.y - b.y)
+			assert_true(_gap(a, b) >= KittenFlock.CLOUD_W * r - 0.01, "%s 이웃 구름 안 겹침" % [c])
+			assert_true(LEAD_X + b.x - KittenFlock.CLOUD_W * r * 0.5 >= KittenFlock.EDGE - 0.5, "%s 자리 %d 화면 왼쪽 안" % [c, i])
+		for k in range(1, rises.size()):
+			assert_true(rises[k] < rises[k - 1] - 1.0, "%s 높이 차가 점점 줄어듦 %s" % [c, rises])
+		assert_true(rises[-1] < rises[0] * 0.7, "%s 뒤쪽은 앞쪽보다 확실히 완만 %s" % [c, rises])
+	assert_eq(KittenFlock.rest(0, 3, KittenFlock.SLIDE_BACK).x, KittenFlock.rest(0, 3).x - KittenFlock.SLIDE_BACK, "슬라이딩 때 맨 앞도 뒤로")
+	KittenFlock.mode_pick = keep
+
+
+## 슬라이딩에 들어가는 첫 프레임에 바로 물러나고, 끝나면 SLIDE_OUT초 동안 부드럽게 제자리
+func test_슬라이딩_비키기는_바로_들어가고_천천히_돌아온다() -> void:
+	var flock := _flock(1)
+	var cats := _cats(1)
+	for f in 30:
+		flock.step(DT, Vector2(LEAD_X, GROUND), cats, _floor)
+	var home := flock.pos[0].x
+	flock.step(DT, Vector2(LEAD_X, GROUND), cats, _floor, true)
+	assert_true(flock.pos[0].x < home - KittenFlock.SLIDE_BACK + 3.0, "첫 프레임에 물러남 %.1f → %.1f" % [home, flock.pos[0].x])
+	var last := flock.pos[0].x
+	var biggest := 0.0
+	for f in int(KittenFlock.SLIDE_OUT / DT) + 20:
+		flock.step(DT, Vector2(LEAD_X, GROUND), cats, _floor, false)
+		biggest = maxf(biggest, flock.pos[0].x - last)
+		last = flock.pos[0].x
+	assert_true(absf(last - home) < 3.0, "제자리로 돌아옴 %.1f" % last)
+	assert_true(biggest < KittenFlock.SLIDE_BACK * 0.2, "돌아올 때 한 프레임 가장 큰 이동 %.1f" % biggest)
 
 
 ## 점프·더블점프·슬라이딩 3초 동안 매 프레임: 구름 안 겹침, 지붕 아래·생선 수 위·화면 밖으로 안 감, 순간이동 없음, 기울기 10도 안·튀지 않음
@@ -87,7 +131,8 @@ func test_뛰어도_겹치거나_튀지_않는다() -> void:
 		var last_tilt := flock.tilt.duplicate()
 		var worst := {"gap": INF, "move": 0.0, "turn": 0.0}
 		for f in 180:
-			flock.step(DT, Vector2(LEAD_X, _lead_y(f * DT)), cats, _floor)
+			var off := flock._off.duplicate()
+			flock.step(DT, Vector2(LEAD_X, _lead_y(f * DT)), cats, _floor, _sliding(f * DT))
 			for i in 6:
 				var p: Vector2 = flock.pos[i]
 				var tag := "%s 프레임 %d 아기 %d %s" % [KittenFlock.MODES[mode], f, i, p]
@@ -95,7 +140,7 @@ func test_뛰어도_겹치거나_튀지_않는다() -> void:
 				assert_true(p.y >= KittenFlock.top() - 20.0 * r - 0.01, tag + " 생선 수 위로")
 				assert_true(p.x - KittenFlock.CLOUD_W * r * 0.5 >= KittenFlock.EDGE - 0.01, tag + " 화면 왼쪽 밖")
 				assert_true(absf(flock.tilt[i]) <= KittenFlock.MAX_TILT + 0.001, tag + " 기울기")
-				worst.move = maxf(worst.move, p.distance_to(last[i]))
+				worst.move = maxf(worst.move, (p - flock._off[i] + off[i]).distance_to(last[i]))  # 슬라이딩 비키기는 일부러 바로
 				worst.turn = maxf(worst.turn, absf(flock.tilt[i] - last_tilt[i]))
 				for j in range(i + 1, 6):
 					worst.gap = minf(worst.gap, _gap(p, flock.pos[j]))

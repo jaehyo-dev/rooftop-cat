@@ -333,10 +333,11 @@ func _form_scene(scene: String) -> void:
 			await _run_until(func() -> bool: return not sim.parade.strays.is_empty() and sim.parade.strays[0].x - sim.x < 500.0, 20.0)
 
 
-## 아기 살아 움직이기 (2026-11-19, review/cat-parade/action/alive/): 치즈냥을 줄 맨 앞에 두고 평지 10초·점프·더블점프·슬라이딩·밟기·피격
+## 아기 살아 움직이기 (2026-11-19, review/cat-parade/action/alive/): 치즈냥을 줄 맨 앞에 두고 평지 10초·점프·더블점프·슬라이딩·밟기·피격,
+## cloud = 큰 하늘 구름이 줄 뒤에 왔을 때 점프 (구름 방석이 하늘 구름 앞에서도 구별되는지)
 ## alive_<장면>_<real|slow>_f000… (parade_alive-jump = 그 장면만). 평지는 10초라 0.25배는 앞 4초만
 func _alive(only: Array) -> void:
-	var clips := [["flat", 10.0], ["jump", 1.8], ["double", 2.2], ["slide", 2.0], ["stomp", 4.6], ["hit", 2.0]]
+	var clips := [["flat", 10.0], ["jump", 1.8], ["double", 2.2], ["slide", 2.0], ["stomp", 4.6], ["hit", 2.0], ["cloud", 1.8]]
 	for clip in clips:
 		if not only.is_empty() and clip[0] not in only:
 			continue
@@ -355,7 +356,7 @@ func _alive_scene(scene: String) -> void:
 	else:
 		sim.parade.cats.erase(cheese[0])
 		sim.parade.cats.push_front(cheese[0])  # 치즈냥이 줄 맨 앞 (피격은 줄 끝이라 날아가지 않음)
-	await _run_flat(2600.0 if scene != "flat" else 8000.0)
+	await _run_flat({"flat": 8000.0, "cloud": 40000.0}.get(scene, 2600.0))  # cloud: 하늘 구름을 기다리는 동안 옥상이 안 끝나게
 	sim.accelerate = false
 	sim.speed = SPEED
 	for cat in sim.parade.cats:
@@ -377,3 +378,16 @@ func _alive_scene(scene: String) -> void:
 			await _stomp_scene([["pot", 450.0], ["tank", 1000.0], ["flock", 1600.0]])
 		"hit":
 			_put("pot", 420.0, 905)
+		"cloud":
+			var textures: Array = preload("res://scripts/world_view.gd").CLOUD_TEXTURES
+			var behind := func() -> bool:  # 큰 구름(1번·4번 그림, 줄 높이)의 가운데가 줄 가운데쯤 (화면 x 120~200)
+				for c in [Backdrop.CLOUDS[1], Backdrop.CLOUDS[3]]:
+					var w: float = textures[c[0]].get_width()
+					var x := Backdrop.cloud_x(c[1], sim.x, sim.elapsed, w) + w * 0.5
+					if x > 120.0 and x < 200.0:
+						return true
+				return false
+			if not await _run_until(behind, 60.0):
+				push_error("cloud: 하늘 구름이 줄 뒤에 안 옴")
+			t0 = sim.elapsed
+			_pilot = func() -> Array: return [sim.elapsed - t0 > 0.15 and sim.elapsed - t0 < 0.4, false]

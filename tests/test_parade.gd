@@ -205,6 +205,82 @@ func test_6마리여도_주인공_자리와_앞_시야는_그대로() -> void:
 	main.queue_free()
 
 
+## 슬라이딩 겹침 (2026-11-19): 슬라이딩에 들어가는 순간부터 일어나는 그림이 끝날 때까지 매 프레임, 주인공 그림과 떠다니는 아기(구름 방석 포함) 그림의
+## 불투명 픽셀이 한 곳도 겹치지 않는다 (예전: 꼬리가 맨 앞 아기를 덮어 지붕에 누운 것처럼 보임, 시작·끝 0.13초 겹침)
+var _images := {}
+
+
+func _alpha(spr: Sprite2D, p: Vector2) -> float:
+	if not spr.is_visible_in_tree() or spr.texture == null:
+		return 0.0
+	var rect := spr.get_rect()
+	var local := spr.get_global_transform().affine_inverse() * p
+	if not rect.has_point(local):
+		return 0.0
+	if not _images.has(spr.texture):
+		_images[spr.texture] = spr.texture.get_image()
+	var img: Image = _images[spr.texture]
+	var at := ((local - rect.position) / rect.size * Vector2(img.get_size())).floor()
+	return img.get_pixelv(Vector2i(at.clamp(Vector2.ZERO, Vector2(img.get_size() - Vector2i.ONE)))).a * spr.modulate.a
+
+
+## node 아래 보이는 그림 중 하나라도 p에서 불투명한가
+func _solid(sprites: Array, p: Vector2) -> bool:
+	for spr in sprites:
+		if _alpha(spr, p) > 0.5:
+			return true
+	return false
+
+
+## 아기 holder들과 주인공이 겹친 픽셀 수 (2픽셀 간격으로 셈)
+func _overlap(world: Node2D, n: int) -> int:
+	var cat_sprites: Array = world.cat.find_children("*", "Sprite2D", true, false)
+	var hits := 0
+	for i in n:
+		var holder: Node2D = world.get_node("Kitten%d" % i)
+		var mine := holder.find_children("*", "Sprite2D", true, false)
+		var box := Rect2(holder.global_position, Vector2.ZERO)
+		for spr: Sprite2D in mine:
+			var g := spr.get_global_transform() * spr.get_rect()
+			box = box.merge(g)
+		for x in range(int(box.position.x), int(box.end.x), 2):
+			for y in range(int(box.position.y), int(box.end.y), 2):
+				var p := Vector2(x, y)
+				if _solid(mine, p) and _solid(cat_sprites, p):
+					hits += 1
+	return hits
+
+
+func test_슬라이딩_내내_주인공과_아기가_안_겹친다() -> void:
+	for n in [1, 4, 6]:
+		var main: Control = load("res://scenes/main.tscn").instantiate()
+		main.show_start = false
+		add_child(main)
+		var world: Node2D = main.get_node("World")
+		world.sim.parade.fill(n)
+		world.sim.accelerate = false
+		await wait_frames(60)
+		world.sim.obstacles.clear()
+		world._touches[99] = "slide"
+		var bad := []
+		var frames := 0
+		for f in 50:  # 슬라이딩 0.6초 → 떼고 일어나기 그림 0.1초 넘게
+			if f == 36:
+				world._touches.erase(99)
+			world.sim.obstacles.clear()
+			await wait_frames(1)
+			if not world.long_pose():
+				continue  # 평소 달리기 꼬리는 맨 앞 구름 끝을 살짝 스침 (예전부터, 이번 범위 밖)
+			frames += 1
+			var hits := _overlap(world, n)
+			if hits > 0:
+				bad.append("%d(%s %d)" % [f, world.cat.frame_name, hits])
+		assert_true(frames >= 30, "%d마리: 슬라이딩 그림 %d장" % [n, frames])
+		assert_eq(bad.size(), 0, "%d마리: 겹친 장 %s" % [n, bad])
+		main.queue_free()
+		await wait_frames(1)
+
+
 ## 능력 (2026-11-17): 준비된 아기만, 쓰면 다시 충전
 func _with(look: String) -> RunnerSim:
 	var sim := _sim()

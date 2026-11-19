@@ -3,7 +3,7 @@
 - <장면>_real.mp4 (30장/초 = 실제 속도), <장면>_slow.mp4 (게임 1/60초마다 한 장을 15장/초로 = 0.25배): 생선 수부터 주인공 앞까지 960 폭
 - <장면>_zoom_real.mp4, <장면>_zoom_slow.mp4: 맨 앞 치즈냥 둘레를 2배로 (pos_parade_alive_pc.json의 발끝 자리를 따라 자름)
 - strip_<장면>.jpg: 0.25배 확대 장을 늘어놓은 것 (프레임 확인용, 찍은 폴더에 둠, 저장소에는 안 올림)
-장면: flat 평지 10초(0.25배는 앞 4초) · jump · double · slide · stomp · hit
+장면: flat 평지 10초(0.25배는 앞 4초) · jump · double · slide · stomp · hit · cloud(하늘 구름 앞 점프)
 """
 import json
 import subprocess
@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "motion"))
 import make_videos as mv  # noqa: E402
 
 HERE = Path(__file__).parent
-SCENES = ["flat", "jump", "double", "slide", "stomp", "hit"]
+SCENES = ["flat", "jump", "double", "slide", "stomp", "hit", "cloud"]
 BOX = (0, 0, 720, 520)
 ZOOM = (150, 120)   # 확대 상자 (창 픽셀): 발끝 기준 왼쪽 75·오른쪽 75, 위 95·아래 25 → 2배
 ABOVE = 95
@@ -47,7 +47,9 @@ def mp4(files: list, fps: int, out: Path) -> None:
 
 def main(src: Path) -> None:
     mv.BOX = BOX
-    pos = json.loads((src / "pos_parade_alive_pc.json").read_text())
+    pos = {}  # 장면을 나눠 찍으면 (parade_alive-slide-cloud 등) 기록 파일도 나뉨
+    for f in src.glob("pos_parade_alive*_pc.json"):
+        pos.update(json.loads(f.read_text()))
     for scene in SCENES:
         for speed in ("real", "slow"):
             files = mv.frames(src, f"alive_{scene}_{speed}")

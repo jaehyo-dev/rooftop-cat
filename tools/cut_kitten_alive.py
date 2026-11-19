@@ -11,6 +11,8 @@
 - 꼬리: 기본 칸의 세운 꼬리를 split_tail로 떼어 alive_tail_0~4(돌린 꼬리)로 저장하고, 다른 칸의 세운 꼬리는 떼어 버린다
   (게임은 alive_tail을 늘 몸 뒤에 그려 살랑임).
   OWN_TAIL 칸(엎드리기·놀람)은 꼬리 모양이 달라 그대로 두고 게임이 따로 붙인 꼬리를 숨긴다.
+- 그림체(2026-11-19): 다른 아기 wait.png와 선·테두리를 맞추는 restyle을 저장하는 모든 장(14장 + 꼬리 5장)에 똑같이 건다.
+  주변보다 어두운 곳(선·연필 결)을 갈색 연필색 쪽으로 진하게, 흰 테두리를 RIM_TRIM픽셀 깎음.
 결과: alive_<이름>.png, alive_tail_<번호>.png (256x240, KITTEN_ANCHOR 기준). 개발용 도구 (numpy, scipy, Pillow).
 """
 import sys
@@ -32,6 +34,10 @@ OWN_TAIL = {"lie", "surprised", "squat"}  # 꼬리 모양이 다르거나(엎드
 BAND = 16          # 엉덩이 자리를 재는 아래 띠 높이 (캔버스 픽셀)
 BAND_FULL = 0.8    # 띠 안에서 이 비율 이상 찬 열부터 몸 (가는 꼬리·발끝은 건너뜀)
 EDGE_SLACK = 3     # 엉덩이 쪽에서 기본 칸 윤곽보다 이만큼(픽셀)까지는 남김
+INK = np.array([95.0, 55.0, 35.0])  # 진하게 할 때 섞는 갈색 (다른 아기 wait.png 선 색)
+INK_GAIN = 0.7 / 60.0  # 주변보다 1 어두우면 이만큼 갈색 쪽으로 (최대 INK_MAX)
+INK_MAX = 0.85
+RIM_TRIM = 1       # 흰 테두리를 깎는 픽셀 (새 시트 3px → wait.png 2px)
 SEARCH = 12        # 기본 칸을 wait에 맞출 때 찾아보는 x 범위 (±픽셀)
 
 
@@ -41,6 +47,18 @@ def rump_x(mask: np.ndarray) -> int:
     band = mask[rows[-1] + 1 - BAND:rows[-1] + 1]
     full = np.nonzero(band.mean(axis=0) >= BAND_FULL)[0]
     return int(full[0])
+
+
+def restyle(img: Image.Image) -> Image.Image:
+    """선을 진하게(갈색), 흰 테두리를 RIM_TRIM픽셀 깎음. 꼬리를 떼거나 지우기 전에 한 번만 (뗀 자리는 깎지 않게)."""
+    arr = np.asarray(img.convert("RGBA")).astype(float)
+    rgb, alpha = arr[..., :3], arr[..., 3]
+    lum = rgb.mean(axis=-1)
+    dark = np.clip(ndimage.gaussian_filter(lum, 3.0) - lum, 0.0, None)
+    w = np.clip(dark * INK_GAIN, 0.0, INK_MAX)[..., None]
+    rgb = rgb * (1.0 - w) + INK * w
+    alpha = ndimage.grey_erosion(alpha, size=2 * RIM_TRIM + 1)  # 부드러운 가장자리는 그대로 안쪽으로
+    return Image.fromarray(np.dstack([rgb, alpha]).clip(0, 255).astype(np.uint8))
 
 
 def paste(img: Image.Image, scale: float, left: int) -> Image.Image:
@@ -75,7 +93,7 @@ def cut(sheet: Path, out_dir: Path) -> dict:
     target = opaque(wait)
     scale = (target.sum() / opaque(frames["base"]).sum()) ** 0.5
     left = fit_left(frames["base"], scale, target)
-    base = paste(frames["base"], scale, left)
+    base = restyle(paste(frames["base"], scale, left))  # 꼬리를 떼기 전에 (뗀 자리가 깎이지 않게)
     body, tails = split_tail(base)
     for i, tail in enumerate(tails):
         tail.save(out_dir / f"alive_tail_{i}.png")
@@ -85,7 +103,7 @@ def cut(sheet: Path, out_dir: Path) -> dict:
     outline = ndimage.binary_dilation(opaque(base), iterations=EDGE_SLACK)
     overlap = {}
     for name, img in frames.items():
-        placed = body if name == "base" else paste(img, scale, left)
+        placed = body if name == "base" else restyle(paste(img, scale, left))
         if name not in OWN_TAIL:
             arr = np.array(placed)
             arr[:ys.max() + 1, :xs.max() + 1] = 0

@@ -424,3 +424,7 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획: 치즈 1장(5-5-4칸 14칸: 기본·깜빡·만세 2·폭 앉기·엎드리기·놀람·하품 2·그루밍 2·꾹꾹이 2·뒤돌아보기). 크기·자리·색이 튀면 다시. 결과: 다시 뽑기 0번.
 - 명령: `bash review/cat-parade/action/alive/make_sheet.sh cheese 1` (첨부 `review/cat-parade/action/alive/prompts/ref_cheese_wait.png` = wait 몸만·꼬리 붙인 모습 2배, 마젠타 배경)
 - 요청문 전문: `review/cat-parade/action/alive/prompts/alive.txt`. 자르기: `python3 tools/cut_kitten_alive.py assets/raw/kitten_alive/cheese_1.png assets/sprites/kittens/cheese`
+- 그림체 다시 뽑기 (2026-11-19 디렉터 확인: 선이 진하고 면이 매끈한 스티커 느낌이라 삼색이 옆에서 튐, 엎드리기가 찌푸린 얼굴): 치즈 2번째 1장, 다시 뽑기 0번.
+  명령: `PROMPT=alive_style.txt REFS=assets/raw/kitten_alive/cheese_1.png STYLE=review/cat-parade/action/alive/prompts/ref_style.png bash review/cat-parade/action/alive/make_sheet.sh cheese 2`
+  첨부: 1번 시트(자세·칸 배치), `ref_cheese_wait.png`(무늬·소품), `ref_style.png`(삼색이·고등어·회색이 wait 꼬리 붙인 모습 2배, 그림체 기준). 요청문 전문 `review/cat-parade/action/alive/prompts/alive_style.txt`.
+  결과는 반대로 선이 옅고 흰 테두리가 두꺼워서(선 밝기 105 vs 다른 아기 67~73, 테두리 3px vs 2px) 자르기 도구의 `restyle`(선을 갈색 쪽으로 진하게, 테두리 1px 깎음)을 14장·꼬리 5장 모두에 똑같이 건다. 자르기: `python3 tools/cut_kitten_alive.py assets/raw/kitten_alive/cheese_2.png assets/sprites/kittens/cheese`
