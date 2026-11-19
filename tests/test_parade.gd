@@ -170,35 +170,11 @@ func test_기다리는_아기_그림이_품종마다_다_있다() -> void:
 
 
 func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
-	assert_eq(WORLD.soft_top(400.0, WORLD.KITTEN_TOP), 400.0, "하한 아래는 그대로")
-	assert_true(WORLD.soft_top(0.0, WORLD.KITTEN_TOP) > WORLD.soft_top(-100.0, WORLD.KITTEN_TOP), "더 높으면 조금 더 위 (멈추지 않음)")
-	assert_true(WORLD.soft_top(-300.0, WORLD.KITTEN_TOP) > 150.0, "아주 높아도 HUD 아래")
-
-
-## 떠다니는 자리 (2026-11-17, 크기 고르기 2026-11-19): 크기마다 모두 주인공 몸 뒤쪽(앞 길을 안 가림), 화면 안,
-## 서로 얼굴을 가리지 않음(지금 크기는 안 겹침, 작게·중간은 같은 줄 이웃이 몸 폭 절반 이상 떨어짐), 작게·중간은 무리 폭(자리 폭 + 구름) <= 주인공 몸 폭
-func test_떠다니는_자리는_크기마다_주인공_뒤에_모인다() -> void:
-	var keep := CatParade.size_pick
-	for pick in Balance.KITTEN_SIZES.size():
-		CatParade.size_pick = pick
-		var r := WORLD.size_ratio()
-		var body := Vector2(80.0, 80.0) * r  # 앉은 아기 몸 (0.46배 80px, 구름 포함 대략)
-		var name: String = Balance.KITTEN_SIZES[pick].name
-		var xs: Array = range(Balance.PARADE_MAX).map(func(k: int) -> float: return CatParade.slot(k).x)
-		for i in Balance.PARADE_MAX:
-			var a := CatParade.slot(i)
-			assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "%s 자리 %d는 주인공 몸 뒤 (%.0f)" % [name, i, a.x])
-			assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 5.0, "%s 자리 %d 화면 왼쪽 안" % [name, i])
-			assert_true(a.y < 0.0, "%s 자리 %d는 위" % [name, i])
-			for j in range(i + 1, Balance.PARADE_MAX):
-				var d := (a - CatParade.slot(j)).abs()
-				var gap := body.x if r >= 1.0 else body.x * 0.5
-				assert_true(d.x >= gap or d.y >= body.y * 0.9, "%s 자리 %d·%d 겹침 %s" % [name, i, j, d])
-		if r < 1.0:
-			var width: float = xs.max() - xs.min() + WORLD.CLOUD_W * r
-			assert_true(width <= Balance.CAT_BODY_SIZE.x, "%s 무리 폭 %.0f <= 주인공 몸 폭" % [name, width])
-	CatParade.size_pick = keep
-	assert_eq(Balance.KITTEN_SIZES[Balance.KITTEN_SIZE_PICK].name, "중간", "기본은 중간")
+	var top := KittenFlock.top()
+	assert_eq(KittenFlock.soft_top(400.0, top), 400.0, "하한 아래는 그대로")
+	assert_true(KittenFlock.soft_top(0.0, top) > KittenFlock.soft_top(-100.0, top), "더 높으면 조금 더 위 (멈추지 않음)")
+	var r := KittenFlock.ratio()
+	assert_true(top - 20.0 * r - KittenFlock.HEAD * r >= KittenFlock.HUD_BOTTOM - 5.0, "가장 높이 눌린 자리(하한 - 20)에서도 머리가 생선 수 아래")
 
 
 func test_둥실_박자는_아기마다_다르다() -> void:
@@ -223,7 +199,7 @@ func test_6마리여도_주인공_자리와_앞_시야는_그대로() -> void:
 		var holder: Node2D = world.get_node("Kitten%d" % i)
 		assert_true(holder.visible, "아기 %d 보임" % i)
 		assert_eq(holder.get_node("View").breed, world.sim.parade.cats[i].look, "자리 %d 품종" % i)
-		assert_true(holder.position.distance_to(world.kitten_target(i)) < 40.0, "자리 %d 근처에 떠 있음" % i)
+		assert_true(holder.position.distance_to(world.kitten_lead() + KittenFlock.rest(i, Balance.PARADE_MAX)) < 40.0, "자리 %d 근처에 떠 있음" % i)
 		last = maxi(last, holder.get_index())
 	assert_true(world.cat.get_index() > last, "주인공이 아기들 위")
 	main.queue_free()

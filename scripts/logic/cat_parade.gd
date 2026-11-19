@@ -3,9 +3,8 @@ extends RefCounted
 ## 줄줄이 고양이 행렬 시험판 (GAME_SPEC "2026-11-13 게임 정체성", 화면과 분리된 로직). RunnerSim.parade_on일 때 sim.step이 부른다.
 ## - 길고양이(strays): 옥상 위 웅크린 고양이. 처음 STRAY_FIRST초, 그 뒤 STRAY_EVERY초마다 화면 오른쪽 밖 옥상에 놓는다.
 ##   장애물·트램펄린·아이템 둘레(STRAY_CLEAR)는 피하고, 그 자리 땅 생선은 치운다. 주인공 x가 그 자리를 지나면(점프 중이어도) 만남.
-## - 무리(cats): 만난 아기는 주인공 뒤쪽 위 정해진 자리(Balance.KITTEN_SLOTS[i], i = 만난 차례) 하나를 잡고 구름 방석에 앉아 떠다닌다
-##   (2026-11-17 사용자 결정: 줄은 평지에서 빽빽하고 도망이 화면 끝에서 끝나 거슬림). 떠다니는 움직임은 화면(world_view)이 스프링으로,
-##   자리·둥실 박자는 여기 static 함수. 아기는 충돌 판정이 없다.
+## - 무리(cats): 만난 아기는 주인공 뒤쪽 위에서 구름 방석에 앉아 떠다닌다 (2026-11-17 사용자 결정: 땅을 걷는 줄은 빽빽하고 도망이 거슬림).
+##   배치·움직임은 KittenFlock(줄줄이·요정 무리), 순서 = 만난 차례 (맨 끝 = 가장 나중). 아기는 충돌 판정이 없다.
 ## - 능력 (2026-11-17 액션 시험판, 자동 발동): 턱시도 냥펀치(앞 장애물 하나 부숨)·치즈 물어 오기(놓친 필수 생선을 물어 와 콤보 유지)·
 ##   삼색 반짝 코(앞 생선 3마리를 황금으로). 나머지 품종은 능력 없음. 아기마다 "cool"(남은 충전 초), 쓰면 skill_used에 알림.
 ## - 부딪힘(scare): 하트도 잃고 가장 나중에 온 아기가 날아가 사라진다 (A 규칙, RunnerSim._hit_obstacles).
@@ -48,12 +47,6 @@ func multiplier() -> float:
 ## 골골 피버 중인지
 func fever() -> bool:
 	return cats.size() >= Balance.PARADE_FEVER
-
-
-## 아기 i(0부터)가 떠 있을 자리: 주인공 발끝 화면 자리에서 (가로, 세로) 픽셀 (세로는 위가 -)
-static func slot(i: int) -> Vector2:
-	var first: Vector2 = Balance.KITTEN_SLOTS[0]
-	return first + (Balance.KITTEN_SLOTS[i] - first) * Balance.KITTEN_SIZES[size_pick].spread
 
 
 ## 지금 고른 떠다니는 아기 크기 (주인공 대비)

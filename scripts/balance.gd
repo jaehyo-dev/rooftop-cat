@@ -328,23 +328,34 @@ const STRAY_FIRST := Vector2(10.0, 15.0)  # 첫 만남 시각 (초, 사이 무�
 const STRAY_EVERY := Vector2(15.0, 25.0)  # 그 뒤 만남 간격 (초)
 const STRAY_CLEAR := 150.0         # 길고양이 둘레 이 거리 안에는 장애물·트램펄린·아이템이 없게
 const STRAY_EDGE := 120.0          # 옥상 끝에서 이만큼 안쪽에만
-## 떠다니는 아기 (2026-11-17): 주인공 발끝 화면 자리에서 (가로, 세로) 픽셀, 만난 차례대로. 주인공 몸(뒤쪽 끝 -75)·앞쪽 길을 가리지 않게
-## 모두 주인공 몸 뒤쪽, 아래 3·가운데 2·위 1 피라미드 (1차 2열 3줄 0.56배는 구름끼리 겹치고 맨 윗줄이 왼쪽 위 생선 수를 가림, 영상 확인).
-## 맨 위 발끝 -235 = 땅에서 화면 y 약 235 (머리가 생선 수 아래), 맨 왼쪽 -293 = 화면 x 47. 맨 앞 -130은 세운 꼬리(약 -110)에 안 닿게
-const KITTEN_SLOTS := [Vector2(-130, -55), Vector2(-212, -60), Vector2(-170, -145), Vector2(-293, -50), Vector2(-252, -150), Vector2(-211, -235)]
-## 떠다니는 아기 크기 고르기 (2026-11-19, 로컬 시험 단추 "아기 크기"): size = 주인공 대비 (기다리는 길고양이는 PARADE_SIZE),
-## spread = KITTEN_SLOTS(0.46배 기준)를 맨 앞 자리 [0]에서 (가로, 세로) 몇 배로 모을지. 가로는 무리 폭(자리 폭 + 구름)이 주인공 몸 폭 150 이하,
-## 세로는 크기 비율(size / 0.46)이라 위 줄 구름이 아래 줄 머리를 덮지 않음 (0.46배 6마리가 주인공보다 넓어 눈이 무리로 감, 디렉터 확인)
+## 떠다니는 아기 크기 고르기 (2026-11-19, 로컬 시험 단추 "아기 크기"): 주인공 대비 (기다리는 길고양이는 PARADE_SIZE).
+## 기본은 작게 (2026-11-19 사용자: 작을수록 좋음). 배치와 움직임은 KittenFlock
 const KITTEN_SIZES := [
-	{"name": "작게", "size": 0.28, "spread": Vector2(0.55, 0.61)},
-	{"name": "중간", "size": 0.36, "spread": Vector2(0.46, 0.78)},
-	{"name": "지금", "size": 0.46, "spread": Vector2(1.0, 1.0)},
+	{"name": "작게", "size": 0.28},
+	{"name": "중간", "size": 0.36},
+	{"name": "지금", "size": 0.46},
 ]
-const KITTEN_SIZE_PICK := 1        # 기본 = 중간
+const KITTEN_SIZE_PICK := 0        # 기본 = 작게
+## 줄줄이 (KittenFlock, 길이는 0.46배 기준 x 크기 비율): 맨 앞 아기는 주인공 발끝에서 (-KITTEN_CHAIN_BACK, 0) + FIRST.
+## BACK = 몸 뒤 끝 75 + 세운 꼬리 20, GAP = 구름 폭 80보다 조금 넓게
+const KITTEN_CHAIN_BACK := 95.0
+const KITTEN_CHAIN_FIRST := Vector2(-50.0, -60.0)
+const KITTEN_CHAIN_GAP := 88.0
+const KITTEN_CHAIN_DELAY := 0.12   # 아기마다 앞 아기(맨 앞은 주인공) 높이를 이만큼 늦게 따라감 (초)
+const KITTEN_CHAIN_HZ := 5.0       # 늦춘 높이를 매끄럽게 따라가는 스프링 (지연을 많이 더하지 않게 빠르게)
+const KITTEN_CHAIN_DAMP := 0.7
+## 요정 무리 (비교용): 구역 가운데 = 발끝에서 (-KITTEN_CHAIN_BACK, 0) + CENTER, 자리 = 가운데 둘레 각도(도, 0 = 앞, + = 아래) 5개 + 가운데
+const KITTEN_FLOCK_CENTER := Vector2(-131.0, -180.0)
+const KITTEN_FLOCK_RADIUS := 102.0
+const KITTEN_FLOCK_ANGLES := [10.0, -60.0, 80.0, -130.0, 150.0]
+const KITTEN_ORBIT := 16.0         # 궤도 반지름
+const KITTEN_ORBIT_HZ := 0.45      # 궤도 박자 (아기마다 0.75~1.25배)
 const KITTEN_BOB := 7.0            # 둥실둥실 세로 폭 (픽셀)
 const KITTEN_BOB_HZ := 0.7         # 둥실 박자 (아기마다 0.8~1.2배)
-const KITTEN_FOLLOW_HZ := 2.4      # 자리 따라가는 스프링 (낮을수록 늦게 따라옴, 아기마다 0.85~1.15배)
+const KITTEN_FOLLOW_HZ := 2.4      # 요정 무리: 자리 따라가는 스프링 (아기마다 0.7~1.3배라 덩어리로 안 움직임)
 const KITTEN_FOLLOW_DAMP := 0.45   # 1보다 작아 점프하면 넘쳤다 돌아오며 출렁
+const KITTEN_CLOUD_HZ := 4.0       # 구름 방석 납작해졌다 돌아오는 스프링
+const KITTEN_CLOUD_DAMP := 0.35
 const KITTEN_FLEE_TIME := 0.7      # 피격 때 날아가 사라지는 시간 (초)
 ## 아기 능력 (2026-11-17 액션 시험판, 자동 발동, CatParade._skills). every = 충전 초 (만나자마자는 비어 있음)
 const KITTEN_SKILLS := {

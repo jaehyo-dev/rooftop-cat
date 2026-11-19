@@ -202,7 +202,7 @@ const GOLD_FLASH_TIME := 0.3
 const GOLD_COLOR := Color("#e8a21a")
 const SHARD_COLORS := {"pot": Color("#c9764f"), "ac": Color("#b9c3c6"), "tank": Color("#9db3c2"), "flock": Color("#d9d4cc"), "sign": Color("#c99a62")}
 const SLIDE_DUST_EVERY := 0.09  # 슬라이딩 중 발밑 먼지 간격 (초)
-const SLIDE_DIP := 22.0         # 슬라이딩 중 떠다니는 아기들도 이만큼 낮아짐
+const SLIDE_LIFT := 30.0        # 슬라이딩 중 떠다니는 아기들은 이만큼 비켜 올라감 (뒤로 길어진 슬라이딩 몸·꼬리 위에 맨 앞 아기가 앉지 않게, 영상 확인)
 ## 떠오르는 효과 글자 ("팡!", "펑!", "딸랑!")
 const POP_TEXT_TIME := 0.5
 ## 방울 HUD: 하트 오른쪽. 막으면 두 쪽으로 깨진다. 진행 막대: 하트 아래 아이콘 + 남은 시간
@@ -225,9 +225,6 @@ const STAGE_POP_TIME := 0.15        # "빨라진다!"가 크게 찍혔다 줄어
 const STAGE_PAW_DELAY := 0.06       # 발바닥 도장이 하나씩 찍히는 간격 (초)
 
 ## 아기 고양이 무리 (cat-parade 브랜치): 떠다니기·만남·날아감 연출, 골골 피버
-const KITTEN_TOP := 255.0       # 떠다니는 아기 발끝 화면 높이: 이보다 위로 가면 부드럽게 눌러 머리가 왼쪽 위 HUD 생선 수(약 160) 아래에
-const KITTEN_TOP_SQUEEZE := 0.12# 하한을 넘은 높이의 이만큼만 더 올라감 (딱 멈추지 않고 살짝 따라 올라가게)
-const CLOUD_W := 92.0           # 구름 방석 폭 (아기 몸 약 80px보다 조금 넓게)
 const CLOUD_SINK := 8.0         # 구름 가운데를 발끝보다 이만큼 아래 (엉덩이가 구름에 묻힘)
 const CLOUD_POP := 0.3          # 구름이 퐁 커지는 시간 (넘쳤다 돌아옴)
 const FLINCH := Vector2(5.0, -9.0)  # 한 마리가 날아갈 때 남은 아기 움찔 (스프링 충격, 픽셀)
@@ -250,7 +247,7 @@ const MEOW_DB := -8.0
 var sim := RunnerSim.new(randi())
 var _stray_view := CatView.new()     # 옥상에서 기다리는 길고양이 (앉아 꼬리 살랑)
 var _kittens: Array[Node2D] = []     # 무리 자리마다 아기 (원점 = 발끝, 자식 Cloud·View)
-var _springs: Array = []              # 자리마다 화면 위치 스프링 (Spring, 빈 자리 null)
+var _flock := KittenFlock.new()      # 떠다니는 아기 배치·움직임 (자리마다 화면 위치·기울기·구름 배율)
 var _slot_looks: Array = []           # 자리마다 스프링을 시작한 아기 품종 (바뀌면 다시 시작)
 var _fly_views: Array[Node2D] = []    # 날아가는 아기 그림
 var _fly_aways: Array[Dictionary] = []  # 날아가는 아기 {"look", "from"(화면), "t"}
@@ -1469,7 +1466,7 @@ func _build_parade() -> void:
 		var holder := Node2D.new()  # 원점 = 아기 발끝
 		holder.visible = false
 		add_child(holder)
-		move_child(holder, i)  # 주인공·효과보다 아래
+		move_child(holder, 0 if i < Balance.PARADE_MAX else i)  # 주인공·효과보다 아래, 앞 아기(번호 작은)가 뒤 아기 위
 		if i < Balance.PARADE_MAX:
 			holder.name = "Kitten%d" % i
 			var cloud := Sprite2D.new()
@@ -1481,7 +1478,6 @@ func _build_parade() -> void:
 			view.name = "View"
 			holder.add_child(view)
 			_kittens.append(holder)
-			_springs.append(null)
 			_slot_looks.append("")
 		else:
 			holder.name = "FlyAway%d" % (i - Balance.PARADE_MAX)
@@ -1507,15 +1503,15 @@ func _build_parade() -> void:
 	add_child(_purr)
 
 
-## 아기 i가 지금 가려는 화면 자리 (주인공 발끝 + 자리 + 둥실)
-func kitten_target(i: int) -> Vector2:
-	var info: Dictionary = sim.parade.cats[i]
-	var at := cat.position + CatParade.slot(i) + CatParade.bob(sim.elapsed, info.quirk) + Vector2(0.0, SLIDE_DIP if sim.sliding else 0.0)
-	# 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게: 맨 위 자리 기준으로 무리 전체를 같이 내림
-	# (아기마다 따로 누르면 모두 한 줄로 눌려 빽빽해짐, 영상 확인)
-	var top: float = cat.position.y + range(Balance.PARADE_MAX).map(func(k: int) -> float: return CatParade.slot(k).y).min()
-	at.y += soft_top(top, KITTEN_TOP) - top
-	return at
+## 아기들이 따라가는 주인공 발끝 화면 자리 (슬라이딩 중엔 조금 높게)
+func kitten_lead() -> Vector2:
+	return cat.position - Vector2(0.0, SLIDE_LIFT if sim.sliding else 0.0)
+
+
+## 화면 x 아래 지붕의 화면 y (없으면 INF, 아기가 지붕 아래로 안 내려가게)
+func _roof_screen_y(screen_x: float) -> float:
+	var roof := sim.roof_at(sim.x + screen_x - Balance.CAT_SCREEN_X)
+	return INF if roof.is_empty() else _screen_at(0.0, roof.top).y - FOOT_SINK
 
 
 ## 이번 step에 만나고 놓친 아기: 야옹·하트·구름 퐁·자리로 날아옴, 냐!·빙글 날아감·남은 아기 움찔
@@ -1535,8 +1531,7 @@ func _parade_events() -> void:
 		_fly_aways.append({"look": cat_info.look, "from": _kittens[i].position, "t": 0.0})
 		_slot_looks[i] = ""
 		for k in parade.cats.size():
-			if _springs[k] != null:
-				_springs[k].kick(FLINCH * Vector2(-1.0 if k % 2 == 0 else 1.0, 1.0))  # 남은 아기 움찔
+			_flock.kick(k, FLINCH * Vector2(-1.0 if k % 2 == 0 else 1.0, 1.0))  # 남은 아기 움찔 (줄 끝이 빠져 빈자리는 없음)
 	_fly_aways = _fly_aways.slice(-FLY_VIEWS)
 	for ev in parade.skill_used:
 		_skill_event(ev)
@@ -1568,11 +1563,10 @@ func _skill_event(ev: Dictionary) -> void:
 		_pop_texts.append({"text": "반짝!", "x": ev.x, "y": ev.y + 70.0, "t": 0.0, "color": GOLD_COLOR})
 
 
-## 아기 i가 자리를 잡음: from 화면 자리에서 스프링으로 자리까지 (구름이 퐁 생김)
+## 아기 i가 자리를 잡음: from 화면 자리에서 줄 끝(무리 빈자리)으로 날아옴 (구름이 퐁 생김)
 func _start_kitten(i: int, from: Vector2) -> void:
-	var info: Dictionary = sim.parade.cats[i]
-	_springs[i] = Spring.new(Balance.KITTEN_FOLLOW_HZ * (0.85 + 0.3 * info.quirk), Balance.KITTEN_FOLLOW_DAMP, from)
-	_slot_looks[i] = info.look
+	_flock.place(i, from)
+	_slot_looks[i] = sim.parade.cats[i].look
 	_kittens[i].set_meta("since", 0.0)
 
 
@@ -1598,25 +1592,29 @@ func _screen_at(at_x: float, feet: float, lift: float = 0.0) -> Vector2:
 	return Vector2(Balance.CAT_SCREEN_X + at_x - sim.x, _ground_y() - feet + FOOT_SINK - lift)
 
 
-## 떠다니는 아기(스프링으로 자리 따라감, 구름 위에 앉아 꼬리 살랑), 날아가는 아기, 기다리는 길고양이
+## 떠다니는 아기(KittenFlock: 줄줄이·요정 무리, 기울기, 구름 납작, 구름 위에 앉아 꼬리 살랑), 날아가는 아기, 기다리는 길고양이
 func _place_parade(delta: float = 0.0) -> void:
 	var parade := sim.parade
+	for i in mini(parade.cats.size(), _kittens.size()):
+		if _slot_looks[i] != parade.cats[i].look:
+			_start_kitten(i, kitten_lead() + KittenFlock.rest(i, parade.cats.size()))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
+	_flock.step(delta, kitten_lead(), parade.cats, _roof_screen_y)
 	for i in _kittens.size():
 		var holder := _kittens[i]
 		holder.visible = not waiting and i < parade.cats.size()
 		if not holder.visible:
 			continue
 		var info: Dictionary = parade.cats[i]
-		if _slot_looks[i] != info.look:
-			_start_kitten(i, kitten_target(i))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
 		var since: float = holder.get_meta("since", 9.0) + delta
 		holder.set_meta("since", since)
-		holder.position = _springs[i].step(kitten_target(i), delta) if delta > 0.0 else _springs[i].value
+		holder.position = _flock.pos[i]
 		_act(holder, delta)
 		var k := clampf(since / CLOUD_POP, 0.0, 1.0) - 1.0
-		holder.get_node("Cloud").scale = Vector2(CLOUD_W, CLOUD_W * 0.8) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * size_ratio()
+		var cloud_w := KittenFlock.CLOUD_W * size_ratio()
+		holder.get_node("Cloud").scale = Vector2(cloud_w, cloud_w * KittenFlock.CLOUD_H) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * _flock.cloud[i]
 		holder.get_node("Cloud").position.y = CLOUD_SINK * size_ratio()
 		var view: CatView = holder.get_node("View")
+		view.rotation = _flock.tilt[i]
 		view.size_k = CatParade.size_k()
 		view.set_breed(info.look)
 		view.show_sit(sim.elapsed + info.quirk * 5.0)
@@ -1711,12 +1709,7 @@ func _draw_twinkle(at: Vector2, phase: float) -> void:
 
 ## 떠다니는 아기 크기 / 0.46 (구름·머리 위 표시 자리를 0.46배 기준 값에서 맞춤)
 static func size_ratio() -> float:
-	return CatParade.size_k() / 0.46
-
-
-## 화면 y가 top보다 위(작음)면 넘은 만큼의 KITTEN_TOP_SQUEEZE배만 올라가게
-static func soft_top(y: float, top: float) -> float:
-	return y if y >= top else top - (top - y) * KITTEN_TOP_SQUEEZE
+	return KittenFlock.ratio()
 
 
 ## 하트(만남)·"냐!"(날아감): 처음 0.12초 크게 찍혔다 줄어듦

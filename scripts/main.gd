@@ -652,13 +652,13 @@ static func is_local_build() -> bool:
 	return not OS.has_feature("web") or not str(JavaScriptBridge.eval("location.hostname")).ends_with("github.io")
 
 
-## 왼쪽 아래 "시험판 임시" (한곳에 모음): 아기 6마리로 시작, 능력 다시 채우기, 아기 바로 나오기, 아기 크기 (이 자리 터치는 점프가 아님)
+## 왼쪽 아래 "시험판 임시" (한곳에 모음): 아기 6마리로 시작, 능력 다시 채우기, 아기 바로 나오기, 아기 크기, 아기 배치 (이 자리 터치는 점프가 아님)
 func _build_parade_dev() -> void:
 	var dev := VBoxContainer.new()
 	dev.name = "ParadeDev"
 	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	dev.offset_left = 16
-	dev.offset_top = -280
+	dev.offset_top = -262  # 버튼 5개를 지붕 아래 건물 쪽에 (떠다니는 아기를 안 가리게)
 	dev.offset_right = 248
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
@@ -674,8 +674,12 @@ func _build_parade_dev() -> void:
 	size_btn.pressed.connect(func() -> void:  # 누를 때마다 다음 크기 (작게 → 중간 → 지금 → 작게)
 		CatParade.size_pick = (CatParade.size_pick + 1) % size_names.size()
 		size_btn.text = "아기 크기: " + size_names[CatParade.size_pick])
-	for b: Control in [fill, refill, summon, size_btn]:
-		b.custom_minimum_size = Vector2(232, 44)
+	var mode_btn := UiKit.button("아기 배치: " + KittenFlock.MODES[KittenFlock.mode_pick], "cream", null, UiKit.FONT_MIN)
+	mode_btn.pressed.connect(func() -> void:  # 누를 때마다 다음 배치 (줄줄이 ↔ 요정 무리)
+		KittenFlock.mode_pick = (KittenFlock.mode_pick + 1) % KittenFlock.MODES.size()
+		mode_btn.text = "아기 배치: " + KittenFlock.MODES[KittenFlock.mode_pick])
+	for b: Control in [fill, refill, summon, size_btn, mode_btn]:
+		b.custom_minimum_size = Vector2(232, 40)
 		dev.add_child(b)
 	dev.visible = false
 	add_child(dev)

@@ -1,6 +1,6 @@
 extends RefCounted
 ## 아기 고양이 무리 + 액션 시험판 캡처 (자동 테스트 아님, review/cat-parade/action/). 검수용 웹 빌드 주소 ?qa=parade_action(영상 프레임)
-## / parade_still(정지 화면, PC·폰) / parade_size(아기 크기 비교)이면 tools/qa_web.gd가 이것을 부른다. 창 없이 헤드리스 Chromium(review/cat-parade/qa_web.mjs)이 qaShot 이름마다 찍는다.
+## / parade_still(정지 화면, PC·폰) / parade_size(아기 크기 비교) / parade_form-<chain|fairy>(아기 배치 영상) / parade_formstill(배치 정지 화면)이면 tools/qa_web.gd가 이것을 부른다. 창 없이 헤드리스 Chromium(review/cat-parade/qa_web.mjs)이 qaShot 이름마다 찍는다.
 ## 판은 120Hz 한 step씩 직접 돌려 같은 시드면 같은 장면. 장면마다 긴 평지 옥상을 찾아 그 앞에 장애물을 놓고 자동 조종(pilot)으로 넘는다.
 ## 영상 프레임 이름: act_<장면>_<real|slow>_f000… (review/cat-parade/action/make_videos.py가 mp4로 묶음)
 
@@ -21,6 +21,9 @@ func run(q: Node, mode: String) -> void:
 		return
 	if mode == "parade_size":
 		await _sizes()
+		return
+	if mode.begins_with("parade_form"):
+		await _formation(mode)
 		return
 	await _action(mode.split("-").slice(1))  # parade_action-stomp-slide = 그 장면만
 
@@ -259,3 +262,66 @@ func _stills() -> void:
 	qa._fall()
 	await qa._wait(Balance.RESTART_DELAY + Juice.COUNT_UP_EACH * 4.0 + 1.5)
 	await qa._shot("result6")
+
+
+## 아기 배치 (2026-11-19, review/cat-parade/action/formation/): 줄줄이(chain)·요정 무리(fairy)마다 평지·점프·더블점프·슬라이딩·피격·새 아기 합류 영상
+## form_<방식>_<장면>_<real|slow>_f000… (parade_form-chain-slide = 그 장면만), parade_formstill = 방식마다 6마리 정지 화면 form_<방식>_still
+const FORM_MODES := ["chain", "fairy"]  # KittenFlock.MODES 차례
+
+
+func _formation(mode: String) -> void:
+	if mode == "parade_formstill":
+		for m in FORM_MODES.size():
+			KittenFlock.mode_pick = m
+			await _start(5, 6)
+			await _run_flat(2600.0)
+			sim.accelerate = false
+			sim.speed = SPEED
+			_pilot = func() -> Array: return [false, false]  # 줄이 출렁이다 멈춘 모습 (생선 길 자동 점프 끔)
+			for i in 240:
+				_advance()
+			await _still("form_%s_still" % FORM_MODES[m])
+		KittenFlock.mode_pick = 0
+		return
+	var m := FORM_MODES.find(mode.split("-")[1])
+	KittenFlock.mode_pick = m
+	var clips := [["flat", 1.4], ["jump", 1.8], ["double", 2.2], ["slide", 1.8], ["hit", 2.0], ["meet", 2.6]]
+	var only := mode.split("-").slice(2)  # parade_form-chain-slide = 그 장면만
+	for clip in clips:
+		if not only.is_empty() and clip[0] not in only:
+			continue
+		for speed in [["real", 4], ["slow", 2]]:
+			await _form_scene(clip[0])
+			if sim.game_over:
+				push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])
+			await _clip("form_%s_%s_%s" % [FORM_MODES[m], clip[0], speed[0]], clip[1], speed[1])
+	KittenFlock.mode_pick = 0
+
+
+func _form_scene(scene: String) -> void:
+	await _start(5, 5 if scene == "meet" else 6)
+	await _run_flat(2600.0)
+	sim.accelerate = false
+	sim.speed = SPEED
+	for cat in sim.parade.cats:
+		cat.cool = INF  # 능력을 쓰지 않게
+	for i in 60:  # 0.5초 자리 잡기
+		_advance()
+	var t0 := sim.elapsed
+	_pilot = func() -> Array: return [false, false]
+	match scene:
+		"jump":
+			_pilot = func() -> Array: return [sim.elapsed - t0 > 0.15 and sim.elapsed - t0 < 0.4, false]
+		"double":
+			_pilot = func() -> Array:
+				var t := sim.elapsed - t0
+				return [(t > 0.15 and t < 0.35) or (t > 0.6 and t < 0.8), false]
+		"slide":
+			_pilot = func() -> Array: return [false, sim.elapsed - t0 > 0.2 and sim.elapsed - t0 < 1.2]
+		"hit":
+			_put("pot", 420.0, 905)
+		"meet":
+			sim.parade.call_now()
+			sim.parade.set("_next_meet", -INF)
+			sim.parade.update(sim, 0.0)
+			await _run_until(func() -> bool: return not sim.parade.strays.is_empty() and sim.parade.strays[0].x - sim.x < 500.0, 20.0)
