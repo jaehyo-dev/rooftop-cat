@@ -201,13 +201,22 @@ func test_6마리여도_주인공_자리와_앞_시야는_그대로() -> void:
 		assert_eq(holder.get_node("View").breed, world.sim.parade.cats[i].look, "자리 %d 품종" % i)
 		assert_true(holder.position.distance_to(world.kitten_lead() + KittenFlock.rest(i, Balance.PARADE_MAX)) < 40.0, "자리 %d 근처에 떠 있음" % i)
 		last = maxi(last, holder.get_index())
-	assert_true(world.cat.get_index() > last, "주인공이 아기들 위")
+	assert_true(world.cat.get_index() < world.get_node("Kitten%d" % (Balance.PARADE_MAX - 1)).get_index(), "아기들이 주인공 위 층 (요정)")
+	assert_true(world.get_node("Kitten0").get_index() == last, "앞 아기가 뒤 아기 위")
 	main.queue_free()
 
 
-## 슬라이딩 겹침 (2026-11-19): 슬라이딩에 들어가는 순간부터 일어나는 그림이 끝날 때까지 매 프레임, 주인공 그림과 떠다니는 아기(구름 방석 포함) 그림의
-## 불투명 픽셀이 한 곳도 겹치지 않는다 (예전: 꼬리가 맨 앞 아기를 덮어 지붕에 누운 것처럼 보임, 시작·끝 0.13초 겹침)
+## 얼굴 겹침 (2026-11-20): 아기(구름 방석 포함)는 주인공 위 층이라, 평지·점프·더블점프·슬라이딩 모든 프레임에서
+## 아기 불투명 픽셀이 주인공 얼굴(눈·코·입·볼) 영역과 한 곳도 겹치지 않는다
 var _images := {}
+
+## 주인공 프레임 그림 픽셀에서 두 눈 (왼 눈 x, 오른 눈 x, 눈 y) — 얼굴 영역은 이것을 넓힌 사각형 (공중제비 공·말기 그림은 얼굴이 안 보여 뺌)
+const EYES := {
+	"run_0": [440, 482, 320], "run_1": [452, 492, 319], "run_2": [452, 490, 312], "run_3": [451, 490, 309],
+	"rise": [447, 487, 289], "fall": [444, 482, 297], "land": [442, 482, 327], "takeoff": [448, 487, 324],
+	"crouch": [450, 490, 331], "flail": [425, 466, 292], "flip_open": [450, 492, 304],
+	"slide_0": [452, 491, 354], "slide_1": [452, 491, 354], "slide_2": [452, 491, 354], "slide_up": [457, 500, 296],
+}
 
 
 func _alpha(spr: Sprite2D, p: Vector2) -> float:
@@ -224,34 +233,40 @@ func _alpha(spr: Sprite2D, p: Vector2) -> float:
 	return img.get_pixelv(Vector2i(at.clamp(Vector2.ZERO, Vector2(img.get_size() - Vector2i.ONE)))).a * spr.modulate.a
 
 
-## node 아래 보이는 그림 중 하나라도 p에서 불투명한가
-func _solid(sprites: Array, p: Vector2) -> bool:
-	for spr in sprites:
-		if _alpha(spr, p) > 0.5:
-			return true
-	return false
+## 지금 주인공 얼굴 영역(화면 점들, 3 프레임 픽셀 간격). 얼굴이 안 보이는 그림이면 빈 배열
+func _face_points(world: Node2D) -> Array:
+	if not EYES.has(world.cat.frame_name):
+		return []
+	var tex: Texture2D = world.cat.frame_texture(world.cat.frame_name)
+	for spr: Sprite2D in world.cat.find_children("*", "Sprite2D", true, false):
+		if spr.texture != tex:
+			continue
+		var e: Array = EYES[world.cat.frame_name]
+		var rect := spr.get_rect()
+		var scale := rect.size / tex.get_size()
+		var points := []
+		for x in range(e[0] - 25, e[1] + 15, 3):
+			for y in range(e[2] - 22, e[2] + 30, 3):
+				points.append(spr.get_global_transform() * (rect.position + Vector2(x, y) * scale))
+		return points
+	return []
 
 
-## 아기 holder들과 주인공이 겹친 픽셀 수 (2픽셀 간격으로 셈)
-func _overlap(world: Node2D, n: int) -> int:
-	var cat_sprites: Array = world.cat.find_children("*", "Sprite2D", true, false)
-	var hits := 0
+## 얼굴 영역에서 아기 그림이 불투명한 점 수
+func _face_hits(world: Node2D, n: int) -> int:
+	var mine := []
 	for i in n:
-		var holder: Node2D = world.get_node("Kitten%d" % i)
-		var mine := holder.find_children("*", "Sprite2D", true, false)
-		var box := Rect2(holder.global_position, Vector2.ZERO)
-		for spr: Sprite2D in mine:
-			var g := spr.get_global_transform() * spr.get_rect()
-			box = box.merge(g)
-		for x in range(int(box.position.x), int(box.end.x), 2):
-			for y in range(int(box.position.y), int(box.end.y), 2):
-				var p := Vector2(x, y)
-				if _solid(mine, p) and _solid(cat_sprites, p):
-					hits += 1
+		mine.append_array(world.get_node("Kitten%d" % i).find_children("*", "Sprite2D", true, false))
+	var hits := 0
+	for p in _face_points(world):
+		for spr in mine:
+			if _alpha(spr, p) > 0.5:
+				hits += 1
+				break
 	return hits
 
 
-func test_슬라이딩_내내_주인공과_아기가_안_겹친다() -> void:
+func test_평지_점프_더블점프_슬라이딩_내내_주인공_얼굴은_안_가려진다() -> void:
 	for n in [1, 4, 6]:
 		var main: Control = load("res://scenes/main.tscn").instantiate()
 		main.show_start = false
@@ -259,24 +274,34 @@ func test_슬라이딩_내내_주인공과_아기가_안_겹친다() -> void:
 		var world: Node2D = main.get_node("World")
 		world.sim.parade.fill(n)
 		world.sim.accelerate = false
-		await wait_frames(60)
-		world.sim.obstacles.clear()
-		world._touches[99] = "slide"
+		await wait_frames(30)
 		var bad := []
-		var frames := 0
-		for f in 50:  # 슬라이딩 0.6초 → 떼고 일어나기 그림 0.1초 넘게
-			if f == 36:
-				world._touches.erase(99)
+		var seen := {}
+		for f in 200:  # 평지 0.5초 → 점프(꾹) → 꼭대기 근처 더블점프 → 착지 → 슬라이딩 0.6초 → 떼고 일어나기
+			match f:
+				30:
+					world._touches[99] = "jump"
+					world._tap_pending = true
+				42:
+					world._touches.erase(99)
+				62:
+					world._tap_pending = true
+				140:
+					world._touches[99] = "slide"
+				176:
+					world._touches.erase(99)
 			world.sim.obstacles.clear()
 			await wait_frames(1)
-			if not world.long_pose():
-				continue  # 평소 달리기 꼬리는 맨 앞 구름 끝을 살짝 스침 (예전부터, 이번 범위 밖)
-			frames += 1
-			var hits := _overlap(world, n)
+			var face := _face_points(world)
+			if face.is_empty():
+				continue
+			seen[world.cat.frame_name.get_slice("_", 0)] = true
+			var hits := _face_hits(world, n)
 			if hits > 0:
 				bad.append("%d(%s %d)" % [f, world.cat.frame_name, hits])
-		assert_true(frames >= 30, "%d마리: 슬라이딩 그림 %d장" % [n, frames])
-		assert_eq(bad.size(), 0, "%d마리: 겹친 장 %s" % [n, bad])
+		for kind in ["run", "rise", "fall", "slide"]:
+			assert_true(seen.has(kind), "%d마리: %s 그림을 거침 %s" % [n, kind, seen.keys()])
+		assert_eq(bad.size(), 0, "%d마리: 얼굴이 가려진 장 %s" % [n, bad])
 		main.queue_free()
 		await wait_frames(1)
 

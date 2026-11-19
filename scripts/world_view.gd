@@ -347,6 +347,8 @@ func _ready() -> void:
 	_build_parade()
 	cat.name = "Cat"
 	add_child(cat)
+	move_child(cat, 0)  # 떠다니는·날아오는·날아가는 아기(요정)는 주인공 위 층
+	move_child(_stray_view, 0)  # 기다리는 길고양이는 예전처럼 주인공 뒤
 	_front_mist.name = "FrontMist"
 	_front_mist.draw.connect(func() -> void: _draw_mist(_front_mist, Backdrop.MISTS[-1], _view_size()))
 	add_child(_front_mist)
@@ -1466,7 +1468,7 @@ func _draw_text(center: Vector2, text: String, size: int, alpha: float, color: C
 
 # --- 아기 고양이 무리 시험판 (cat-parade 브랜치) ---
 
-## 떠다니는 아기 6자리(구름 방석 + 앉은 아기, 주인공보다 먼저 = 뒤에 그림)·날아가는 아기·길고양이, 소리
+## 떠다니는 아기 6자리(구름 방석 + 앉은 아기, _ready에서 주인공을 이들 아래로 옮김 = 주인공 위에 그림)·날아가는 아기·길고양이, 소리
 func _build_parade() -> void:
 	_stray_view.name = "Stray"
 	_stray_view.size_k = Balance.PARADE_SIZE
@@ -1476,7 +1478,7 @@ func _build_parade() -> void:
 		var holder := Node2D.new()  # 원점 = 아기 발끝
 		holder.visible = false
 		add_child(holder)
-		move_child(holder, 0 if i < Balance.PARADE_MAX else i)  # 주인공·효과보다 아래, 앞 아기(번호 작은)가 뒤 아기 위
+		move_child(holder, 0 if i < Balance.PARADE_MAX else i)  # 효과보다 아래, 앞 아기(번호 작은)가 뒤 아기 위
 		if i < Balance.PARADE_MAX:
 			holder.name = "Kitten%d" % i
 			var rim := Sprite2D.new()
@@ -1524,7 +1526,7 @@ func kitten_lead() -> Vector2:
 	return cat.position
 
 
-## 주인공이 뒤로 길게 엎드린 그림(슬라이딩·일어나기)인가: 아기 줄이 꼬리를 비킴 (KittenFlock.SLIDE_BACK)
+## 주인공이 뒤로 길게 엎드린 그림(슬라이딩·일어나기)인가: 아기 줄을 조금 올림 (KittenFlock.SLIDE_LIFT)
 func long_pose() -> bool:
 	return cat.frame_name.begins_with("slide")
 
