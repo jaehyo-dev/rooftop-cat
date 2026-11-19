@@ -1479,7 +1479,6 @@ func _build_parade() -> void:
 			holder.add_child(cloud)
 			var view := CatView.new()
 			view.name = "View"
-			view.size_k = Balance.KITTEN_SIZE
 			holder.add_child(view)
 			_kittens.append(holder)
 			_springs.append(null)
@@ -1489,9 +1488,6 @@ func _build_parade() -> void:
 			var spr := Sprite2D.new()
 			spr.name = "Scared"
 			spr.offset = -Vector2(SCARED_ANCHOR) + Vector2(0, -SCARED_CENTER)  # 몸 가운데 축으로 돎
-			var px := CatView.KITTEN_ART * CatView.art_scale() * Balance.KITTEN_SIZE  # 그림 픽셀 → 게임 픽셀 (앉은 아기와 같은 크기)
-			spr.position.y = SCARED_CENTER * px
-			spr.scale = Vector2.ONE * px
 			holder.add_child(spr)
 			_fly_views.append(holder)
 	for sound in ["meow", "nya"]:
@@ -1517,7 +1513,7 @@ func kitten_target(i: int) -> Vector2:
 	var at := cat.position + CatParade.slot(i) + CatParade.bob(sim.elapsed, info.quirk) + Vector2(0.0, SLIDE_DIP if sim.sliding else 0.0)
 	# 높이 뛰어도 머리가 HUD 숫자 밑에 깔리지 않게: 맨 위 자리 기준으로 무리 전체를 같이 내림
 	# (아기마다 따로 누르면 모두 한 줄로 눌려 빽빽해짐, 영상 확인)
-	var top: float = cat.position.y + Balance.KITTEN_SLOTS.map(func(v: Vector2) -> float: return v.y).min()
+	var top: float = cat.position.y + range(Balance.PARADE_MAX).map(func(k: int) -> float: return CatParade.slot(k).y).min()
 	at.y += soft_top(top, KITTEN_TOP) - top
 	return at
 
@@ -1618,8 +1614,10 @@ func _place_parade(delta: float = 0.0) -> void:
 		holder.position = _springs[i].step(kitten_target(i), delta) if delta > 0.0 else _springs[i].value
 		_act(holder, delta)
 		var k := clampf(since / CLOUD_POP, 0.0, 1.0) - 1.0
-		holder.get_node("Cloud").scale = Vector2(CLOUD_W, CLOUD_W * 0.8) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k)
+		holder.get_node("Cloud").scale = Vector2(CLOUD_W, CLOUD_W * 0.8) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * size_ratio()
+		holder.get_node("Cloud").position.y = CLOUD_SINK * size_ratio()
 		var view: CatView = holder.get_node("View")
+		view.size_k = CatParade.size_k()
 		view.set_breed(info.look)
 		view.show_sit(sim.elapsed + info.quirk * 5.0)
 	for i in _fly_views.size():
@@ -1630,6 +1628,9 @@ func _place_parade(delta: float = 0.0) -> void:
 		var r: Dictionary = _fly_aways[i]
 		var u: float = r.t / Balance.KITTEN_FLEE_TIME
 		var spr: Sprite2D = holder.get_node("Scared")
+		var px := CatView.KITTEN_ART * CatView.art_scale() * CatParade.size_k()  # 그림 픽셀 → 게임 픽셀 (앉은 아기와 같은 크기)
+		spr.position.y = SCARED_CENTER * px
+		spr.scale = Vector2.ONE * px
 		spr.texture = load(CatView.KITTEN_DIR + r.look + "/scared.png")
 		# 화면 위·뒤로 포물선 (처음 빠르게), 빙글빙글, 끝 40%에 사라짐
 		holder.position = r.from + FLY_TO * (1.0 - (1.0 - u) * (1.0 - u)) + Vector2(0.0, -30.0 * sin(u * PI))
@@ -1660,7 +1661,7 @@ func _act(holder: Node2D, delta: float) -> void:
 	else:
 		holder.remove_meta("act")
 	var trail: Array = holder.get_meta("trail", [])
-	trail.push_front(holder.position + Vector2(0.0, -30.0))
+	trail.push_front(holder.position + Vector2(0.0, -30.0 * size_ratio()))
 	holder.set_meta("trail", trail.slice(0, SKILL_TRAIL if holder.has_meta("act") else 0))
 
 
@@ -1674,7 +1675,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 	if fever:
 		for holder in _kittens:
 			if holder.visible:
-				_draw_fever_glow(holder.position, Balance.KITTEN_SIZE)
+				_draw_fever_glow(holder.position, CatParade.size_k())
 		_draw_fever_glow(cat.position, 1.0)
 	for i in _kittens.size():
 		var holder := _kittens[i]
@@ -1684,7 +1685,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 		for k in trail.size():  # 능력 궤적: 뒤로 갈수록 작고 옅은 금빛 점
 			draw_circle(trail[k], 14.0 * (1.0 - float(k) / SKILL_TRAIL), Color(FEVER_GLOW, 0.75 * (1.0 - float(k) / SKILL_TRAIL)))
 		if i < sim.parade.cats.size() and CatParade.charge(sim.parade.cats[i]) >= 1.0 and not holder.has_meta("act"):
-			_draw_twinkle(holder.position + Vector2(30.0, -58.0), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
+			_draw_twinkle(holder.position + Vector2(30.0, -58.0) * size_ratio(), sim.elapsed * 6.0 + i)  # 능력 준비: 머리 옆 반짝
 	for r in _fly_aways:  # 날아가는 아기 머리 위 "냐!" (처음 반)
 		var i := _fly_aways.find(r)
 		if i < _fly_views.size() and r.t < Balance.KITTEN_FLEE_TIME * 0.5:
@@ -1694,7 +1695,7 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 		var at := _screen_at(fx.x, fx.y)
 		for holder in _kittens:
 			if holder.visible and holder.get_node("View").breed == fx.look:
-				at = holder.position + Vector2(0.0, -72.0 - 40.0 * fx.t)
+				at = holder.position + Vector2(0.0, -72.0 * size_ratio() - 40.0 * fx.t)
 		_parade_fx_draw(fx.kind, at, fx.t, clampf((1.0 - fx.t / PARADE_FX_TIME) * 3.0, 0.0, 1.0))
 
 
@@ -1706,6 +1707,11 @@ func _draw_twinkle(at: Vector2, phase: float) -> void:
 		var a := TAU * k / 8.0 - PI * 0.5
 		pts.append(at + Vector2(cos(a), sin(a)) * (r if k % 2 == 0 else r * 0.35))
 	draw_colored_polygon(pts, Color(1.0, 0.93, 0.55, 0.8 + 0.2 * sin(phase)))
+
+
+## 떠다니는 아기 크기 / 0.46 (구름·머리 위 표시 자리를 0.46배 기준 값에서 맞춤)
+static func size_ratio() -> float:
+	return CatParade.size_k() / 0.46
 
 
 ## 화면 y가 top보다 위(작음)면 넘은 만큼의 KITTEN_TOP_SQUEEZE배만 올라가게

@@ -175,17 +175,30 @@ func test_높이_뛴_아기는_HUD_밑으로_부드럽게_눌린다() -> void:
 	assert_true(WORLD.soft_top(-300.0, WORLD.KITTEN_TOP) > 150.0, "아주 높아도 HUD 아래")
 
 
-## 떠다니는 자리 (2026-11-17): 6자리가 서로 안 겹치고, 모두 주인공 몸 뒤쪽(앞 길을 안 가림), 화면 안
-func test_떠다니는_자리는_서로_안_겹치고_주인공_뒤() -> void:
-	var body := Vector2(80.0, 80.0)  # 앉은 아기 몸 (0.46배, 구름 포함 대략)
-	for i in Balance.PARADE_MAX:
-		var a := CatParade.slot(i)
-		assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "자리 %d는 주인공 몸 뒤 (%.0f)" % [i, a.x])
-		assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 5.0, "자리 %d 화면 왼쪽 안" % i)
-		assert_true(a.y < 0.0, "자리 %d는 위" % i)
-		for j in range(i + 1, Balance.PARADE_MAX):
-			var d := (a - CatParade.slot(j)).abs()
-			assert_true(d.x >= body.x or d.y >= body.y, "자리 %d·%d 겹침 %s" % [i, j, d])
+## 떠다니는 자리 (2026-11-17, 크기 고르기 2026-11-19): 크기마다 모두 주인공 몸 뒤쪽(앞 길을 안 가림), 화면 안,
+## 서로 얼굴을 가리지 않음(지금 크기는 안 겹침, 작게·중간은 같은 줄 이웃이 몸 폭 절반 이상 떨어짐), 작게·중간은 무리 폭(자리 폭 + 구름) <= 주인공 몸 폭
+func test_떠다니는_자리는_크기마다_주인공_뒤에_모인다() -> void:
+	var keep := CatParade.size_pick
+	for pick in Balance.KITTEN_SIZES.size():
+		CatParade.size_pick = pick
+		var r := WORLD.size_ratio()
+		var body := Vector2(80.0, 80.0) * r  # 앉은 아기 몸 (0.46배 80px, 구름 포함 대략)
+		var name: String = Balance.KITTEN_SIZES[pick].name
+		var xs: Array = range(Balance.PARADE_MAX).map(func(k: int) -> float: return CatParade.slot(k).x)
+		for i in Balance.PARADE_MAX:
+			var a := CatParade.slot(i)
+			assert_true(a.x + body.x * 0.5 <= -Balance.CAT_BODY_SIZE.x * 0.5 + 10.0, "%s 자리 %d는 주인공 몸 뒤 (%.0f)" % [name, i, a.x])
+			assert_true(Balance.CAT_SCREEN_X + a.x - body.x * 0.5 >= 5.0, "%s 자리 %d 화면 왼쪽 안" % [name, i])
+			assert_true(a.y < 0.0, "%s 자리 %d는 위" % [name, i])
+			for j in range(i + 1, Balance.PARADE_MAX):
+				var d := (a - CatParade.slot(j)).abs()
+				var gap := body.x if r >= 1.0 else body.x * 0.5
+				assert_true(d.x >= gap or d.y >= body.y * 0.9, "%s 자리 %d·%d 겹침 %s" % [name, i, j, d])
+		if r < 1.0:
+			var width: float = xs.max() - xs.min() + WORLD.CLOUD_W * r
+			assert_true(width <= Balance.CAT_BODY_SIZE.x, "%s 무리 폭 %.0f <= 주인공 몸 폭" % [name, width])
+	CatParade.size_pick = keep
+	assert_eq(Balance.KITTEN_SIZES[Balance.KITTEN_SIZE_PICK].name, "중간", "기본은 중간")
 
 
 func test_둥실_박자는_아기마다_다르다() -> void:

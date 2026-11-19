@@ -1,6 +1,6 @@
 extends RefCounted
 ## 아기 고양이 무리 + 액션 시험판 캡처 (자동 테스트 아님, review/cat-parade/action/). 검수용 웹 빌드 주소 ?qa=parade_action(영상 프레임)
-## / parade_still(정지 화면, PC·폰)이면 tools/qa_web.gd가 이것을 부른다. 창 없이 헤드리스 Chromium(review/cat-parade/qa_web.mjs)이 qaShot 이름마다 찍는다.
+## / parade_still(정지 화면, PC·폰) / parade_size(아기 크기 비교)이면 tools/qa_web.gd가 이것을 부른다. 창 없이 헤드리스 Chromium(review/cat-parade/qa_web.mjs)이 qaShot 이름마다 찍는다.
 ## 판은 120Hz 한 step씩 직접 돌려 같은 시드면 같은 장면. 장면마다 긴 평지 옥상을 찾아 그 앞에 장애물을 놓고 자동 조종(pilot)으로 넘는다.
 ## 영상 프레임 이름: act_<장면>_<real|slow>_f000… (review/cat-parade/action/make_videos.py가 mp4로 묶음)
 
@@ -18,6 +18,9 @@ func run(q: Node, mode: String) -> void:
 	qa = q
 	if mode == "parade_still":
 		await _stills()
+		return
+	if mode == "parade_size":
+		await _sizes()
 		return
 	await _action(mode.split("-").slice(1))  # parade_action-stomp-slide = 그 장면만
 
@@ -219,6 +222,18 @@ func _scene(scene: String) -> void:
 				var under: bool = not o.is_empty() and sim.x - 75.0 < o[0].x + o[0].w
 				# 점프 → 꼭대기 지나 내려찍기 → 누른 채 닿아 슬라이딩 → 간판 밑을 지나 뗌
 				return [t > 0.1 and t < 0.35, t > 0.55 and under]
+
+
+## 아기 크기 비교 (2026-11-19): 같은 시드·같은 장면을 크기마다 한 장씩 size_<번호> (review/cat-parade/action/size_compare.py가 나란히 붙임)
+func _sizes() -> void:
+	for pick in Balance.KITTEN_SIZES.size():
+		CatParade.size_pick = pick
+		await _start(5, 6)
+		await _run_flat(2600.0)
+		for i in 120:
+			_advance()
+		await _still("size_%d" % pick)
+	CatParade.size_pick = Balance.KITTEN_SIZE_PICK
 
 
 ## 정지 화면 (PC·폰): 떠다니는 6마리 평지, 능력 준비 HUD, 슬라이딩 첫 안내와 간판, 결과

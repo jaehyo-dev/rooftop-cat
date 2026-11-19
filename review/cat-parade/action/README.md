@@ -16,7 +16,7 @@
 | `dive_stomp` | 공중 내려찍기로 실외기 밟기 |
 | `dive_slide` | 점프 → 내려찍기 → 누른 채 닿아 슬라이딩으로 이어져 간판 밑 지나가기 |
 
-정지 화면: `float6_pc.png`·`float6_phone.png`(6마리), `hud_ready_*`(능력 준비 고리), `sign_teach_*`(슬라이딩 첫 안내), `result6_*`(결과 카드).
+정지 화면: `float6_pc.png`·`float6_phone.png`(6마리, 0.46배), `hud_ready_*`(능력 준비 고리), `sign_teach_*`(슬라이딩 첫 안내), `result6_*`(결과 카드).
 
 다시 만들기: `GODOT=<경로> bash review/v0.7.0/2c-juice/export_qa.sh` → `PLAYWRIGHT=<경로> node review/cat-parade/qa_web.mjs build/qa <폴더> parade_action x pc` (장면만: `parade_action-stomp-slide_sign`, 정지: `parade_still x pc|phone`) → `python3 review/cat-parade/action/make_videos.py <폴더>`. 밟기 장면은 `tools/qa_stomp_plan.gd`가 같은 속도(600)·같은 상대 자리에서 밟히는 입력을 찾아 그대로 재생한다.
 
@@ -69,3 +69,9 @@
 | sign_teach | 문제 없음 | 문제 없음 | 손가락 + "눌러서 슬라이딩"이 왼쪽 아래(처음 자리 0.25·0.62는 "숙여!" 말풍선·주인공과 겹쳐 옮김), 간판 "!" + 아래 화살표 |
 | result6 | 문제 없음 | 문제 없음 | 결과 카드 얼굴에는 능력 고리가 없음 (/ponytail-review 지적으로 숨김) |
 | 영상 장면 | 확인 | - | "밟기 x2"·"+220"·"냥펀치!"·"물어 왔다!"·"반짝!"·"냐!" 글자 깨짐 없음. 웹 콘솔 오류 0 (영상 2,466장 + 정지 8장) |
+
+## 아기 크기 고르기 (2026-11-19)
+- 지적: 0.46배 6마리 + 구름 방석이 주인공보다 넓어 눈이 무리로 먼저 감 (`float6_pc.png`).
+- 로컬 시험 단추 "아기 크기: 작게 0.28 / 중간 0.36(기본) / 지금 0.46". 자리는 맨 앞 자리에서 가로는 무리 폭 <= 주인공 몸 폭 150, 세로는 크기 비율만큼 모음 (`Balance.KITTEN_SIZES`, 자동 테스트).
+- 비교: `size_compare_pc.png`, `size_compare_phone.png`(아래 줄 = 폰 무리 2배 확대). 다시 만들기: 검수용 빌드 → `node review/cat-parade/qa_web.mjs build/qa <폴더> parade_size x pc|phone` → `python3 review/cat-parade/action/size_compare.py <폴더>`.
+- 폰(1배 화면 캡처) 작게: 품종은 털 색·무늬로 구별되지만 눈·삼색 꽃·치즈 방울은 뭉개짐. 얼굴·소품이 남는 하한은 중간(0.36).

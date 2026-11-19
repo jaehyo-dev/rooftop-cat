@@ -11,6 +11,7 @@ extends RefCounted
 ## - 부딪힘(scare): 하트도 잃고 가장 나중에 온 아기가 날아가 사라진다 (A 규칙, RunnerSim._hit_obstacles).
 
 ## 아기 고양이 품종 (assets/sprites/kittens/<품종>/, GAME_SPEC "줄줄이" 시안 2 확정): 치즈(방울)·고등어(접힌 귀)·턱시도(나비넥타이)·삼색(꽃핀)·젖소(방울 꼬리)·회색(삐친 털)
+static var size_pick := Balance.KITTEN_SIZE_PICK  # Balance.KITTEN_SIZES 번호 (로컬 시험 단추로 바꿈, 실행하는 동안 유지)
 const LOOKS := ["cheese", "mackerel", "tuxedo", "calico", "cow", "gray"]
 
 ## 무리: {"look", "quirk"(0~1, 개성: 둥실 박자·울음 높이)}. 자리 = 배열 순서
@@ -51,7 +52,13 @@ func fever() -> bool:
 
 ## 아기 i(0부터)가 떠 있을 자리: 주인공 발끝 화면 자리에서 (가로, 세로) 픽셀 (세로는 위가 -)
 static func slot(i: int) -> Vector2:
-	return Balance.KITTEN_SLOTS[i]
+	var first: Vector2 = Balance.KITTEN_SLOTS[0]
+	return first + (Balance.KITTEN_SLOTS[i] - first) * Balance.KITTEN_SIZES[size_pick].spread
+
+
+## 지금 고른 떠다니는 아기 크기 (주인공 대비)
+static func size_k() -> float:
+	return Balance.KITTEN_SIZES[size_pick].size
 
 
 ## 아기마다 박자가 조금 다른 둥실둥실 (자리에 더하는 화면 픽셀). quirk 0~1
