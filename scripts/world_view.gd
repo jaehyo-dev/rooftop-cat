@@ -248,6 +248,7 @@ var sim := RunnerSim.new(randi())
 var _stray_view := CatView.new()     # 옥상에서 기다리는 길고양이 (앉아 꼬리 살랑)
 var _kittens: Array[Node2D] = []     # 무리 자리마다 아기 (원점 = 발끝, 자식 Cloud·View)
 var _flock := KittenFlock.new()      # 떠다니는 아기 배치·움직임 (자리마다 화면 위치·기울기·구름 배율)
+var _life := KittenLife.new()        # 떠다니는 아기 살아 움직이기 (자리마다 몸 프레임·꼬리·숨, 그림이 있는 품종만)
 var _slot_looks: Array = []           # 자리마다 스프링을 시작한 아기 품종 (바뀌면 다시 시작)
 var _fly_views: Array[Node2D] = []    # 날아가는 아기 그림
 var _fly_aways: Array[Dictionary] = []  # 날아가는 아기 {"look", "from"(화면), "t"}
@@ -612,6 +613,11 @@ func _play_events(combo_before: Array) -> void:
 		if sound == "boing":
 			_sfx.boing.pitch_scale = SfxEvents.stomp_pitch(sim.stomp_chain) if not sim.stomped.is_empty() else 1.0
 		_sfx[sound].play()
+	# 떠다니는 아기 반응: 점프·더블점프·밟기 = 만세, 착지 = 폭 앉기 (앞 아기부터 차례로)
+	if sim.jumped or sim.double_jumped or not sim.stomped.is_empty():
+		_life.react("cheer")
+	elif sim.landed:
+		_life.react("squat", 1)
 	if doomed:
 		_fall_sounded = true
 	elif sim.on_ground or sim.bounced:
@@ -655,6 +661,7 @@ func restart(seed_value: int = randi(), wait: bool = false) -> void:
 	sim.parade_on = true
 	_fly_aways.clear()
 	_slot_looks.fill("")
+	_life = KittenLife.new(seed_value)  # 같은 시드면 아기 행동도 같음 (캡처·테스트)
 	_parade_fx.clear()
 	_purr_gain = 0.0
 	tracker = MissionTracker.new()
@@ -1530,6 +1537,7 @@ func _parade_events() -> void:
 		_sfx.nya.play()
 		_fly_aways.append({"look": cat_info.look, "from": _kittens[i].position, "t": 0.0})
 		_slot_looks[i] = ""
+		_life.react("surprised", -1)
 		for k in parade.cats.size():
 			_flock.kick(k, FLINCH * Vector2(-1.0 if k % 2 == 0 else 1.0, 1.0))  # 남은 아기 움찔 (줄 끝이 빠져 빈자리는 없음)
 	_fly_aways = _fly_aways.slice(-FLY_VIEWS)
@@ -1568,6 +1576,7 @@ func _start_kitten(i: int, from: Vector2) -> void:
 	_flock.place(i, from)
 	_slot_looks[i] = sim.parade.cats[i].look
 	_kittens[i].set_meta("since", 0.0)
+	_life.reset(i)
 
 
 ## 연출 시간, 골골 소리
@@ -1599,6 +1608,7 @@ func _place_parade(delta: float = 0.0) -> void:
 		if _slot_looks[i] != parade.cats[i].look:
 			_start_kitten(i, kitten_lead() + KittenFlock.rest(i, parade.cats.size()))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
 	_flock.step(delta, kitten_lead(), parade.cats, _roof_screen_y)
+	_life.step(delta, sim.sliding, parade.cats.size())
 	for i in _kittens.size():
 		var holder := _kittens[i]
 		holder.visible = not waiting and i < parade.cats.size()
@@ -1614,10 +1624,14 @@ func _place_parade(delta: float = 0.0) -> void:
 		holder.get_node("Cloud").scale = Vector2(cloud_w, cloud_w * KittenFlock.CLOUD_H) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * _flock.cloud[i]
 		holder.get_node("Cloud").position.y = CLOUD_SINK * size_ratio()
 		var view: CatView = holder.get_node("View")
-		view.rotation = _flock.tilt[i]
 		view.size_k = CatParade.size_k()
 		view.set_breed(info.look)
-		view.show_sit(sim.elapsed + info.quirk * 5.0)
+		_life.idle_ok[i] = view.has_life()  # 그림 없는 아기가 안 보이는 하품으로 "한 번에 한 마리" 자리를 막지 않게
+		if view.has_life():
+			view.show_alive(_life, i)
+		else:
+			view.show_sit(sim.elapsed + info.quirk * 5.0)
+		view.rotation = _flock.tilt[i]  # show_*가 rotation을 0으로 두므로 그 뒤에 (예전엔 앞에 있어 기울기가 안 보였음)
 	for i in _fly_views.size():
 		var holder := _fly_views[i]
 		holder.visible = not waiting and i < _fly_aways.size()

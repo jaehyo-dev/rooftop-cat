@@ -19,6 +19,7 @@ const vp = size === "phone" ? { width: 844, height: 390 } : { width: 1280, heigh
 const browser = await chromium.launch({ ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}), args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });  // 기본 headless (창 없음). CHROME = 이미 받은 브라우저 경로
 const errors = [];
 const cells = {};
+const pos = {};  // 찍은 장마다 window.qaPos (맨 앞 아기 발끝, 창 픽셀. qa_parade.gd _clip이 정함)
 try {
   const ctx = await browser.newContext({ viewport: vp, isMobile: size === "phone", hasTouch: size === "phone" });
   const page = await ctx.newPage();
@@ -44,6 +45,7 @@ try {
       const name = `${s.shot.name}_${size}`;
       await page.screenshot({ path: join(out, `${name}.png`) });
       cells[name] = s.shot.cells;
+      pos[name] = await page.evaluate(() => window.qaPos ?? null);
       await page.evaluate((n) => { window.qaTaken = n; }, s.shot.name);
       continue;
     }
@@ -53,6 +55,7 @@ try {
   if (mode === "shots") await writeFile(join(out, `cells_${look}_${size}.json`), JSON.stringify(cells));
 } finally {
   await writeFile(join(out, `console_${mode}_${look}_${size}.txt`), errors.join("\n"));
+  await writeFile(join(out, `pos_${mode}_${size}.json`), JSON.stringify(pos));
   await browser.close();
   server.close();
 }

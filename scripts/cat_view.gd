@@ -30,7 +30,7 @@ const KITTEN_ANCHOR := Vector2(140, 216)
 const KITTEN_ART := 2.5
 const KITTEN_FRAMES := ["wait"]  # 기다리는 길고양이·떠다니는 아기 (구름 위에 앉음). 날아가는 아기는 scared.png
 const KITTEN_TAILS := 5
-static var _kitten_cache := {}  # 품종 → {"frames": {이름: 그림}, "tails": [그림...]}
+static var _kitten_cache := {}  # 품종 → {"frames": {이름: 그림}, "tails": [그림...], "alive": {이름: 그림}, "alive_tails": [그림...]}
 
 var frame_name := "run_0"
 ## 그림 크기 배율 (줄줄이 아기 고양이 Balance.PARADE_SIZE)
@@ -80,7 +80,14 @@ func set_breed(look: String) -> void:
 		var tails: Array[Texture2D] = []
 		for i in KITTEN_TAILS:
 			tails.append(load(KITTEN_DIR + look + "/wait_tail_%d.png" % i))
-		_kitten_cache[look] = {"frames": frames, "tails": tails}
+		var alive := {}
+		var alive_tails: Array[Texture2D] = []
+		if ResourceLoader.exists(KITTEN_DIR + look + "/alive_base.png"):  # 살아 움직이기 그림이 있는 품종만 (지금은 치즈)
+			for frame in KittenLife.FRAMES:
+				alive[frame] = load(KITTEN_DIR + look + "/alive_" + frame + ".png")
+			for i in KITTEN_TAILS:
+				alive_tails.append(load(KITTEN_DIR + look + "/alive_tail_%d.png" % i))
+		_kitten_cache[look] = {"frames": frames, "tails": tails, "alive": alive, "alive_tails": alive_tails}
 	_textures = _kitten_cache[look].frames
 	_tails = _kitten_cache[look].tails
 	_sprite.scale = Vector2.ONE * KITTEN_ART
@@ -161,6 +168,23 @@ func show_sit(t: float) -> void:
 	scale = CatPose.sit_breath(t) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
 	_stand = CatPose.STAND_TIME
+
+
+## 이 품종에 살아 움직이기 그림이 있는지 (떠다니는 아기만 씀)
+func has_life() -> bool:
+	return breed != "" and not _kitten_cache[breed].alive.is_empty()
+
+
+## 떠다니는 아기 i: KittenLife가 고른 몸 프레임·꼬리·숨쉬기 (꼬리가 그려진 프레임이면 따로 붙인 꼬리를 숨김)
+func show_alive(life: KittenLife, i: int) -> void:
+	var cache: Dictionary = _kitten_cache[breed]
+	frame_name = life.frame(i)
+	_sprite.texture = cache.alive[frame_name]
+	_sprite.rotation = 0.0
+	_tail.visible = not frame_name in KittenLife.OWN_TAIL
+	_tail.texture = cache.alive_tails[life.tail(i, cache.alive_tails.size())]
+	scale = life.breath(i) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
+	modulate = Color.WHITE
 
 
 ## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다

@@ -419,3 +419,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획 2장: 간판 1장(첨부 `assets/sprites/obstacles/ac.png`·`pot.png`), 슬라이딩 4칸 1장(첨부 `assets/sprites/cat_base_run.png`·`cat_frames/run_1.png`). 어긋나면 각 1번 더 → 둘 다 1번에 됨(다시 뽑기 0번).
 - 명령: `bash review/cat-parade/action/make_art.sh sign|slide`. 요청문 전문 `review/cat-parade/action/prompts/sign.txt`·`slide.txt`. 결과 `assets/raw/action/`.
 - 자르기: `python3 tools/make_action_art.py sign|slide`.
+
+## 떠다니는 아기 살아 움직이기 (2026-11-19, 맥 Codex, cat-parade 브랜치)
+- 계획: 치즈 1장(5-5-4칸 14칸: 기본·깜빡·만세 2·폭 앉기·엎드리기·놀람·하품 2·그루밍 2·꾹꾹이 2·뒤돌아보기). 크기·자리·색이 튀면 다시. 결과: 다시 뽑기 0번.
+- 명령: `bash review/cat-parade/action/alive/make_sheet.sh cheese 1` (첨부 `review/cat-parade/action/alive/prompts/ref_cheese_wait.png` = wait 몸만·꼬리 붙인 모습 2배, 마젠타 배경)
+- 요청문 전문: `review/cat-parade/action/alive/prompts/alive.txt`. 자르기: `python3 tools/cut_kitten_alive.py assets/raw/kitten_alive/cheese_1.png assets/sprites/kittens/cheese`

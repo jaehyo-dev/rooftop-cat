@@ -22,6 +22,9 @@ func run(q: Node, mode: String) -> void:
 	if mode == "parade_size":
 		await _sizes()
 		return
+	if mode.begins_with("parade_alive"):
+		await _alive(mode.split("-").slice(1))
+		return
 	if mode.begins_with("parade_form"):
 		await _formation(mode)
 		return
@@ -102,6 +105,9 @@ func _clip(name: String, seconds: float, every: int) -> void:
 		_advance()
 		if i % every == 0:
 			main._process(STEP * every)
+			# 맨 앞 아기 발끝 화면 자리 (창 픽셀) → qa_web.mjs가 pos_<모드>.json에 남김 (확대 영상이 따라 자름)
+			var foot: Vector2 = qa.get_tree().root.get_final_transform() * world.get_global_transform_with_canvas() * world.get("_kittens")[0].position
+			JavaScriptBridge.eval("window.qaPos = [%f, %f]" % [foot.x, foot.y])
 			await qa._shot("%s_f%03d" % [name, n])
 			n += 1
 
@@ -325,3 +331,49 @@ func _form_scene(scene: String) -> void:
 			sim.parade.set("_next_meet", -INF)
 			sim.parade.update(sim, 0.0)
 			await _run_until(func() -> bool: return not sim.parade.strays.is_empty() and sim.parade.strays[0].x - sim.x < 500.0, 20.0)
+
+
+## 아기 살아 움직이기 (2026-11-19, review/cat-parade/action/alive/): 치즈냥을 줄 맨 앞에 두고 평지 10초·점프·더블점프·슬라이딩·밟기·피격
+## alive_<장면>_<real|slow>_f000… (parade_alive-jump = 그 장면만). 평지는 10초라 0.25배는 앞 4초만
+func _alive(only: Array) -> void:
+	var clips := [["flat", 10.0], ["jump", 1.8], ["double", 2.2], ["slide", 2.0], ["stomp", 4.6], ["hit", 2.0]]
+	for clip in clips:
+		if not only.is_empty() and clip[0] not in only:
+			continue
+		for speed in [["real", 4], ["slow", 2]]:
+			await _alive_scene(clip[0])
+			if sim.game_over:
+				push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])
+			await _clip("alive_%s_%s" % [clip[0], speed[0]], 4.0 if clip[0] == "flat" and speed[0] == "slow" else clip[1], speed[1])
+
+
+func _alive_scene(scene: String) -> void:
+	await _start(5, 6)
+	var cheese: Array = sim.parade.cats.filter(func(c: Dictionary) -> bool: return c.look == "cheese")
+	if cheese.is_empty():
+		sim.parade.cats[0].look = "cheese"
+	else:
+		sim.parade.cats.erase(cheese[0])
+		sim.parade.cats.push_front(cheese[0])  # 치즈냥이 줄 맨 앞 (피격은 줄 끝이라 날아가지 않음)
+	await _run_flat(2600.0 if scene != "flat" else 8000.0)
+	sim.accelerate = false
+	sim.speed = SPEED
+	for cat in sim.parade.cats:
+		cat.cool = INF
+	for i in 60:
+		_advance()
+	var t0 := sim.elapsed
+	_pilot = func() -> Array: return [false, false]
+	match scene:
+		"jump":
+			_pilot = func() -> Array: return [sim.elapsed - t0 > 0.15 and sim.elapsed - t0 < 0.4, false]
+		"double":
+			_pilot = func() -> Array:
+				var t := sim.elapsed - t0
+				return [(t > 0.15 and t < 0.35) or (t > 0.6 and t < 0.8), false]
+		"slide":
+			_pilot = func() -> Array: return [false, sim.elapsed - t0 > 0.2 and sim.elapsed - t0 < 1.3]
+		"stomp":
+			await _stomp_scene([["pot", 450.0], ["tank", 1000.0], ["flock", 1600.0]])
+		"hit":
+			_put("pot", 420.0, 905)
