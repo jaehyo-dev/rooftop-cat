@@ -443,3 +443,9 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/restructure/style/make_art.sh <1|2|3> <A|B|C> <차례> [덧붙일 말]`, 정리 `python3 review/restructure/style/compose.py`
 - 첨부: `review/restructure/style/prompts/ref_game.png`(지금 게임 화면), `ref_cats.png`(주인공·아기 6마리 설정), `ref_hero.png`(주인공 기준 그림) + 화풍 2·3은 `assets/concept/restructure_style/s1_<장면>.png`
 - 요청문 전문: `review/restructure/style/prompts/common.txt` + `style<화풍>.txt` + `scene<장면>.txt`, 다시 뽑은 덧붙임은 `review/restructure/style/README.md`. 결과 `assets/concept/restructure_style/`.
+
+## 카툰 기준 만들기 (2026-11-20, 맥 Codex, restructure 브랜치)
+- 계획: 기준 설정화 1장 + 슬라이딩 시트 1장 + 피격 시트 1장 = 3장, 장마다 최대 2번 다시. 결과: 5장 생성(기준 2번째, 슬라이딩 1번째, 피격 2번째 사용).
+- 명령: `bash review/restructure/cartoon/make_art.sh <장면> <차례> <첨부...> [-- 덧붙일 말]`, 정리 `python3 review/restructure/cartoon/compose.py <효과 후보 폴더>`
+- 첨부: 기준 = `review/restructure/cartoon/prompts/ref_cartoon_hero.png`(3_A 주인공 부분) + `assets/concept/cat_reference_sheet.png`, 슬라이딩 = `assets/concept/cartoon/hero_reference.png` + `assets/concept/restructure_style/s3_C.png`, 피격 = `hero_reference.png`. 다시 뽑을 때는 지난 결과도 첨부.
+- 요청문 전문: `review/restructure/cartoon/prompts/common.txt` + `<장면>.txt`(hero_ref·slide·hit), 덧붙임은 `review/restructure/cartoon/README.md`. 결과 `assets/concept/cartoon/`.

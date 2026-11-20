@@ -316,3 +316,9 @@ PROGRESS.md에서 옮긴 지난 기록이다. 내용은 고치지 않고 그대�
 - 검토: 결과는 review/cat-parade/action/alive/README.md "다듬기"
 - 확인할 것: bash tools/play_local.sh → "아기 6마리로 시작", 슬라이딩·점프, 하늘 구름 앞 방석
 - 남은 것: 평소 달리기 꼬리 덮음 → 2차에서 해결
+
+## 치즈냥 다듬기 2차: 아기를 주인공 앞에 (cat-parade 브랜치, 버전 그대로)
+- 만든 것: 떠다니는·날아오는·날아가는 아기를 주인공 위 층에, 슬라이딩 뒤로 물리기(SLIDE_BACK) 지우고 줄 모양 그대로 24px 올리기(0.18초), 얼굴 겹침 0 자동 테스트, 확인 영상 다시(flat·jump·double·slide·hit)
+- 내가 판단한 것: 올리기 24px(요청 20~30 가운데), 0.18초 smoothstep, 스프링을 거쳐 따라가게(예전처럼 바로 옮기지 않음), 기다리는 길고양이는 주인공 뒤 그대로
+- 검토: 결과는 review/cat-parade/action/alive/README.md "다듬기 2차"
+- 확인할 것: bash tools/play_local.sh → "아기 6마리로 시작", 평지·슬라이딩·점프

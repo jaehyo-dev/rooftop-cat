@@ -1,12 +1,6 @@
 # 진행 기록
 
-> 지난 기록(0단계~치즈냥 다듬기 1차)은 [docs/PROGRESS_ARCHIVE.md](docs/PROGRESS_ARCHIVE.md)에 있다.
-
-## 치즈냥 다듬기 2차: 아기를 주인공 앞에 (cat-parade 브랜치, 버전 그대로)
-- 만든 것: 떠다니는·날아오는·날아가는 아기를 주인공 위 층에, 슬라이딩 뒤로 물리기(SLIDE_BACK) 지우고 줄 모양 그대로 24px 올리기(0.18초), 얼굴 겹침 0 자동 테스트, 확인 영상 다시(flat·jump·double·slide·hit)
-- 내가 판단한 것: 올리기 24px(요청 20~30 가운데), 0.18초 smoothstep, 스프링을 거쳐 따라가게(예전처럼 바로 옮기지 않음), 기다리는 길고양이는 주인공 뒤 그대로
-- 검토: 결과는 review/cat-parade/action/alive/README.md "다듬기 2차"
-- 확인할 것: bash tools/play_local.sh → "아기 6마리로 시작", 평지·슬라이딩·점프
+> 지난 기록(0단계~치즈냥 다듬기 2차)은 [docs/PROGRESS_ARCHIVE.md](docs/PROGRESS_ARCHIVE.md)에 있다.
 
 ## 구름 타고 날기: 치즈냥 먼저 (cat-parade 브랜치, 버전 그대로)
 - 만든 것: 치즈냥 타기 그림 5장(펄럭임 3·올라가기·내려가기)·탄 구름·꼬리 조각 3(Codex 2장), 앞뒤 늘어짐·물결·구름 조각, 혜성 꼬리 줄, 주인공 오른쪽 옮기기(최대 60px), 시험 단추 "아기 타기"
@@ -14,8 +8,15 @@
 - 검토: 결과는 review/cat-parade/action/ride/README.md (여전히 어색한 점 6가지 포함)
 - 확인할 것: bash tools/play_local.sh → "아기 6마리로 시작", "아기 타기"로 예전/새 바꿔 점프·착지·슬라이딩
 
+## 카툰 화풍 1단계: 기준 만들기 (restructure 브랜치, 버전 그대로, 게임 코드 그대로)
+- 만든 것: ART_BIBLE 14절(3_A·B·C를 재서 선 굵기·선 색·색표·그림자·금지), 주인공 기준 그림(옆·앞·3/4·뒤 + 표정 6), 슬라이딩·피격 동작 시트, GIF·겹침 비교, 효과 후보 비교, 측정·자르기 도구 tools/cartoon_art.py(+테스트)
+- 내가 판단한 것: 선 색 #331806, 바깥선 3.5·안쪽 3.0(화면 px), 그라데이션은 하늘 지평선 띠만, 밝은 테두리는 쓰지 않음(시안에 없음)
+- 검토: review/restructure/cartoon/README.md (다시 뽑기 2번)
+- 확인할 것: GIF 6개, hero_compare.png, effects_compare.png에서 효과 후보 고르기
+
 ## 이어서 할 일
 - 2026-11-19 맥: cat-parade 브랜치(작업 브랜치, main은 v0.7.0 그대로)에 액션 시험판과 아기 배치(줄줄이 기본·요정 무리) 만듦
 - 2026-11-20 맥: 치즈냥 살아 움직이기 + 다듬기 1·2차 (review/cat-parade/action/alive/), 구름 타고 날기 (review/cat-parade/action/ride/), 디렉터 확인 뒤 나머지 5마리로 넓히기
 - 다음: 사용자가 formation 영상·play_local로 배치를 고르고, "때리고 부수는 게임이 더 재미있는가" 판단
 - 그 결과로 밟기 점수·생선 길(밟기 궤적)과 GAME_SPEC 로드맵 다시 짜기
+- 2026-11-20 맥: restructure 브랜치(작업 브랜치)에서 카툰 화풍 1단계(기준) 끝. 다음은 2단계 주인공 동작 전부(효과 후보 선택 뒤)

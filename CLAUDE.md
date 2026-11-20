@@ -68,6 +68,7 @@ mkdir -p build/web && godot --headless --path . --export-release "Web" "$PWD/bui
 
 ## 기준 캐릭터
 
+- 카툰 화풍(2026-11-20~, restructure): 기준 그림 `assets/concept/cartoon/hero_reference.png`, 선·색 숫자는 ART_BIBLE 14절. 아래 색연필 규칙 중 밝은 테두리는 카툰에서 안 씀.
 - 기준 캐릭터는 `assets/concept/cat_reference_sheet.png`, 기준 그림은 `assets/sprites/cat_base_run.png`(1024x1024), 동작 참고는 `assets/concept/poses/`.
 - 통통한 치즈 태비, 접힌 귀, 작은 점 눈과 볼 홍조, 색연필 질감, 초록 목도리. 몸 둘레에 얇은 밝은 테두리가 기본.
 - 새 고양이 그림은 항상 기준 그림을 `--image`로 넘겨. 배경은 연두 말고 마젠타(#FF00FF).
