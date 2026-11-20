@@ -7,6 +7,10 @@ extends RefCounted
 ##   슬라이딩 동안 엎드리기, 다른 아기 피격 = 놀람. 반응이 가끔 하는 행동보다 우선 (하던 것을 끊고 바로).
 ## - 가끔(혼자): 하품·그루밍·꾹꾹이·뒤돌아보기. 아기마다 6~12초 무작위 간격, 화면 전체에서 한 번에 한 마리, 같은 행동 연속 안 함,
 ##   길이도 매번 조금씩 달라 기계적으로 안 보이게.
+## - 구름 타기(2026-11-20, KittenFlock.ride): 쉬는 그림이 구름에 엎드려 탄 그림 — 펄럭임 반복(ride_0~2, 귀·꼬리·털만 다름),
+##   올라가는 중 ride_up, 내려가는 중 ride_down (세로 속도로 고르고 되돌아갈 때는 기준을 낮춰 깜빡이지 않게).
+##   점프·더블점프 만세는 안 함(구름을 놓고 만세하면 이상하고, 올라가기 그림이 그 반응), 착지 폭 앉기·슬라이딩 엎드리기는 ride_down.
+##   깜빡임은 안 함(앉은 그림이라 자세가 튐). 밟기 만세·놀람·가끔 하는 행동은 그대로 앉은 그림을 씀.
 ## 프레임 이름 = assets/sprites/kittens/<품종>/alive_<이름>.png (tools/cut_kitten_alive.py), 꼬리 = alive_tail_<번호>.png
 
 ## 동작마다 [프레임, 초]. 가운데(가장 긴) 칸 길이는 시작할 때 HOLD_JITTER만큼 무작위로 늘이고 줄인다
@@ -20,9 +24,13 @@ const ACTS := {
 	"look": [["look", 1.3]],
 }
 const IDLE_ACTS := ["yawn", "groom", "knead", "look"]
-const OWN_TAIL := ["lie", "surprised", "squat"]  # 자기 꼬리가 그려진 프레임 (따로 붙인 꼬리를 숨김)
+const OWN_TAIL := ["lie", "surprised", "squat", "ride_0", "ride_1", "ride_2", "ride_up", "ride_down"]  # 자기 꼬리가 그려진 프레임 (따로 붙인 꼬리를 숨김)
 const FRAMES := ["base", "blink", "cheer_0", "cheer_1", "squat", "lie", "surprised", "yawn_0", "yawn_1",
-		"groom_0", "groom_1", "knead_0", "knead_1", "look"]
+		"groom_0", "groom_1", "knead_0", "knead_1", "look", "ride_0", "ride_1", "ride_2", "ride_up", "ride_down"]
+const RIDE_FLAP := [0, 1, 2, 1]         # 펄럭임 반복 차례
+const RIDE_FLAP_TIME := 0.09            # 한 장 (초)
+const RIDE_VY := 160.0                  # 이 세로 속도(픽셀/초)보다 빠르면 올라가기·내려가기 그림
+const RIDE_VY_OFF := 70.0               # 그 그림에서 펄럭임으로 돌아오는 속도 (사이에서 깜빡이지 않게)
 const IDLE_GAP := Vector2(6.0, 12.0)    # 가끔 하는 행동 간격 (초, 아기마다 무작위)
 const IDLE_RETRY := Vector2(0.5, 1.5)   # 다른 아기가 하는 중이면 이만큼 뒤 다시
 const HOLD_JITTER := Vector2(0.75, 1.35)
@@ -38,6 +46,8 @@ var kittens: Array[Dictionary] = []
 var idle_ok: Array[bool] = []
 var _rng := RandomNumberGenerator.new()
 var _sliding := false
+var riding := false                     # 구름 타기 (world_view가 KittenFlock.ride로 정함)
+var _climb: Array[int] = []             # 아기마다 -1 올라감, 1 내려감, 0 그 밖
 
 
 func _init(seed_value: int = 0) -> void:
@@ -45,6 +55,7 @@ func _init(seed_value: int = 0) -> void:
 	for i in Balance.PARADE_MAX:
 		kittens.append({})
 		idle_ok.append(true)
+		_climb.append(0)
 		reset(i)
 
 
@@ -63,13 +74,16 @@ func react(act: String, lead: int = 0) -> void:
 		kittens[i].pending.append({"act": act, "in": (i + lead) * Balance.KITTEN_CHAIN_DELAY if lead >= 0 else 0.0})
 
 
-## count = 지금 떠 있는 아기 수 (이 수까지만 가끔 하는 행동을 함)
-func step(dt: float, sliding: bool, count: int) -> void:
+## count = 지금 떠 있는 아기 수 (이 수까지만 가끔 하는 행동을 함), vys = 아기마다 세로 속도 (구름 타기 올라가기·내려가기 그림)
+func step(dt: float, sliding: bool, count: int, vys: Array = []) -> void:
 	var was_sliding := _sliding
 	_sliding = sliding
 	for i in kittens.size():
 		var c: Dictionary = kittens[i]
 		c.age += dt
+		var vy: float = vys[i] if i < vys.size() else 0.0
+		var off := RIDE_VY_OFF if _climb[i] != 0 else RIDE_VY
+		_climb[i] = -1 if vy < -off else (1 if vy > off else 0)
 		if sliding:
 			c.down = 0.0 if c.down < 0.0 else c.down + dt
 			c.seq = []
@@ -99,9 +113,13 @@ func step(dt: float, sliding: bool, count: int) -> void:
 func frame(i: int) -> String:
 	var c: Dictionary = kittens[i]
 	if c.down >= 0.0:
-		return "squat" if c.down < LIE_IN else "lie"
+		return "ride_down" if riding else ("squat" if c.down < LIE_IN else "lie")
 	if not c.seq.is_empty():
-		return c.seq[c.k][0]
+		return "ride_down" if riding and c.seq[c.k][0] == "squat" else c.seq[c.k][0]
+	if riding:
+		if _climb[i] != 0:
+			return "ride_up" if _climb[i] < 0 else "ride_down"
+		return "ride_%d" % RIDE_FLAP[int(c.age / RIDE_FLAP_TIME + c.wag_at * RIDE_FLAP.size()) % RIDE_FLAP.size()]
 	return "blink" if c.blink > 0.0 else "base"
 
 

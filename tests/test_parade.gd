@@ -186,14 +186,17 @@ func test_둥실_박자는_아기마다_다르다() -> void:
 
 
 ## 카메라: 아기 수와 상관없이 주인공 화면 자리는 그대로 (줄 때문에 옮기던 카메라 지움, 앞 시야 v0.7.0과 같음)
-func test_6마리여도_주인공_자리와_앞_시야는_그대로() -> void:
+## 구름 타기(2026-11-20)는 6마리면 주인공을 KittenFlock.lead_shift(6)만큼 오른쪽으로 옮기고 앞 시야(view_ahead)도 그만큼 줄어듦. 예전 앉기는 그대로
+func test_6마리면_주인공을_옮기고_아기는_위_층에() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.show_start = false
 	add_child(main)
 	var world: Node2D = main.get_node("World")
 	world.sim.parade.fill(Balance.PARADE_MAX)
-	await wait_frames(40)
-	assert_eq(world.cat.position.x, Balance.CAT_SCREEN_X, "주인공 화면 x")
+	await wait_frames(90)  # 옮기기(SHIFT_TIME 0.5초)가 끝나게
+	assert_true(absf(world.cat.position.x - Balance.CAT_SCREEN_X - KittenFlock.lead_shift(Balance.PARADE_MAX)) < 0.01, "주인공 화면 x %.1f" % world.cat.position.x)
+	assert_true(KittenFlock.lead_shift(Balance.PARADE_MAX) <= KittenFlock.SHIFT_MAX, "옮김은 SHIFT_MAX 이하")
+	assert_true(absf(world.sim.view_ahead - (world.get_viewport_rect().size.x - world.cat.position.x)) < 1.0, "앞 시야 = 화면 오른쪽 끝 - 주인공 x")
 	var last := -1
 	for i in Balance.PARADE_MAX:
 		var holder: Node2D = world.get_node("Kitten%d" % i)

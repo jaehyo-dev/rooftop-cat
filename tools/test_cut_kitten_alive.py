@@ -7,7 +7,7 @@ if HAS_LIBS:
     import numpy as np
     from PIL import Image
 
-    from cut_kitten_alive import BASELINE, RIM_TRIM, paste, restyle, rump_x
+    from cut_kitten_alive import BASELINE, CLOUD_WIDTH, RIM_TRIM, cut_cloud, paste, restyle, rump_x
 
 
 @unittest.skipUnless(HAS_LIBS, "numpy, scipy, Pillow 필요")
@@ -36,6 +36,23 @@ class RumpTest(unittest.TestCase):
         self.assertEqual(list(out[18, 30, :3]), [240, 190, 140])            # 선에서 먼 면은 그대로
         self.assertEqual(out[10 + RIM_TRIM - 1, 30, 3], 0)                  # 바깥 RIM_TRIM픽셀은 지워짐
         self.assertEqual(out[10 + RIM_TRIM, 30, 3], 255)
+
+
+    def test_구름_시트는_한_배율로_줄여_조각_크기_비율을_지킨다(self):
+        import tempfile
+        from pathlib import Path
+        sheet = np.zeros((400, 900, 3), np.uint8)
+        sheet[...] = (255, 0, 255)
+        sheet[40:140, 100:700] = (250, 245, 235)    # 타는 구름 600 폭
+        for k, w in enumerate((120, 90, 60)):       # 조각 3개
+            sheet[250:300, 100 + k * 250:100 + k * 250 + w] = (250, 245, 235)
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "s.png"
+            Image.fromarray(sheet).save(src)
+            sizes = cut_cloud(src, Path(d))
+        self.assertEqual(sizes["cloud"][0], CLOUD_WIDTH)
+        for name, w in (("puff_0", 120), ("puff_1", 90), ("puff_2", 60)):
+            self.assertAlmostEqual(sizes[name][0], w * CLOUD_WIDTH / 600, delta=2)
 
 
 if __name__ == "__main__":

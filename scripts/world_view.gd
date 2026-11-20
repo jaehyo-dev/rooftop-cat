@@ -229,6 +229,14 @@ const CUSHION_TINT := Color(1.0, 0.96, 0.88)            # 구름 방석: 하늘 
 const CUSHION_RIM := Color(0.63, 0.45, 0.33, 0.45)      # 방석 뒤에 깐 조금 큰 사본 = 옅은 갈색 테두리·그림자 (하늘 구름 앞에서도 구별)
 const CUSHION_RIM_SIZE := 1.1
 const CUSHION_RIM_DROP := 1.5                           # 테두리 사본을 이만큼 아래로 (픽셀, 0.46배 기준)
+## 구름 타기 (KittenFlock.ride): 탄 구름 폭·자리(발끝 기준, 0.46배 기준 x 크기 비율), 꼬리 조각 폭
+const RIDE_CLOUD := preload("res://assets/sprites/kittens/ride/ride_cloud.png")
+const RIDE_PUFFS := [preload("res://assets/sprites/kittens/ride/ride_puff_0.png"), preload("res://assets/sprites/kittens/ride/ride_puff_1.png"),
+		preload("res://assets/sprites/kittens/ride/ride_puff_2.png")]
+const RIDE_CLOUD_W := 140.0
+const RIDE_CLOUD_AT := Vector2(KittenFlock.RIDE_TAIL + RIDE_CLOUD_W * 0.5, 10.0)  # 뒤 끝 = KittenFlock.RIDE_TAIL (화면 왼쪽 계산과 같게)
+const RIDE_CLOUD_PAD := 8.0   # 구름·조각 그림 둘레 투명 여백 합 (tools/cut_kitten_alive.py CLOUD_PAD x 2)
+const RIDE_PUFF_SIZE := 1.7    # 꼬리 조각은 탄 구름과 같은 배율의 이만큼 (그대로면 0.28배에서 거의 안 보임)
 const CLOUD_POP := 0.3          # 구름이 퐁 커지는 시간 (넘쳤다 돌아옴)
 const FLINCH := Vector2(5.0, -9.0)  # 한 마리가 날아갈 때 남은 아기 움찔 (스프링 충격, 픽셀)
 const SKILL_OUT := 0.25         # 물어 오기·반짝 코: 아기가 대상까지 날아가는 시간 (냥펀치는 Balance.SKILL_PUNCH_TRAVEL)
@@ -390,7 +398,8 @@ func _process(delta: float) -> void:
 			restart()
 		return
 	_wait_release = _wait_release and pressed
-	sim.view_ahead = _view_size().x - Balance.CAT_SCREEN_X
+	sim.view_ahead = _view_size().x - cat_x()
+	sim.view_behind = cat_x()
 	_hitstop_gap = maxf(0.0, _hitstop_gap - delta)
 	_hitstop = maxf(0.0, _hitstop - delta)
 	# 멈춤 중에는 게임 진행 루프를 건너뛴다 (눌린 입력은 _tap_pending에 남아 멈춤 뒤에 처리됨)
@@ -619,10 +628,19 @@ func _play_events(combo_before: Array) -> void:
 			_sfx.boing.pitch_scale = SfxEvents.stomp_pitch(sim.stomp_chain) if not sim.stomped.is_empty() else 1.0
 		_sfx[sound].play()
 	# 떠다니는 아기 반응: 점프·더블점프·밟기 = 만세, 착지 = 폭 앉기 (앞 아기부터 차례로)
-	if sim.jumped or sim.double_jumped or not sim.stomped.is_empty():
+	# 구름 타기: 점프·더블점프는 만세 대신 올라가기 그림과 줄 늘어짐(밟기만 만세), 질주 시작도 늘어짐, 착지는 살짝 앞으로
+	if not sim.stomped.is_empty() or ((sim.jumped or sim.double_jumped) and not _life.riding):
 		_life.react("cheer")
 	elif sim.landed:
 		_life.react("squat", 1)
+	if sim.double_jumped:
+		_flock.drag("double")
+	elif sim.jumped:
+		_flock.drag("jump")
+	elif sim.landed:
+		_flock.drag("land")
+	if sim.dash_started:
+		_flock.drag("dash")
 	if doomed:
 		_fall_sounded = true
 	elif sim.on_ground or sim.bounced:
@@ -644,7 +662,7 @@ func _play_events(combo_before: Array) -> void:
 func _place_cat(delta: float) -> void:
 	var lift := tramp_cat_lift(sim)
 	_cat_lift = lift if delta <= 0.0 else lerpf(_cat_lift, lift, 1.0 - exp(-CAT_LIFT_RATE * delta))
-	cat.position = Vector2(Balance.CAT_SCREEN_X, _ground_y() - sim.y + FOOT_SINK - _cat_lift)
+	cat.position = Vector2(cat_x(), _ground_y() - sim.y + FOOT_SINK - _cat_lift)
 	if waiting:
 		cat.show_sit(_sit_time)  # 시작 화면: 앉아서 꼬리 흔들기
 	else:
@@ -667,6 +685,7 @@ func restart(seed_value: int = randi(), wait: bool = false) -> void:
 	_fly_aways.clear()
 	_slot_looks.fill("")
 	_life = KittenLife.new(seed_value)  # 같은 시드면 아기 행동도 같음 (캡처·테스트)
+	_flock = KittenFlock.new(seed_value)  # 구름 조각도 같은 시드면 같게, 주인공 옮김도 0부터
 	_parade_fx.clear()
 	_purr_gain = 0.0
 	tracker = MissionTracker.new()
@@ -760,7 +779,7 @@ func _ground_y() -> float:
 func _draw() -> void:
 	var size := _view_size()
 	var ground := _ground_y()  # 로직 높이 0 = 화면 맨 아래 (+ 세로 카메라)
-	var offset := Balance.CAT_SCREEN_X - sim.x  # 로직 x → 화면 x
+	var offset := cat_x() - sim.x  # 로직 x → 화면 x
 
 	# 하늘 (위아래 두 색). 화면이 멀어지면 y 0 위까지 보인다
 	var sky_top := size.y * (1.0 - 1.0 / _zoom)
@@ -795,7 +814,7 @@ func _draw() -> void:
 	var floors: Array = sim.roofs + ([sim.line_touch_eta(0.0).line] if riding else [])
 	var shadow := CatShadow.under(floors, sim.x, sim.y)
 	if not shadow.is_empty() and not sim.rescuing:
-		_draw_shadow(Vector2(Balance.CAT_SCREEN_X, ground - shadow.top + FOOT_SINK - (_cat_lift if riding else 0.0)), shadow)
+		_draw_shadow(Vector2(cat_x(), ground - shadow.top + FOOT_SINK - (_cat_lift if riding else 0.0)), shadow)
 
 	_draw_parade(offset, ground)
 	for burst in _bursts:
@@ -822,7 +841,7 @@ func _draw() -> void:
 	if sim.rescuing:
 		# 고양이 발밑에서 상자가 받쳐 올린다 (고양이는 자식 노드라 상자 위에 그려짐)
 		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
-		draw_texture_rect(BOX_TEXTURE, Rect2(Balance.CAT_SCREEN_X - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
+		draw_texture_rect(BOX_TEXTURE, Rect2(cat_x() - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
 
 
@@ -837,7 +856,7 @@ func _draw_dash_look(offset: float, ground: float) -> void:
 	var center := cat.position + Vector2(0.0, -Balance.CAT_BODY_SIZE.y * 0.5)
 	var r := DASH_GLOW_RADIUS * (1.0 + 0.08 * sin(sim.elapsed * 18.0))
 	draw_texture_rect(_shadow_texture, Rect2(center - Vector2(r, r), Vector2(r, r) * 2.0), false, Color(DASH_GLOW, DASH_GLOW_ALPHA))
-	draw_line(Vector2(Balance.CAT_SCREEN_X - 110.0, cat.position.y + 3.0), Vector2(Balance.CAT_SCREEN_X + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.55), 5.0, true)
+	draw_line(Vector2(cat_x() - 110.0, cat.position.y + 3.0), Vector2(cat_x() + 110.0, cat.position.y + 3.0), Color(DASH_GLOW, 0.55), 5.0, true)
 
 
 ## 조각 하나 (별은 _draw_star, 나머지는 작은 사각 조각)
@@ -1191,7 +1210,7 @@ func _draw_overlay() -> void:
 	if input_off:
 		return  # 상점·미션 화면: 맨 앞 층(top_level)이 메뉴 위에 그려지지 않게
 	var ground := _ground_y()
-	var offset := Balance.CAT_SCREEN_X - sim.x
+	var offset := cat_x() - sim.x
 	_overlay.draw_set_transform(position, 0.0, scale)
 	var touch := sim.line_touch_eta(GUIDE_TIME)
 	if not touch.is_empty() and not sim.game_over:
@@ -1204,13 +1223,13 @@ func _draw_overlay() -> void:
 			_overlay.draw_arc(at, GUIDE_PAW, 0.0, TAU, 32, Color(HUD_BROWN, 0.45), 3.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_CREAM, 9.0)
 			_overlay.draw_arc(at, r, 0.0, TAU, 48, HUD_BROWN, 5.0)
-			_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
+			_draw_bubble(Vector2(cat_x(), ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), "눌러!")
 	if not sim.game_over:
 		_draw_obstacle_signs(ground, offset)  # 결과 카드 위에 "!"가 뜨지 않게 (이 층은 카드보다 위)
 	if RESULT_TEXT.has(sim.bounce_result) and sim.time_since_bounce < RESULT_TIME:
 		var k := sim.time_since_bounce / RESULT_TIME
 		# 고양이 머리 위에서 떠올랐다 사라짐 (몸과 겹치지 않게)
-		var at := Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
+		var at := Vector2(cat_x(), ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 50.0 - 40.0 * k)
 		_draw_text(at, RESULT_TEXT[sim.bounce_result], 44, 1.0 - k * k)
 	for pop in _pop_texts:
 		var k: float = pop.t / POP_TEXT_TIME
@@ -1236,7 +1255,7 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 	for o in sim.obstacles:
 		var left: float = RunnerSim.obstacle_left(o, sim.x)
 		if o.kind == "flock" and not sim.game_over:
-			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - Balance.CAT_SCREEN_X)
+			var eta := RunnerSim.flock_eta(o, sim.x, sim.vx(), view_w - cat_x())
 			if eta > 0.0 and eta <= FLOCK_WARN_TIME:
 				_draw_feather(Vector2(view_w - 34.0, ground - (o.y0 + o.y1) * 0.5))
 		if alert_showing(o, sim.x, _alerts):
@@ -1251,7 +1270,7 @@ func _draw_obstacle_signs(ground: float, offset: float) -> void:
 			_draw_text(at, "!", roundi(72.0 * (0.5 + 0.5 * pop)), 1.0, ALERT_COLOR)
 	_draw_slide_teach()
 	if not _hint.is_empty() and not sim.game_over:
-		_draw_bubble(Vector2(Balance.CAT_SCREEN_X, ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
+		_draw_bubble(Vector2(cat_x(), ground - sim.y + FOOT_SINK - _cat_lift - Balance.CAT_BODY_SIZE.y - 46.0), _hint.text)
 
 
 ## 빨간 아래 화살표 (크림 테두리), 간판 "!" 밑
@@ -1414,7 +1433,7 @@ func _draw_speed_lines() -> void:
 func _fish_on_screen() -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	var ground := _ground_y()
-	var offset := Balance.CAT_SCREEN_X - sim.x
+	var offset := cat_x() - sim.x
 	var view_w := _view_size().x
 	for item in sim.items:
 		var x: float = item.x + offset
@@ -1492,6 +1511,10 @@ func _build_parade() -> void:
 			cloud.modulate = CUSHION_TINT
 			cloud.position.y = CLOUD_SINK
 			holder.add_child(cloud)
+			var ride_cloud := Sprite2D.new()
+			ride_cloud.name = "RideCloud"
+			ride_cloud.texture = RIDE_CLOUD
+			holder.add_child(ride_cloud)
 			var view := CatView.new()
 			view.name = "View"
 			holder.add_child(view)
@@ -1521,6 +1544,11 @@ func _build_parade() -> void:
 	add_child(_purr)
 
 
+## 주인공 화면 x: 구름 타기 줄이 길면 오른쪽으로 옮김 (KittenFlock.shift). 세계 그림도 이 자리를 기준으로
+func cat_x() -> float:
+	return Balance.CAT_SCREEN_X + _flock.shift
+
+
 ## 아기들이 따라가는 주인공 발끝 화면 자리
 func kitten_lead() -> Vector2:
 	return cat.position
@@ -1533,7 +1561,7 @@ func long_pose() -> bool:
 
 ## 화면 x 아래 지붕의 화면 y (없으면 INF, 아기가 지붕 아래로 안 내려가게)
 func _roof_screen_y(screen_x: float) -> float:
-	var roof := sim.roof_at(sim.x + screen_x - Balance.CAT_SCREEN_X)
+	var roof := sim.roof_at(sim.x + screen_x - cat_x())
 	return INF if roof.is_empty() else _screen_at(0.0, roof.top).y - FOOT_SINK
 
 
@@ -1614,7 +1642,7 @@ func _update_parade(delta: float) -> void:
 
 ## 화면 x (로직 x → 화면)
 func _screen_at(at_x: float, feet: float, lift: float = 0.0) -> Vector2:
-	return Vector2(Balance.CAT_SCREEN_X + at_x - sim.x, _ground_y() - feet + FOOT_SINK - lift)
+	return Vector2(cat_x() + at_x - sim.x, _ground_y() - feet + FOOT_SINK - lift)
 
 
 ## 떠다니는 아기(KittenFlock: 줄줄이·요정 무리, 기울기, 구름 납작, 구름 위에 앉아 꼬리 살랑), 날아가는 아기, 기다리는 길고양이
@@ -1624,7 +1652,11 @@ func _place_parade(delta: float = 0.0) -> void:
 		if _slot_looks[i] != parade.cats[i].look:
 			_start_kitten(i, kitten_lead() + KittenFlock.rest(i, parade.cats.size()))  # 시험 단추로 채운 아기: 자리에서 바로 (구름은 퐁)
 	_flock.step(delta, kitten_lead(), parade.cats, _roof_screen_y, long_pose())
-	_life.step(delta, sim.sliding, parade.cats.size())
+	_life.riding = KittenFlock.ride and KittenFlock.mode_pick == 0
+	var vys := []
+	for i in _kittens.size():
+		vys.append(_flock.vy(i))
+	_life.step(delta, sim.sliding, parade.cats.size(), vys)
 	for i in _kittens.size():
 		var holder := _kittens[i]
 		holder.visible = not waiting and i < parade.cats.size()
@@ -1637,7 +1669,14 @@ func _place_parade(delta: float = 0.0) -> void:
 		_act(holder, delta)
 		var k := clampf(since / CLOUD_POP, 0.0, 1.0) - 1.0
 		var cloud_w := KittenFlock.CLOUD_W * size_ratio()
-		holder.get_node("Cloud").scale = Vector2(cloud_w, cloud_w * KittenFlock.CLOUD_H) / CLOUD_TEXTURES[0].get_size().x * (1.0 + 2.7 * k * k * k + 1.7 * k * k) * _flock.cloud[i]
+		var pop := (1.0 + 2.7 * k * k * k + 1.7 * k * k) * _flock.cloud[i]
+		holder.get_node("Cloud").scale = Vector2(cloud_w, cloud_w * KittenFlock.CLOUD_H) / CLOUD_TEXTURES[0].get_size().x * pop
+		var ride_cloud: Sprite2D = holder.get_node("RideCloud")
+		ride_cloud.visible = _life.riding
+		ride_cloud.scale = Vector2.ONE * RIDE_CLOUD_W * size_ratio() / (RIDE_CLOUD.get_width() - RIDE_CLOUD_PAD) * pop
+		ride_cloud.position = RIDE_CLOUD_AT * size_ratio()
+		holder.get_node("Cloud").visible = not _life.riding
+		holder.get_node("CloudRim").visible = not _life.riding
 		holder.get_node("Cloud").position.y = CLOUD_SINK * size_ratio()
 		var rim: Sprite2D = holder.get_node("CloudRim")
 		rim.scale = holder.get_node("Cloud").scale * CUSHION_RIM_SIZE
@@ -1700,7 +1739,7 @@ func _act(holder: Node2D, delta: float) -> void:
 func _draw_parade(_offset: float, _ground: float) -> void:
 	var fever := sim.parade.fever()
 	if _stray_view.visible:
-		var shadow := CatShadow.under(sim.roofs, _stray_view.position.x - Balance.CAT_SCREEN_X + sim.x, _ground_y() + FOOT_SINK - _stray_view.position.y)
+		var shadow := CatShadow.under(sim.roofs, _stray_view.position.x - cat_x() + sim.x, _ground_y() + FOOT_SINK - _stray_view.position.y)
 		if not shadow.is_empty():
 			_draw_shadow(Vector2(_stray_view.position.x, _ground_y() - shadow.top + FOOT_SINK), shadow, _stray_view)
 	if fever:
@@ -1708,6 +1747,11 @@ func _draw_parade(_offset: float, _ground: float) -> void:
 			if holder.visible:
 				_draw_fever_glow(holder.position, CatParade.size_k())
 		_draw_fever_glow(cat.position, 1.0)
+	for puff in _flock.puffs:  # 구름 꼬리 조각: 뒤로 떨어지며 작아지고 옅어짐 (아기 그림 아래)
+		var u: float = puff.t / KittenFlock.PUFF_LIFE
+		var tex: Texture2D = RIDE_PUFFS[puff.kind]
+		var size: Vector2 = tex.get_size() * RIDE_CLOUD_W * size_ratio() / (RIDE_CLOUD.get_width() - RIDE_CLOUD_PAD) * RIDE_PUFF_SIZE * puff.s * (1.0 - 0.6 * u)
+		draw_texture_rect(tex, Rect2(puff.p - size * 0.5, size), false, Color(1, 1, 1, 0.9 * (1.0 - u * u)))
 	for i in _kittens.size():
 		var holder := _kittens[i]
 		if not holder.visible:

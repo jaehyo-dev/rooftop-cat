@@ -14,6 +14,11 @@
 - 그림체(2026-11-19): 다른 아기 wait.png와 선·테두리를 맞추는 restyle을 저장하는 모든 장(14장 + 꼬리 5장)에 똑같이 건다.
   주변보다 어두운 곳(선·연필 결)을 갈색 연필색 쪽으로 진하게, 흰 테두리를 RIM_TRIM픽셀 깎음.
 결과: alive_<이름>.png, alive_tail_<번호>.png (256x240, KITTEN_ANCHOR 기준). 개발용 도구 (numpy, scipy, Pillow).
+
+구름 타기(2026-11-20): python3 tools/cut_kitten_alive.py ride <타기 시트> <출력 폴더> / cloud <구름 시트> <출력 폴더>
+- ride: 6칸(크기 기준 앉은 그림, 타기 0~2, 올라가기, 내려가기). 크기는 1번 칸 넓이를 wait에 맞춘 배율(위와 같은 방법),
+  아랫선은 BASELINE, ride_0은 엉덩이 끝을 alive_base와 같은 x에, 나머지는 ride_0과 가장 많이 겹치는 x에. 같은 restyle. 꼬리는 그림에 붙은 그대로.
+- cloud: 4칸(타는 구름, 조각 3). 타는 구름 폭이 CLOUD_WIDTH가 되는 배율 하나를 조각에도 써서 크기 비율을 지킴 → ride_cloud.png, ride_puff_<번호>.png.
 """
 import sys
 from pathlib import Path
@@ -39,6 +44,10 @@ INK_GAIN = 0.7 / 60.0  # 주변보다 1 어두우면 이만큼 갈색 쪽으로 
 INK_MAX = 0.85
 RIM_TRIM = 1       # 흰 테두리를 깎는 픽셀 (새 시트 3px → wait.png 2px)
 SEARCH = 12        # 기본 칸을 wait에 맞출 때 찾아보는 x 범위 (±픽셀)
+RIDE_NAMES = ["size", "ride_0", "ride_1", "ride_2", "ride_up", "ride_down"]  # size = 크기 기준 (저장 안 함)
+RIDE_SEARCH = 30   # 타기 그림끼리 맞출 때 찾아보는 x 범위
+CLOUD_WIDTH = 256  # 타는 구름 그림 폭 (여백 빼고, 게임에서 약 85px로 줄여 그림)
+CLOUD_PAD = 4      # 구름·조각 그림 둘레 투명 여백
 
 
 def rump_x(mask: np.ndarray) -> int:
@@ -115,7 +124,61 @@ def cut(sheet: Path, out_dir: Path) -> dict:
     return {"scale": round(scale, 4), "left": left, "wait_overlap": overlap}
 
 
+def _pieces(sheet: Path, names: list) -> dict:
+    rgba = remove_magenta(np.asarray(Image.open(sheet).convert("RGB")))
+    out = {}
+    for name, ((top, bottom, left, right, label), labels) in zip(names, blobs(rgba[..., 3] > 128, len(names))):
+        piece = rgba[top:bottom, left:right].copy()
+        piece[labels[top:bottom, left:right] != label] = 0
+        out[name] = Image.fromarray(piece)
+    return out
+
+
+def _overlap(img: Image.Image, scale: float, left: int, key: np.ndarray) -> int:
+    """엉덩이를 left에 붙였을 때 key와 겹치는 넓이 (캔버스 밖으로 나가는 자리는 -1)."""
+    try:
+        return int((opaque(paste(img, scale, left)) & key).sum())
+    except ValueError:
+        return -1
+
+
+def cut_ride(sheet: Path, out_dir: Path) -> dict:
+    frames = _pieces(sheet, RIDE_NAMES)
+    wait = Image.open(out_dir / "wait.png").convert("RGBA")
+    wait.alpha_composite(Image.open(out_dir / "wait_tail_2.png").convert("RGBA"))
+    scale = (opaque(wait).sum() / opaque(frames["size"]).sum()) ** 0.5
+    left = rump_x(opaque(Image.open(out_dir / "alive_base.png")))
+    first = paste(frames["ride_0"], scale, left)
+    key = opaque(first)
+    out = {"scale": round(scale, 4)}
+    for name in RIDE_NAMES[1:]:
+        if name == "ride_0":
+            placed = first
+        else:
+            best = max(range(left - RIDE_SEARCH, left + RIDE_SEARCH + 1), key=lambda x: _overlap(frames[name], scale, x, key))
+            placed = paste(frames[name], scale, best)
+            out[name] = round(float((opaque(placed) & key).sum() / key.sum()), 3)
+        restyle(placed).save(out_dir / f"alive_{name}.png")
+    return out
+
+
+def cut_cloud(sheet: Path, out_dir: Path) -> dict:
+    pieces = _pieces(sheet, ["cloud", "puff_0", "puff_1", "puff_2"])
+    scale = CLOUD_WIDTH / pieces["cloud"].width
+    sizes = {}
+    for name, img in pieces.items():
+        small = img.resize((max(1, round(img.width * scale)), max(1, round(img.height * scale))), Image.LANCZOS)
+        padded = Image.new("RGBA", (small.width + 2 * CLOUD_PAD, small.height + 2 * CLOUD_PAD), (0, 0, 0, 0))
+        padded.paste(small, (CLOUD_PAD, CLOUD_PAD))  # 둘레 투명 여백 (필터링 때 가장자리가 잘려 보이지 않게)
+        padded.save(out_dir / f"ride_{name}.png")
+        sizes[name] = small.size
+    return sizes
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) == 4 and sys.argv[1] in ("ride", "cloud"):
+        print((cut_ride if sys.argv[1] == "ride" else cut_cloud)(Path(sys.argv[2]), Path(sys.argv[3])))
+    elif len(sys.argv) == 3:
+        print(cut(Path(sys.argv[1]), Path(sys.argv[2])))
+    else:
         sys.exit(__doc__)
-    print(cut(Path(sys.argv[1]), Path(sys.argv[2])))

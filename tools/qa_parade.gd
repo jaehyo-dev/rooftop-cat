@@ -22,6 +22,9 @@ func run(q: Node, mode: String) -> void:
 	if mode == "parade_size":
 		await _sizes()
 		return
+	if mode.begins_with("parade_ride"):
+		await _ride(mode.split("-").slice(1))
+		return
 	if mode.begins_with("parade_alive"):
 		await _alive(mode.split("-").slice(1))
 		return
@@ -348,8 +351,8 @@ func _alive(only: Array) -> void:
 			await _clip("alive_%s_%s" % [clip[0], speed[0]], 4.0 if clip[0] == "flat" and speed[0] == "slow" else clip[1], speed[1])
 
 
-func _alive_scene(scene: String) -> void:
-	await _start(5, 6)
+func _alive_scene(scene: String, cats: int = 6) -> void:
+	await _start(5, cats)
 	var cheese: Array = sim.parade.cats.filter(func(c: Dictionary) -> bool: return c.look == "cheese")
 	if cheese.is_empty():
 		sim.parade.cats[0].look = "cheese"
@@ -391,3 +394,25 @@ func _alive_scene(scene: String) -> void:
 				push_error("cloud: 하늘 구름이 줄 뒤에 안 옴")
 			t0 = sim.elapsed
 			_pilot = func() -> Array: return [sim.elapsed - t0 > 0.15 and sim.elapsed - t0 < 0.4, false]
+
+
+## 구름 타기 (2026-11-20, review/cat-parade/action/ride/): 예전(앉기)·새(타기) x 6마리(치즈냥 맨 앞)·치즈냥 1마리 x 장면 x 실제·0.25배.
+## ride_<old|new>_<6|1>_<장면>_<real|slow>_f000…  (parade_ride-jump-new-6 = 그 조합만, 빈 칸은 모두)
+func _ride(only: Array) -> void:
+	var clips := [["flat", 3.0], ["jump", 1.8], ["double", 2.2], ["slide", 2.0], ["hit", 2.0]]
+	for way in ["old", "new"]:
+		if ("old" in only or "new" in only) and way not in only:
+			continue
+		for n in [6, 1]:
+			if ("6" in only or "1" in only) and str(n) not in only:
+				continue
+			for clip in clips:
+				if only.any(func(o: String) -> bool: return o in ["flat", "jump", "double", "slide", "hit"]) and clip[0] not in only:
+					continue
+				for speed in [["real", 4], ["slow", 2]]:
+					KittenFlock.ride = way == "new"
+					await _alive_scene(clip[0], n)
+					if sim.game_over:
+						push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])
+					await _clip("ride_%s_%d_%s_%s" % [way, n, clip[0], speed[0]], clip[1], speed[1])
+	KittenFlock.ride = true

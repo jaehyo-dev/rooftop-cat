@@ -125,6 +125,7 @@ var time_since_stand := 99.0  # 땅에서 슬라이딩을 떼고 일어난 뒤 �
 var stomp_points := 0
 ## 고양이 앞으로 화면 끝까지 거리 (통조림 범위). 화면 너비에 따라 world_view가 넘겨준다
 var view_ahead := 940.0
+var view_behind := Balance.CAT_SCREEN_X  # 주인공 뒤로 보이는 폭 (구름 타기로 주인공을 옮기면 world_view가 넓힘)
 ## 투명화 남은 시간 (0이면 보통 상태)
 var ghost_time := 0.0
 ## 착지한 뒤 지난 시간 (납작해짐 연출용). 착지 전이면 큰 값
@@ -609,7 +610,7 @@ func _open_can() -> void:
 	for i in range(obstacles.size() - 1, -1, -1):
 		var o := obstacles[i]
 		var left := obstacle_left(o, x)
-		if left > x + view_ahead or left + o.w < x - Balance.CAT_SCREEN_X:
+		if left > x + view_ahead or left + o.w < x - view_behind:
 			continue
 		var was := o.duplicate()
 		was.x = left

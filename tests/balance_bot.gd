@@ -21,6 +21,9 @@ const DT := 1.0 / 120.0
 const LINE_LOOK := 0.6
 ## 간판 앞 이만큼(초) 앞에서 슬라이딩을 누르기 시작 (실수가 커도 대부분 늦지 않게)
 const SLIDE_LEAD := 0.3
+## 시야 모델 (2026-11-20, 구름 타기 주인공 옮기기 측정용, play_stats의 sight > 0일 때만): 넘을 것(다음 옥상 왼쪽 끝·장애물)이
+## 화면 오른쪽 끝(주인공 앞 sight 픽셀 - 그때 아기 수로 옮긴 픽셀(최대 shift_max))에 들어온 뒤 REACT초가 지나야 누를 수 있다. 계획한 때보다 늦으면 그만큼 늦게 누름
+const REACT := 0.3
 
 ## 실력별 실수 크기. 초보 = 처음 해 보는 사람, 익숙함 = 몇 판 해 본 사람, 숙련 = 많이 해 본 사람
 const SKILLS := {
@@ -46,7 +49,7 @@ static func play(skill: Dictionary, seed_value: int, max_time: float, start_spee
 ## off: 끌 아이템 종류 (효과 비교용). perks: 강화·부스터 (null = 0단계, v0.7.0). dash_at: 질주를 시작한 시각들
 ## parade: 아기 고양이 무리 시험판 켬. met_at(만난 시각들)·line_sum(마리 x 초)·scared(날아간 수)·line_end(끝날 때 마리)
 ## stomp: 밟기를 노리는 봇 (화분·실외기는 넘는 대신 최대로 뛰어 내려오며 윗면 가운데를 밟으려 함). stomps(밟은 수)·stomp_points
-static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: bool = false, stomp: bool = false) -> Dictionary:
+static func play_stats(skill: Dictionary, seed_value: int, max_time: float, start_speed: float = Balance.RUN_SPEED, accelerate: bool = true, inputs: Array = [], off: Array = [], perks: Perks = null, parade: bool = false, stomp: bool = false, sight: float = 0.0, shift_max: float = KittenFlock.SHIFT_MAX) -> Dictionary:
 	var stats := {"time": 0.0, "tramp_try": 0, "tramp_ok": 0, "line_try": 0, "line_ok": 0, "pole_try": 0, "pole_ok": 0, "touch_try": 0, "touch_ok": 0, "doubles": 0,
 			"end": "", "hits": {}, "segment_try": {}, "segment_ok": {},
 			"dash_count": 0, "dash_smashed": 0, "dash_seconds": [], "dash_fall": 0, "first_dash": -1.0, "dash_at": [], "eaten": {}, "made": {},
@@ -103,6 +106,9 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 			planned_roof = ground
 			var plan: Dictionary = hop if not hop.is_empty() else _plan(sim)
 			press_x = plan.x + rng.randfn(0.0, skill.timing) * sim.speed
+			if sight > 0.0 and plan.has("see"):
+				var ahead := sight - minf(KittenFlock.lead_shift(sim.parade.cats.size()), shift_max)  # 구름 타기: 아기가 많으면 주인공을 옮긴 만큼 줄어듦
+				press_x = maxf(press_x, plan.see - ahead + REACT * sim.speed)
 			var max_hold := JumpModel.max_hold_time()
 			# 손 떼는 때는 사람처럼 양쪽으로 흔들린다 (톡이 길어지면 비둘기에 맞는다). 최대로 누르는 틈 점프는 짧게만
 			hold = clampf(plan.hold + rng.randfn(0.0, skill.short_hold) * max_hold, 0.02, max_hold) if plan.has("hold") else \
@@ -250,9 +256,9 @@ static func _obstacle_plan(sim: RunnerSim, ground: Dictionary, stomp: bool = fal
 	if stomp and next.kind in ["pot", "ac"] and not flock_near:  # 비둘기가 같이 있으면 높이 뛰면 머리를 박으니 낮게 넘음
 		# 밟기: 최대로 뛰어 내려오는 길이 윗면 높이를 지날 때 몸 가운데가 장애물 가운데 (물탱크·비둘기는 한 번 점프로 위에 못 가 그대로)
 		var hold := JumpModel.max_hold_time()
-		return {"x": next.x + next.w * 0.5 - sim.speed * JumpModel.air_time(hold, next.y1 - ground.top), "hold": hold, "dj": false}
+		return {"x": next.x + next.w * 0.5 - sim.speed * JumpModel.air_time(hold, next.y1 - ground.top), "hold": hold, "dj": false, "see": next.x}
 	var lead := FishRoad.press_lead(next.kind, next.action, roundf(sim.speed / 10.0) * 10.0)
-	return {"x": next.x - lead * sim.speed, "hold": FishRoad.center_variant(next.action)[0], "dj": next.action == "double"}
+	return {"x": next.x - lead * sim.speed, "hold": FishRoad.center_variant(next.action)[0], "dj": next.action == "double", "see": next.x}
 
 
 ## 최대 점프 + 첫 점프 꼭대기에서 더블점프(최대)의 체공 시간 (높이 차 rise)
@@ -275,20 +281,20 @@ static func _plan(sim: RunnerSim) -> Dictionary:
 	if next.has("line"):
 		# 줄 틈: 틈 시작 조금 안쪽 줄 위에 내리도록 최대로 뛴다. 일찍 뛰면 옥상에 다시 내릴 뿐이라 늦는 쪽이 위험하다
 		var land_x: float = roof.right + 90.0
-		return {"x": minf(land_x - sim.speed * JumpModel.max_air_time(Balance.LINE_HEIGHT), latest), "dj": false}
+		return {"x": minf(land_x - sim.speed * JumpModel.max_air_time(Balance.LINE_HEIGHT), latest), "dj": false, "see": land_x}
 	var rise: float = next.top - roof.top
 	if next.get("platform", false):
 		# 전봇대 판: 넓은 틈이라 항상 더블점프. 최대 점프 + 꼭대기 더블점프로 판 가운데에 내려앉는 위치 (너무 앞이면 마지막 순간)
 		var center: float = (next.left + next.right) * 0.5
-		return {"x": minf(center - sim.speed * _apex_double_time(rise), latest), "dj": true}
+		return {"x": minf(center - sim.speed * _apex_double_time(rise), latest), "dj": true, "see": next.left}
 	# 지금 속도로 계산 (점프 중 단계가 오르면 조금 더 멀리 가지만 무시)
 	var reach := sim.speed * JumpModel.max_air_time(rise)
 	var earliest: float = next.left - Balance.CAT_FOOT_HALF - reach + 10.0  # 이보다 일찍 누르면 앞발이 못 걸침
 	if earliest <= latest - 20.0:
-		return {"x": minf((earliest + latest) * 0.5, latest), "dj": false}
+		return {"x": minf((earliest + latest) * 0.5, latest), "dj": false, "see": next.left}
 	# 점프 한 번으로는 빠듯한 틈 (판에서 다음 옥상 등): 꼭대기 더블점프 거리로 계획
 	var dj_earliest: float = next.left - Balance.CAT_FOOT_HALF - sim.speed * _apex_double_time(rise) + 10.0
-	return {"x": minf((dj_earliest + latest) * 0.5, latest), "dj": true}
+	return {"x": minf((dj_earliest + latest) * 0.5, latest), "dj": true, "see": next.left}
 
 
 ## press_x에서 hold초 누른 점프 한 번이 다음 발판(줄·트램펄린 틈 제외)에 못 미치는지
