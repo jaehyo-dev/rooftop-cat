@@ -437,3 +437,9 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 구름: `bash review/cat-parade/action/ride/make_art.sh cloud 1` → `assets/raw/kitten_alive/cloud_ride_1.png`.
   첨부: `ref_style.png`, `review/cat-parade/action/ride/prompts/ref_cloud.png`(하늘 구름 cloud1). 요청문 전문 `review/cat-parade/action/ride/prompts/cloud.txt`.
   자르기: `python3 tools/cut_kitten_alive.py cloud assets/raw/kitten_alive/cloud_ride_1.png assets/sprites/kittens/ride`
+
+## 화풍 시안 세 가지 (2026-11-20, 맥 Codex, restructure 브랜치)
+- 계획: 화풍 3 x 장면 3 = 9장. 화풍 1을 먼저 그리고 화풍 2·3은 그 그림을 구도 기준으로 첨부. 생김새·글자·구도·자세가 어긋나면 그 장만 다시. 결과: 다시 뽑기 1번(화풍 1 C: 미끄러지기 자세가 지적과 달라 자세 설명을 덧붙임).
+- 명령: `bash review/restructure/style/make_art.sh <1|2|3> <A|B|C> <차례> [덧붙일 말]`, 정리 `python3 review/restructure/style/compose.py`
+- 첨부: `review/restructure/style/prompts/ref_game.png`(지금 게임 화면), `ref_cats.png`(주인공·아기 6마리 설정), `ref_hero.png`(주인공 기준 그림) + 화풍 2·3은 `assets/concept/restructure_style/s1_<장면>.png`
+- 요청문 전문: `review/restructure/style/prompts/common.txt` + `style<화풍>.txt` + `scene<장면>.txt`, 다시 뽑은 덧붙임은 `review/restructure/style/README.md`. 결과 `assets/concept/restructure_style/`.

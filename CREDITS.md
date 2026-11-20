@@ -42,6 +42,7 @@ Codex(ChatGPT 구독)의 내장 이미지 생성(gpt-image-2)으로 만들었습
 | `assets/sprites/cat_mascot_i~k.png` | 2026-11-06 | 위 원본 | 배경을 지운 마스코트 시안 (게임 내보내기에서 제외) | 연두 배경을 초록 우세도(G - max(R, B))로 지움 (rembg는 닫힌 틈에 배경이 남고 몸이 반투명해져 쓰지 않음) |
 | `assets/concept/cat_mascot.png` | 2026-11-06 | 시안 I·J·K | 마스코트 비교용 (게임에 포함 안 됨) | 3장을 잘라 나란히 붙이고 글자를 넣음 |
 | `assets/concept/cat_reference_sheet.png` | 2026-11-06 | 사용자가 다른 세션에서 AI로 만들어 제공 (요청문 기록 없음) | 기준 캐릭터 참고 시트, 6가지 동작 (게임에 포함 안 됨) | 없음 |
+| `assets/concept/restructure_style/s1~3_A~C.png`, `review/restructure/style/` | 2026-11-20 | Codex 내장 이미지 생성 (지금 게임 화면·고양이 설정·기준 그림 첨부) | 구조 전환 화풍 시안 3종 x 장면 3 (게임에 포함 안 됨) | 비교 그림은 크기를 줄여 나란히 붙이고 주아 글꼴로 화풍 이름을 넣음 |
 | `assets/concept/poses/walk·crouch·run·jump·land·dash.png` | 2026-11-06 | 위 참고 시트 | 모션 참고용 동작 6장 (게임에 포함 안 됨) | 시트에서 잘라 남색 배경을 색 거리로 지움 |
 | `assets/sprites/items/fish_0~3.png` | 2026-11-11 (2c에 씀) | Codex 내장 이미지 생성: v0.7.0 시안 10 "세트 1"(`review/v0.7.0/concept/10_fish_set1.png`) | 생선 점수 강화 0·3·6·10단계 생선 그림 (멸치·고등어·분홍 도미·하늘보라 물고기) | 마젠타 배경을 지우고(`tools/cut_parts.py`) 지금 생선과 같은 240x136 칸에 맞춤, 반짝이 조각은 뺌 (`review/v0.7.0/2c/cut_art.py`) |
 | `assets/raw/ui_paper_sheet.png` → `assets/sprites/ui/pin_red·pin_yellow.png` | 2026-11-12 | Codex 내장 이미지 생성 (시안 05·08 첨부) | 미션 쪽지·상점 띠의 압정 (같은 시트의 종이 패널·버튼은 2c 피드백 B 확정 때, 빨래집게 clip.png는 v0.7.0 배포 때 안 써서 지움) | 마젠타 배경을 지우고 잘라 냄 (`review/v0.7.0/2c/cut_art.py`) |
