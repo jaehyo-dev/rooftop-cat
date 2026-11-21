@@ -17,17 +17,18 @@ func _sim_on_roofs(list: Array) -> RunnerSim:
 	return sim
 
 
-func test_달리기는_달린_거리로_4프레임을_차례로_돈다() -> void:
+func test_달리기는_달린_거리로_6프레임을_차례로_돈다() -> void:
 	var sim := RunnerSim.new(1)
+	var n := CatPose.RUN_FRAMES.size()
 	var seen: Array[String] = []
-	for i in 8:
-		sim.x = Balance.CAT_STRIDE * (i + 0.5) / 4.0
+	for i in n * 2:
+		sim.x = Balance.CAT_STRIDE * (i + 0.5) / n
 		seen.append(CatPose.pose(sim).frame)
-	assert_eq(seen, ["run_0", "run_1", "run_2", "run_3", "run_0", "run_1", "run_2", "run_3"] as Array[String])
-	sim.x = -Balance.CAT_STRIDE * 0.1
-	assert_eq(CatPose.pose(sim).frame, "run_3", "음수 거리도 순서대로")
-	for i in 4:
-		sim.x = Balance.CAT_STRIDE * (i + 0.5) / 4.0
+	assert_eq(seen, CatPose.RUN_FRAMES + CatPose.RUN_FRAMES)
+	sim.x = -Balance.CAT_STRIDE * 0.05
+	assert_eq(CatPose.pose(sim).frame, CatPose.RUN_FRAMES[-1], "음수 거리도 순서대로")
+	for i in n:
+		sim.x = Balance.CAT_STRIDE * (i + 0.5) / n
 		assert_eq(CatPose.pose(sim).tilt, 0.0, "달릴 때 기울지 않음")
 
 
@@ -144,8 +145,10 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝
 		if texture == null:
 			continue
 		var used := texture.get_image().get_used_rect()
-		# 모든 프레임의 가장 아랫줄(발끝)이 기준점 높이에 있다 (정렬 도구가 맞춤, 반투명 가장자리 1~2픽셀 허용)
-		assert_true(absf(used.end.y - CatView.ANCHOR.y) <= 3.0, "%s 발끝 %d" % [frame, used.end.y])
+		# 모든 프레임의 가장 아랫줄(발끝)이 기준점 높이에 있다 (정렬 도구가 맞춤, 반투명 가장자리 1~2픽셀 허용).
+		# 튕겨 뜬 장(hit_fly)만 시트에서 떠 있던 높이만큼 위 (tools/make_hero_frames.py LIFTED)
+		var lift := 0.0 if frame != "hit_fly" else 14.0
+		assert_true(absf(used.end.y + lift - CatView.ANCHOR.y) <= 3.0, "%s 발끝 %d" % [frame, used.end.y])
 	cat.queue_free()
 
 
@@ -179,7 +182,7 @@ func test_상태에_맞는_그림과_투명화() -> void:
 		sim.step(DT, false)
 		cat.show_state(sim, DT)
 		frames[cat.frame_name] = true
-	assert_eq(frames.size(), 4, "달리며 4프레임을 모두 씀")
+	assert_eq(frames.size(), CatPose.RUN_FRAMES.size(), "달리며 달리기 프레임을 모두 씀")
 	assert_eq(cat.modulate.a, 1.0)
 	sim.ghost_time = 1.0
 	cat.show_state(sim, DT)
@@ -354,4 +357,77 @@ func test_시작을_누르면_일어나는_그림을_잠깐_보이고_달린다(
 		sim.step(DT, false)
 		cat.show_state(sim, DT)
 	assert_true(cat.frame_name.begins_with("run_"), "그다음 달리기 %s" % cat.frame_name)
+	cat.queue_free()
+
+
+func test_땅_슬라이딩은_낮추기_미끄러지기_일어나기_1_2_순서() -> void:
+	var sim := _sim_on_roofs([{"left": 0.0, "right": 100000.0, "top": 200.0}])
+	var order: Array[String] = []
+	for f in 150:  # 0.2초 달리기 → 0.6초 슬라이딩 → 떼고 0.45초
+		sim.step(DT, false, f >= 24 and f < 96)
+		var frame: String = CatPose.pose(sim).frame
+		if order.is_empty() or order[-1] != frame:
+			order.append(frame)
+	var slide := order.slice(order.find("slide_down"))
+	assert_true(order[0].begins_with("run_") and not slide.is_empty(), str(order))
+	assert_true(slide.slice(1, 3).has("slide_a") and slide.slice(1, 3).has("slide_b"), "낮추기 뒤 미끄러지기 a·b %s" % str(order))
+	var up := order.find("slide_up1")
+	assert_true(up > 0 and order[up + 1] == "slide_up2" and order[up + 2].begins_with("run_"), "일어나기 1 → 2 → 달리기 %s" % str(order))
+	assert_false(order.has("slide_squash"), "달리다 슬라이딩하면 눌림 없음")
+
+
+func test_공중_슬라이딩은_내리꽂기_눌림_미끄러지기_순서() -> void:
+	var sim := _sim_on_roofs([{"left": 0.0, "right": 100000.0, "top": 200.0}])
+	var order: Array[String] = []
+	for f in 140:  # 점프(꾹) → 0.3초에 슬라이딩 누름(내리꽂기) → 누른 채 착지
+		sim.step(DT, f < 12, f >= 36)
+		var frame: String = CatPose.pose(sim).frame
+		if order.is_empty() or order[-1] != frame:
+			order.append(frame)
+	var dive := order.find("dive")
+	assert_true(dive > 0, str(order))
+	assert_eq(order.slice(dive, dive + 3), ["dive", "slide_squash", "slide_a"] as Array[String], "내리꽂기 → 눌림 → 미끄러지기 %s" % str(order))
+
+
+func test_피격은_맞는_순간_튕김_휘청_달리기_그림만_밀렸다_돌아옴() -> void:
+	var sim := _sim_on_roofs([{"left": 0.0, "right": 100000.0, "top": 200.0}])
+	sim.step(DT, false)
+	sim.time_since_hit = 0.0
+	var order: Array[String] = []
+	var pushes := []
+	for f in 80:
+		var frame: String = CatPose.pose(sim).frame
+		if order.is_empty() or order[-1] != frame:
+			order.append(frame)
+		pushes.append(CatView.hit_push(sim.time_since_hit))
+		sim.step(DT, false)
+	assert_eq(order.slice(0, 3), CatPose.HIT_FRAMES, str(order))
+	assert_true(order[3].begins_with("run_"), "휘청 뒤 달리기 %s" % str(order))
+	assert_true(pushes[0] == 0.0 and pushes.max() > CatView.HIT_PUSH * 0.95 and pushes[-1] == 0.0, "0 → 뒤로 → 제자리")
+	for i in pushes.size() - 1:
+		assert_true(absf(pushes[i + 1] - pushes[i]) < 6.0, "한 프레임에 6px 넘게 튀지 않음 %d" % i)
+	sim.time_since_hit = 0.0
+	for f in 70:  # 슬라이딩 중 맞아도(화분) 맞은 그림 → 끝나면 미끄러지기
+		sim.step(DT, false, true)
+		if f == 1:
+			assert_eq(CatPose.pose(sim).frame, "hit", "슬라이딩 중 맞으면 맞은 그림")
+	assert_true(CatPose.pose(sim).frame in CatPose.SLIDE_FRAMES, "피격 뒤 계속 누르면 미끄러지기 %s" % CatPose.pose(sim).frame)
+	sim.time_since_hit = 0.3
+	sim.on_ground = false
+	assert_true(CatPose.pose(sim).frame != "hit_wobble", "공중에서는 휘청 대신 공중 그림")
+
+
+func test_예전_화풍_그림이_모두_있다() -> void:
+	# 시험 단추 "주인공 화풍: 예전" (로컬 빌드): 카툰에만 있는 그림은 비슷한 예전 그림으로 바꿔 읽는다
+	for frame in CatPose.ALL_FRAMES:
+		var name: String = CatView.PENCIL_SWAP.get(frame, frame)
+		assert_true(ResourceLoader.exists(CatView.PENCIL_DIR + name + ".png"), name)
+	CatView.pencil = true
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames(1)
+	assert_eq(cat.frame_texture("slide_a").resource_path, CatView.PENCIL_DIR + "slide_0.png")
+	CatView.pencil = false
+	cat.show_state(_sim_on_roofs([{"left": 0.0, "right": 4000.0, "top": 0.0}]), 0.0)
+	assert_eq(cat.frame_texture("slide_a").resource_path, CatView.FRAME_DIR + "slide_a.png", "단추를 다시 누르면 카툰")
 	cat.queue_free()

@@ -37,3 +37,6 @@ desktop.ini
 
 # Codex 작업 로그
 logs/
+
+# 카툰 2단계 게임 안 확인 영상 (다시 만들기: review/restructure/hero/README.md, 커밋하지 않음)
+review/restructure/hero/video/

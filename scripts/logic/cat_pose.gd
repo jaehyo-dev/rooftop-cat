@@ -4,20 +4,28 @@ class_name CatPose
 ## 앞구르기 공중제비(spin)는 기울기 금지의 예외: 몸을 말아 가는 그림 4장을 바꾸며 몸 가운데 기준으로 한 바퀴 돈다.
 ## 배율은 발끝을 기준으로 적용하므로 발이 옥상에서 뜨지 않는다. 기울기는 도 단위, 양수 = 시계 방향(코가 아래로).
 
-## 달리기 한 바퀴의 프레임 (모으기 → 박차기 → 앞발 디딤 → 뒷발 들어옴)
-const RUN_FRAMES := ["run_0", "run_1", "run_2", "run_3"]
-## 프레임마다 몸 전체 배율 (가로, 세로): 모을 때 짧고 높게, 박찰 때 길고 낮게
-const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.04, 0.97), Vector2(1.02, 0.99), Vector2(0.98, 1.02)]
+## 달리기 한 바퀴의 프레임 (모으기 → 박차기 → 쭉 뻗기 → 앞발 디딤 → 앞발로 받치기 → 뒷발 들어옴). 카툰은 6장
+const RUN_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5"]
+## 프레임마다 몸 전체 배율 (가로, 세로): 모을 때 짧고 높게, 뻗을 때 길고 낮게
+const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.02, 0.98), Vector2(1.04, 0.97), Vector2(1.02, 0.99),
+		Vector2(0.99, 1.01), Vector2(0.98, 1.02)]
 ## 앞구르기 프레임 (숙이기, C자, 공, 펴기)과 각 그림으로 바뀌는 회전 각도 (도)
 const FLIP_FRAMES := ["flip_tuck", "flip_curl", "flip_ball", "flip_open"]
 const FLIP_FROM_DEG := [0.0, 25.0, 60.0, 300.0]
-const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "crouch", "takeoff", "rise", "fall", "land", "flail",
+const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5", "crouch", "takeoff", "rise", "fall", "land", "flail",
 		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "sit_body", "sit_body_blink", "sit_up",
-		"slide_0", "slide_1", "slide_2", "slide_up"]
-## 슬라이딩 (2026-11-17): 납작 엎드려 미끄러짐 3장을 달린 거리로 돌리고, 떼면 SLIDE_UP_TIME 동안 일어나기 그림
-const SLIDE_FRAMES := ["slide_0", "slide_1", "slide_2"]
-const SLIDE_STRIDE := 90.0   # 슬라이딩 그림 한 바퀴의 거리 (귀·꼬리·목도리 펄럭임)
-const SLIDE_UP_TIME := 0.1
+		"slide_down", "slide_a", "slide_b", "slide_up1", "slide_up2", "dive", "slide_squash",
+		"hit", "hit_fly", "hit_wobble"]
+## 슬라이딩 (카툰 2단계): 땅 = 몸 낮추기(SLIDE_DOWN_TIME) → 미끄러지기 a·b를 달린 거리로 반복 → 떼면 일어나기 1·2(SLIDE_UP_TIME을 반씩).
+## 공중 = 내리꽂기(dive) → 누른 채 땅에 닿으면 눌림(SLIDE_SQUASH_TIME) → 미끄러지기
+const SLIDE_FRAMES := ["slide_a", "slide_b"]
+const SLIDE_STRIDE := 100.0  # 미끄러지기 a·b 한 바퀴의 거리 (목도리 끝·먼지 펄럭임)
+const SLIDE_DOWN_TIME := 0.06
+const SLIDE_SQUASH_TIME := 0.1
+const SLIDE_UP_TIME := 0.16
+## 피격 (카툰 2단계): 맞는 순간 → 튕겨 뜸 → 네 발로 휘청 → 달리기. 각 그림이 끝나는 시간 (부딪힌 뒤 초). 판정·무적은 그대로
+const HIT_FRAMES := ["hit", "hit_fly", "hit_wobble"]
+const HIT_UNTIL := [0.08, 0.26, 0.48]
 ## 시작 화면 (2c-polish): 몸 그림 한 장(바닥 고정) 뒤에 꼬리 그림 8장(tools/make_sit_tail.py)을 오가며 흔들고,
 ## 몸은 바닥을 축으로 아주 살짝 숨쉬고, 가끔 눈을 깜빡인다. 예전 sit_0·1·2는 몸 바닥이 달라 위아래로 흔들렸다
 const SIT_TAILS := 8
@@ -98,14 +106,16 @@ static func _pose(sim: RunnerSim) -> Dictionary:
 		# 떨어져서 끝나는 중·트램펄린에서 안 눌러 맥없이 튐: 코가 아래로 기울고, 몸 전체를 빠르게 흔들어 허우적거린다 (1초에 약 5번)
 		var wobble := sin(sim.elapsed * TAU * 5.0)
 		return {"frame": "flail", "scale": Vector2(1.0 + 0.04 * wobble, 1.0 - 0.04 * wobble), "tilt": 12.0 + 10.0 * wobble}
+	# 피격은 슬라이딩보다 먼저 (슬라이딩 중 화분에 맞아도 맞은 그림을 보이고, 끝나면 미끄러지기로 돌아감)
+	var hit := hit_frame(sim)
+	if hit != "":
+		return {"frame": hit, "scale": Vector2.ONE, "tilt": 0.0}
 	if sim.on_ground and sim.sliding:
-		var k := mini(int(fposmod(sim.x / SLIDE_STRIDE, 1.0) * SLIDE_FRAMES.size()), SLIDE_FRAMES.size() - 1)
-		return {"frame": SLIDE_FRAMES[k], "scale": Vector2.ONE, "tilt": 0.0}
+		return {"frame": slide_frame(sim), "scale": Vector2.ONE, "tilt": 0.0}
 	if sim.on_ground and sim.time_since_stand < SLIDE_UP_TIME:
-		return {"frame": "slide_up", "scale": Vector2.ONE, "tilt": 0.0}
+		return {"frame": "slide_up1" if sim.time_since_stand < SLIDE_UP_TIME * 0.5 else "slide_up2", "scale": Vector2.ONE, "tilt": 0.0}
 	if sim.diving:
-		# 내려찍기: 내려옴 그림을 세로로 늘이고 코를 아래로
-		return {"frame": "fall", "scale": Vector2(0.9, 1.14), "tilt": 14.0}
+		return {"frame": "dive", "scale": Vector2.ONE, "tilt": 0.0}
 	if sim.on_ground:
 		if sim.time_since_land < Balance.CAT_LAND_TIME:
 			# 착지: 앞발부터 닿는 그림 (눌림은 스프링 충격 KICK_LAND)
@@ -137,9 +147,28 @@ static func _pose(sim: RunnerSim) -> Dictionary:
 	return {"frame": "rise" if sim.vy > 0.0 and not flipped else "fall", "scale": scale, "tilt": 0.0}
 
 
-## 달리기 몸 들썩임 (게임 픽셀, phase = 달리기 한 바퀴 안 위치 0~1): 박차기·뒷발 들어옴 그림 가운데에서 가장 높고 한 바퀴에 2번
+## 땅에서 슬라이딩 중 그림: 누른 채 착지해 막 시작했으면 눌림, 달리다 시작했으면 몸 낮추기, 그 뒤 미끄러지기 a·b
+static func slide_frame(sim: RunnerSim) -> String:
+	if sim.time_since_slide < SLIDE_SQUASH_TIME and sim.time_since_land <= sim.time_since_slide + 0.02:
+		return "slide_squash"
+	if sim.time_since_slide < SLIDE_DOWN_TIME:
+		return "slide_down"
+	var k := mini(int(fposmod(sim.x / SLIDE_STRIDE, 1.0) * SLIDE_FRAMES.size()), SLIDE_FRAMES.size() - 1)
+	return SLIDE_FRAMES[k]
+
+
+## 부딪힌 뒤 그림 ("" = 피격 그림 아님). 휘청은 땅에서만 (공중이면 그대로 내려옴 그림)
+static func hit_frame(sim: RunnerSim) -> String:
+	for i in HIT_FRAMES.size():
+		if sim.time_since_hit < HIT_UNTIL[i]:
+			return "" if HIT_FRAMES[i] == "hit_wobble" and not sim.on_ground else HIT_FRAMES[i]
+	return ""
+
+
+## 달리기 몸 들썩임 (게임 픽셀, phase = 달리기 한 바퀴 안 위치 0~1): 한 바퀴에 2번. 모으기(run_0)·앞발 디딤(run_3) 가운데에서
+## 가장 낮고, 박차기→쭉 뻗기(1/3)·앞발로 받치기→뒷발 들어옴(5/6) 사이에서 가장 높다
 static func run_bob(phase: float) -> float:
-	return Balance.CAT_RUN_BOB * 0.5 * (1.0 - cos(TAU * 2.0 * (phase - 0.125)))
+	return Balance.CAT_RUN_BOB * 0.5 * (1.0 - cos(TAU * 2.0 * (phase - 1.0 / 12.0)))
 
 
 ## 트램펄린에서 안 눌러 맥없이 튀어 오르는 중 (내려설 때까지)

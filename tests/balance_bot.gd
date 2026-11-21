@@ -144,6 +144,10 @@ static func play_stats(skill: Dictionary, seed_value: int, max_time: float, star
 		var dashing_before := sim.dashing
 		sim.step(DT, hold_left > 0.0 or tap, slide)
 		stats.slides = stats.get("slides", 0) + (1 if sim.sliding and sim.time_since_slide == 0.0 else 0)
+		for o in sim.obstacles:  # 맞지 않고 다 지난 간판 (맞은 간판은 목록에서 빠지고 hits.sign에 셈)
+			if o.kind == "sign" and not o.has("bot_passed") and sim.x - Balance.CAT_BODY_SIZE.x * 0.5 > o.x + o.w:
+				o.bot_passed = true
+				stats.signs_ok = stats.get("signs_ok", 0) + 1
 		tracker.observe(sim)
 		if dashing_before:
 			stats.dash_points += sim.combo.points - points_before  # 질주 중 생선 점수 (2배 포함)

@@ -33,7 +33,7 @@ func test_여러_옥상이_겹치면_발_아래_가장_높은_윗면() -> void:
 
 func test_그림자_모양은_자세와_몸_배율을_따른다() -> void:
 	var gather := CatShadow.shape("run_0", Vector2.ONE, 0.0)
-	var stretch := CatShadow.shape("run_1", Vector2.ONE, 0.0)
+	var stretch := CatShadow.shape("run_2", Vector2.ONE, 0.0)
 	assert_true(stretch.radius > gather.radius * 1.5, "뻗으면 넓어짐 %.0f / %.0f" % [stretch.radius, gather.radius])
 	assert_true(stretch.center_x < gather.center_x, "가운데도 자세 따라 이동")
 	var squashed := CatShadow.shape("run_0", Vector2(1.2, 0.8), 0.0)

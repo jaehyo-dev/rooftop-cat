@@ -6,6 +6,12 @@ extends Node2D
 ## 몸 배율은 스프링(Spring)으로 목표를 따라가고, 착지·이륙·트램펄린 같은 순간에는 스프링에 충격을 넣어 말랑하게 출렁인다.
 
 const FRAME_DIR := "res://assets/sprites/cat_frames/"
+## 예전 색연필 그림 (시험 단추 "주인공 화풍"으로 비교, 로컬 빌드만). 카툰에만 있는 그림은 가장 비슷한 예전 그림으로
+const PENCIL_DIR := "res://assets/sprites/cat_frames_pencil/"
+const PENCIL_SWAP := {"run_4": "run_3", "run_5": "run_3", "slide_down": "slide_up", "slide_a": "slide_0", "slide_b": "slide_1", "slide_up1": "slide_up",
+		"slide_up2": "slide_up", "dive": "fall", "slide_squash": "slide_2", "hit": "flail", "hit_fly": "flail", "hit_wobble": "land"}
+const STYLES := ["카툰", "예전"]
+static var pencil := false  # 시험 단추로 바꿈. 다음 show_state에서 그림을 다시 읽는다
 ## 프레임 그림 안의 기준점 (tools/align_frames.py의 ANCHOR_X, BASELINE과 같아야 함)
 const ANCHOR := Vector2(360, 450)
 ## 프레임은 기준 그림(cat_base_run.png)의 절반 크기(align_frames.py OUT_SCALE)로 저장되어 있다.
@@ -14,10 +20,9 @@ const BASE_BODY_WIDTH := 711.0
 const FRAME_SCALE := 0.5
 ## 기울기가 목표로 다가가는 빠르기 (클수록 빨리 바뀜)
 const TILT_SMOOTH := 22.0
-## 부딪힌 뒤 비틀거림 (그림만, 속도·판정은 그대로): 최대 각도, 시간(초), 빠르기
-const STAGGER_DEG := 14.0
-const STAGGER_TIME := 0.6
-const STAGGER_RATE := 20.0
+## 부딪힌 뒤 그림만 뒤로 밀렸다 돌아옴 (게임 픽셀, 초). 속도·판정은 그대로
+const HIT_PUSH := 22.0
+const HIT_PUSH_TIME := 0.48
 const INVULN_BLINK := 0.08  # 무적 깜빡임 간격 (초)
 const DASH_TINT := Color(1.0, 0.86, 0.5)
 ## 부딪힌 직후 빨갛게 깜빡임 (그 뒤는 무적 깜빡임)
@@ -45,20 +50,18 @@ var _spring := Spring.new(Balance.CAT_SPRING_HZ, Balance.CAT_SPRING_DAMPING)
 var _tilt := 0.0
 var _last := {}  # 지난 프레임의 sim 타이머·상태 (줄어들었으면 그 일이 새로 일어난 것)
 var _stand := 0.0  # 앉아 있다 달리기 시작한 뒤 "일어남" 그림을 보일 남은 시간
+var _pencil := false  # 지금 읽어 둔 그림이 예전 그림인지
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # 크게 줄여 그려도 거칠지 않게
-	for frame in CatPose.ALL_FRAMES:
-		_textures[frame] = load(FRAME_DIR + frame + ".png")
+	_load_frames()
 	_sprite.name = "Sprite"
 	_sprite.centered = false
 	# 그림을 몸 가운데(발끝 위 몸 높이의 절반)에 두고 그 점을 축으로 돌린다 (공중제비). 회전이 0이면 전과 같은 자리
 	_sprite.position = spin_center()
 	_sprite.offset = -ANCHOR - spin_center()
 	_sprite.texture = _textures[frame_name]
-	for i in CatPose.SIT_TAILS:
-		_tails.append(load(FRAME_DIR + "sit_tail_%d.png" % i))
 	_tail.name = "Tail"
 	_tail.centered = false
 	_tail.offset = -ANCHOR
@@ -66,6 +69,17 @@ func _ready() -> void:
 	add_child(_tail)  # 몸보다 먼저 = 뒤에 그림
 	add_child(_sprite)
 	scale = Vector2.ONE * art_scale()
+
+
+## 주인공 프레임·꼬리 그림을 지금 화풍(pencil)으로 읽는다
+func _load_frames() -> void:
+	_pencil = pencil
+	var dir := PENCIL_DIR if pencil else FRAME_DIR
+	for frame in CatPose.ALL_FRAMES:
+		_textures[frame] = load(dir + (PENCIL_SWAP.get(frame, frame) if pencil else frame) + ".png")
+	_tails.clear()
+	for i in CatPose.SIT_TAILS:
+		_tails.append(load(dir + "sit_tail_%d.png" % i))
 
 
 ## 아기 고양이 그림으로 바꾼다 (줄 자리마다 오는 아이가 달라 매 프레임 부름, 같으면 그대로)
@@ -124,6 +138,8 @@ func spin() -> float:
 ## 로직 상태에 맞춰 그림·늘어남·기울기·투명도를 바꾼다. dt = 지난 프레임 시간 (0이면 바로 목표로).
 ## 노드 위치(발끝)는 부르기 전에 world_view.gd가 정하고, 여기서는 달리기 들썩임만큼 그림을 올린다.
 func show_state(sim: RunnerSim, dt: float) -> void:
+	if breed == "" and _pencil != pencil:
+		_load_frames()
 	var pose := CatPose.pose(sim)
 	_tail.visible = false
 	frame_name = pose.frame
@@ -142,9 +158,10 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 		_sprite.texture = _textures[frame_name]
 	# 발끝(원점)을 기준으로 늘이고 줄이고 기울여서 옥상에 붙어 있게 한다 (스프링이 넘쳐도 뒤집히지 않게 하한)
 	scale = _spring.value.max(Vector2(0.5, 0.5)) * art_scale()
-	rotation_degrees = _tilt + stagger(sim.time_since_hit)
+	rotation_degrees = _tilt
 	_sprite.rotation = pose.spin
 	position.y -= pose.bob
+	position.x -= hit_push(sim.time_since_hit)
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
 	modulate = Color.WHITE
 	if sim.dashing:
@@ -159,6 +176,8 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 
 ## 시작 화면: 앉아서 꼬리를 흔들고 숨쉰다 (t = 앉아 있은 시간). 다음 달리기 첫 순간에 "일어남"을 보이게 해 둔다
 func show_sit(t: float) -> void:
+	if breed == "" and _pencil != pencil:
+		_load_frames()
 	frame_name = CatPose.sit_frame(t) if breed == "" else "wait"  # 아기는 눈 깜빡임 없이 꼬리만
 	_sprite.texture = _textures[frame_name]
 	_sprite.rotation = 0.0
@@ -187,11 +206,12 @@ func show_alive(life: KittenLife, i: int) -> void:
 	modulate = Color.WHITE
 
 
-## 부딪힌 뒤 since초일 때 몸 기울기 (도). 차츰 잦아든다
-static func stagger(since: float) -> float:
-	if since >= STAGGER_TIME:
+## 부딪힌 뒤 since초일 때 그림이 뒤로 밀린 거리 (게임 픽셀): 빨리 밀리고(약 0.18초에 가장 멀리) 천천히 돌아옴
+static func hit_push(since: float) -> float:
+	if since >= HIT_PUSH_TIME:
 		return 0.0
-	return STAGGER_DEG * sin(since * STAGGER_RATE) * (1.0 - since / STAGGER_TIME)
+	var k := since / HIT_PUSH_TIME
+	return HIT_PUSH * sin(PI * pow(k, 0.7))
 
 
 ## 지난 프레임 뒤에 새로 일어난 일(착지, 점프, 웅크림 끝, 더블점프, 그물 실림, 튕김)마다 스프링에 충격을 넣는다

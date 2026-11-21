@@ -12,6 +12,7 @@ var world: Node2D
 var sim: RunnerSim
 var _pilot := Callable()   # step마다 [점프 누름, 슬라이딩 누름]
 var _memo := {}            # 자동 조종 상태
+var _follow_hero := false  # _clip이 남기는 발끝 자리: 주인공 (아니면 맨 앞 아기)
 
 
 func run(q: Node, mode: String) -> void:
@@ -27,6 +28,9 @@ func run(q: Node, mode: String) -> void:
 		return
 	if mode.begins_with("parade_alive"):
 		await _alive(mode.split("-").slice(1))
+		return
+	if mode.begins_with("parade_hero"):
+		await _hero(mode.split("-").slice(1))
 		return
 	if mode.begins_with("parade_form"):
 		await _formation(mode)
@@ -109,7 +113,8 @@ func _clip(name: String, seconds: float, every: int) -> void:
 		if i % every == 0:
 			main._process(STEP * every)
 			# 맨 앞 아기 발끝 화면 자리 (창 픽셀) → qa_web.mjs가 pos_<모드>.json에 남김 (확대 영상이 따라 자름)
-			var foot: Vector2 = qa.get_tree().root.get_final_transform() * world.get_global_transform_with_canvas() * world.get("_kittens")[0].position
+			var lead: Vector2 = world.cat.position if _follow_hero else world.get("_kittens")[0].position
+			var foot: Vector2 = qa.get_tree().root.get_final_transform() * world.get_global_transform_with_canvas() * lead
 			JavaScriptBridge.eval("window.qaPos = [%f, %f]" % [foot.x, foot.y])
 			await qa._shot("%s_f%03d" % [name, n])
 			n += 1
@@ -416,3 +421,62 @@ func _ride(only: Array) -> void:
 						push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])
 					await _clip("ride_%s_%d_%s_%s" % [way, n, clip[0], speed[0]], clip[1], speed[1])
 	KittenFlock.ride = true
+
+
+## 카툰 주인공 (2026-11-21, review/restructure/hero/): 아기 없이 주인공만. 평지·점프·더블점프·땅 슬라이딩·공중 슬라이딩·피격·낮은 간판·시작 화면.
+## hero_<장면>_<real|slow>_f000… (parade_hero-jump = 그 장면만). 평지는 0.25배를 앞 1.5초만. 확대 영상용 발끝 = 주인공
+func _hero(only: Array) -> void:
+	var clips := [["flat", 3.0], ["jump", 1.6], ["double", 2.2], ["slide_ground", 1.8], ["slide_air", 2.0], ["hit", 1.8],
+			["sign", 2.2], ["sit", 3.0]]
+	_follow_hero = true
+	for clip in clips:
+		if not only.is_empty() and clip[0] not in only:
+			continue
+		for speed in [["real", 4], ["slow", 2]]:
+			await _hero_scene(clip[0])
+			if sim.game_over:
+				push_error("장면 %s: 찍기 전에 판이 끝남" % clip[0])
+			await _clip("hero_%s_%s" % [clip[0], speed[0]], 1.5 if clip[0] == "flat" and speed[0] == "slow" else clip[1], speed[1])
+	_follow_hero = false
+
+
+func _hero_scene(scene: String) -> void:
+	await _start(5, 0)
+	await _run_flat(2600.0)
+	sim.accelerate = false
+	sim.speed = SPEED
+	for i in 60:
+		_advance()
+	var t0 := sim.elapsed
+	_pilot = func() -> Array: return [false, false]
+	match scene:
+		"jump":
+			_pilot = func() -> Array: return [sim.elapsed - t0 > 0.15 and sim.elapsed - t0 < 0.4, false]
+		"double":
+			_pilot = func() -> Array:
+				var t := sim.elapsed - t0
+				return [(t > 0.15 and t < 0.35) or (t > 0.6 and t < 0.8), false]
+		"slide_ground":
+			_pilot = func() -> Array: return [false, sim.elapsed - t0 > 0.2 and sim.elapsed - t0 < 1.0]
+		"slide_air":
+			# 점프 → 올라가는 중에 내리꽂기 → 누른 채 닿아 미끄러지기 → 떼고 일어나기
+			_pilot = func() -> Array:
+				var t := sim.elapsed - t0
+				return [t > 0.1 and t < 0.35, t > 0.45 and t < 1.3]
+		"hit":
+			_put("pot", 420.0, 905)
+		"sign":
+			_put("sign", 650.0, 906)
+			_pilot = func() -> Array:
+				var o: Array = sim.obstacles.filter(func(x: Dictionary) -> bool: return x.id == 906)
+				return [false, not o.is_empty() and sim.front() > o[0].x - sim.vx() * 0.3 and sim.x - 75.0 < o[0].x + o[0].w]
+		"sit":
+			# 시작 화면: 앉아서 꼬리 흔들기·깜빡임 2.6초 → 일어나 달리기 (world.waiting을 풀면 다음 step이 일어남 그림)
+			world.restart(5, true)
+			sim = world.sim
+			var steps := [0]
+			_pilot = func() -> Array:
+				steps[0] += 1
+				if steps[0] == int(2.6 / STEP):
+					world.waiting = false
+				return [false, false]

@@ -92,10 +92,10 @@ func test_달리기_몸_들썩임은_한_바퀴에_2번() -> void:
 		rising = b > prev
 		prev = b
 	assert_eq(peaks, 2)
-	assert_true(absf(CatPose.run_bob(0.375) - Balance.CAT_RUN_BOB) < 0.01, "박차기 가운데에서 가장 높음")
-	assert_true(CatPose.run_bob(0.125) < 0.01, "모으기 가운데에서 가장 낮음")
+	assert_true(absf(CatPose.run_bob(1.0 / 3.0) - Balance.CAT_RUN_BOB) < 0.01, "박차기 → 쭉 뻗기 사이에서 가장 높음")
+	assert_true(CatPose.run_bob(1.0 / 12.0) < 0.01, "모으기(run_0) 가운데에서 가장 낮음")
 	var sim := RunnerSim.new(1)
-	sim.x = Balance.CAT_STRIDE * 0.375
+	sim.x = Balance.CAT_STRIDE / 3.0
 	assert_true(absf(CatPose.pose(sim).bob - Balance.CAT_RUN_BOB) < 0.01, "달릴 때 자세에 들어감")
 
 

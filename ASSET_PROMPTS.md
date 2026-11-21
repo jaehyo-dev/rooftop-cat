@@ -449,3 +449,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/restructure/cartoon/make_art.sh <장면> <차례> <첨부...> [-- 덧붙일 말]`, 정리 `python3 review/restructure/cartoon/compose.py <효과 후보 폴더>`
 - 첨부: 기준 = `review/restructure/cartoon/prompts/ref_cartoon_hero.png`(3_A 주인공 부분) + `assets/concept/cat_reference_sheet.png`, 슬라이딩 = `assets/concept/cartoon/hero_reference.png` + `assets/concept/restructure_style/s3_C.png`, 피격 = `hero_reference.png`. 다시 뽑을 때는 지난 결과도 첨부.
 - 요청문 전문: `review/restructure/cartoon/prompts/common.txt` + `<장면>.txt`(hero_ref·slide·hit), 덧붙임은 `review/restructure/cartoon/README.md`. 결과 `assets/concept/cartoon/`.
+
+## 카툰 주인공 동작 (2026-11-21, 맥 Codex, restructure 브랜치)
+- 명령: `bash review/restructure/hero/make_art.sh <장면> <차례> assets/concept/cartoon/hero_reference.png [지난 결과...] [-- 덧붙일 말]`, 게임 그림 만들기 `python3 tools/make_hero_frames.py`
+- 요청문 전문: `review/restructure/hero/prompts/common.txt` + `<장면>.txt`(run·air·flip·slide·hit·sit·dive). 다시 뽑을 때 덧붙인 말은 `review/restructure/hero/README.md`. 결과 `assets/concept/cartoon/hero/`.
+- 슬라이딩·피격은 1단계 시트(`assets/concept/cartoon/slide_1.png`·`hit_2.png`)를 둘째 첨부로 넘기고 디렉터 지적(목도리 토끼 귀, 일어나기 2, 네 발 휘청, 충격 별 크기, 눌림 머리 크기)을 요청문에 넣음.
