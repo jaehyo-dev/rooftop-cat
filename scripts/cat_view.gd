@@ -8,7 +8,7 @@ extends Node2D
 const FRAME_DIR := "res://assets/sprites/cat_frames/"
 ## 예전 색연필 그림 (시험 단추 "주인공 화풍"으로 비교, 로컬 빌드만). 카툰에만 있는 그림은 가장 비슷한 예전 그림으로
 const PENCIL_DIR := "res://assets/sprites/cat_frames_pencil/"
-const PENCIL_SWAP := {"run_4": "run_3", "run_5": "run_3", "slide_down": "slide_up", "slide_a": "slide_0", "slide_b": "slide_1", "slide_up1": "slide_up",
+const PENCIL_SWAP := {"run_0": "run_2", "run_1": "run_2", "run_2": "run_3", "run_4": "run_0", "run_5": "run_0", "run_6": "run_1", "run_7": "run_1", "slide_down": "slide_up", "slide_a": "slide_0", "slide_b": "slide_1", "slide_up1": "slide_up",
 		"slide_up2": "slide_up", "dive": "fall", "slide_squash": "slide_2", "hit": "flail", "hit_fly": "flail", "hit_wobble": "land"}
 const STYLES := ["카툰", "예전"]
 static var pencil := false  # 시험 단추로 바꿈. 다음 show_state에서 그림을 다시 읽는다
@@ -25,9 +25,10 @@ const HIT_PUSH := 22.0
 const HIT_PUSH_TIME := 0.48
 const INVULN_BLINK := 0.08  # 무적 깜빡임 간격 (초)
 const DASH_TINT := Color(1.0, 0.86, 0.5)
-## 부딪힌 직후 빨갛게 깜빡임 (그 뒤는 무적 깜빡임)
-const HIT_FLASH_TIME := 0.3
-const HIT_FLASH_COLOR := Color(1.0, 0.62, 0.56)  # 곱하는 색이라 너무 진하면 고양이가 빨간 덩어리로 보임
+## 부딪힌 순간 하얀 번쩍임 (선은 그대로) → 그 뒤는 무적 깜빡임(투명). 시간이 아니라 그린 장 수로 센다:
+## 맞는 순간 멈춤(히트스톱) 동안 time_since_hit가 0에 머물러 시간으로 재면 6장이 하얬다
+const HIT_FLASH_FRAMES := 2
+const FLASH_SHADER := preload("res://scripts/cat_flash.gdshader")
 ## 아기 고양이 (줄줄이): 품종마다 그림 폴더. 그림은 tools/cut_kittens.py가 작은 캔버스(기준점 KITTEN_ANCHOR)에 맞춰 두고
 ## 여기서 KITTEN_ART배로 키워 주인공 프레임 크기에 맞춘 뒤 size_k(0.56)로 줄인다 (원본 해상도를 그대로 써서 덜 흐림)
 const KITTEN_DIR := "res://assets/sprites/kittens/"
@@ -43,6 +44,8 @@ var size_k := 1.0
 ## 아기 고양이 품종 ("" = 주인공). set_breed로 바꾼다
 var breed := ""
 var _textures := {}
+var _flash_left := 0  # 하얀 번쩍임 남은 장 수
+var _last_hit := 99.0  # 지난 장의 time_since_hit (줄어들면 새로 맞음)
 var _sprite := Sprite2D.new()
 var _tail := Sprite2D.new()  # 앉았을 때만: 몸 뒤 꼬리 (CatPose.sit_tail)
 var _tails: Array[Texture2D] = []
@@ -62,6 +65,8 @@ func _ready() -> void:
 	_sprite.position = spin_center()
 	_sprite.offset = -ANCHOR - spin_center()
 	_sprite.texture = _textures[frame_name]
+	_sprite.material = ShaderMaterial.new()
+	_sprite.material.shader = FLASH_SHADER
 	_tail.name = "Tail"
 	_tail.centered = false
 	_tail.offset = -ANCHOR
@@ -164,10 +169,16 @@ func show_state(sim: RunnerSim, dt: float) -> void:
 	position.x -= hit_push(sim.time_since_hit)
 	# 투명화 중에는 반투명하게, 0.1초마다 깜빡인다
 	modulate = Color.WHITE
+	if sim.time_since_hit < _last_hit:
+		_flash_left = HIT_FLASH_FRAMES
+	_last_hit = sim.time_since_hit
+	var flashing := _flash_left > 0
+	_flash_left -= int(flashing)
+	_sprite.material.set_shader_parameter("flash", 1.0 if flashing else 0.0)
 	if sim.dashing:
 		modulate = DASH_TINT.lerp(Color.WHITE, 0.5 + 0.5 * sin(sim.elapsed * 18.0))  # 금빛으로 번쩍임
-	elif sim.time_since_hit < HIT_FLASH_TIME:
-		modulate = HIT_FLASH_COLOR if int(sim.time_since_hit / INVULN_BLINK) % 2 == 0 else Color.WHITE
+	elif flashing:
+		pass  # 하얀 번쩍임은 투명하게 깜빡이지 않고 꽉 차게
 	elif sim.ghost_time > 0.0:
 		modulate.a = 0.2 if int(sim.ghost_time * 10.0) % 2 == 0 else 0.55
 	elif sim.invuln_time > 0.0:
@@ -186,6 +197,7 @@ func show_sit(t: float) -> void:
 	rotation = 0.0
 	scale = CatPose.sit_breath(t) * art_scale() * size_k  # 노드 원점 = 발끝이라 바닥은 그대로
 	modulate = Color.WHITE
+	_sprite.material.set_shader_parameter("flash", 0.0)
 	_stand = CatPose.STAND_TIME
 
 

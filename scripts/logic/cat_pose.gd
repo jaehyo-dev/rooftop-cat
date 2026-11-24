@@ -4,15 +4,20 @@ class_name CatPose
 ## 앞구르기 공중제비(spin)는 기울기 금지의 예외: 몸을 말아 가는 그림 4장을 바꾸며 몸 가운데 기준으로 한 바퀴 돈다.
 ## 배율은 발끝을 기준으로 적용하므로 발이 옥상에서 뜨지 않는다. 기울기는 도 단위, 양수 = 시계 방향(코가 아래로).
 
-## 달리기 한 바퀴의 프레임 (모으기 → 박차기 → 쭉 뻗기 → 앞발 디딤 → 앞발로 받치기 → 뒷발 들어옴). 카툰은 6장
-const RUN_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5"]
-## 프레임마다 몸 전체 배율 (가로, 세로): 모을 때 짧고 높게, 뻗을 때 길고 낮게
-const RUN_SCALE := [Vector2(0.97, 1.03), Vector2(1.02, 0.98), Vector2(1.04, 0.97), Vector2(1.02, 0.99),
-		Vector2(0.99, 1.01), Vector2(0.98, 1.02)]
+## 달리기 한 바퀴의 프레임 (고양이 갤럽 8장: 쭉 뻗기 → 공중 → 앞발 착지 → 앞발로 받치기 → 모으기 → 뒷발 착지 → 뒷발 박차기 → 늘어남).
+## 몸은 늘 낮고 머리 높이는 그림에서 거의 같다 (모으는 장은 run_4 하나, 몸을 세운 장 없음)
+const RUN_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5", "run_6", "run_7"]
+## 프레임마다 몸 전체 배율 (가로, 세로): 뻗을 때 길고 낮게, 모을 때 짧게 (세로는 살짝만: 몸을 세워 보이지 않게)
+const RUN_SCALE := [Vector2(1.04, 0.97), Vector2(1.03, 0.98), Vector2(1.01, 0.99), Vector2(0.99, 1.0),
+		Vector2(0.97, 1.02), Vector2(0.99, 1.01), Vector2(1.01, 0.99), Vector2(1.03, 0.98)]
+## 장마다 끝나는 위치 (한 바퀴 0~1). 다리를 몸 아래에 둔 run_3·run_4는 짧게(각 0.08), 뻗기·공중은 길게:
+## 같은 길이면 두 장이 이어서 약 5게임프레임 보여 잠깐 서 있는 것처럼 보였다 (2026-11-24 0.25배 영상)
+const RUN_UNTIL := [0.15, 0.31, 0.44, 0.52, 0.60, 0.73, 0.86, 1.0]
+const RUN_BOB_PEAK := 0.23  # 공중 장(run_1) 가운데
 ## 앞구르기 프레임 (숙이기, C자, 공, 펴기)과 각 그림으로 바뀌는 회전 각도 (도)
 const FLIP_FRAMES := ["flip_tuck", "flip_curl", "flip_ball", "flip_open"]
 const FLIP_FROM_DEG := [0.0, 25.0, 60.0, 300.0]
-const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5", "crouch", "takeoff", "rise", "fall", "land", "flail",
+const ALL_FRAMES := ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5", "run_6", "run_7", "crouch", "takeoff", "rise", "fall", "land", "flail",
 		"flip_tuck", "flip_curl", "flip_ball", "flip_open", "sit_body", "sit_body_blink", "sit_up",
 		"slide_down", "slide_a", "slide_b", "slide_up1", "slide_up2", "dive", "slide_squash",
 		"hit", "hit_fly", "hit_wobble"]
@@ -123,7 +128,8 @@ static func _pose(sim: RunnerSim) -> Dictionary:
 			return {"frame": "land", "scale": Vector2.ONE, "tilt": lerpf(6.0, 0.0, k)}
 		# 달리기: 달린 거리로 프레임을 정해 빨라지면 다리도 그만큼 빨리 움직인다 (발이 미끄러져 보이지 않음)
 		var phase := fposmod(sim.x / Balance.CAT_STRIDE, 1.0)
-		var step := mini(int(phase * RUN_FRAMES.size()), RUN_FRAMES.size() - 1)
+		var step := RUN_UNTIL.bsearch(phase, false)  # phase보다 큰 첫 끝 위치 = 지금 장
+		step = mini(step, RUN_FRAMES.size() - 1)
 		return {"frame": RUN_FRAMES[step], "scale": RUN_SCALE[step], "tilt": 0.0, "bob": run_bob(phase)}
 	if sim.time_since_jump < Balance.CAT_CROUCH_TIME:
 		# 뛰는 순간: 아주 짧게 웅크려 땅을 박차는 모습
@@ -165,10 +171,10 @@ static func hit_frame(sim: RunnerSim) -> String:
 	return ""
 
 
-## 달리기 몸 들썩임 (게임 픽셀, phase = 달리기 한 바퀴 안 위치 0~1): 한 바퀴에 2번. 모으기(run_0)·앞발 디딤(run_3) 가운데에서
-## 가장 낮고, 박차기→쭉 뻗기(1/3)·앞발로 받치기→뒷발 들어옴(5/6) 사이에서 가장 높다
+## 달리기 몸 들썩임 (게임 픽셀, phase = 달리기 한 바퀴 안 위치 0~1): 한 바퀴에 1번, 작게.
+## 공중 장(run_1) 가운데에서 가장 높고 반대편(뒷발 착지 → 박차기 사이)에서 가장 낮다. 머리 높이는 그림에서 이미 거의 같다
 static func run_bob(phase: float) -> float:
-	return Balance.CAT_RUN_BOB * 0.5 * (1.0 - cos(TAU * 2.0 * (phase - 1.0 / 12.0)))
+	return Balance.CAT_RUN_BOB * 0.5 * (1.0 + cos(TAU * (phase - RUN_BOB_PEAK)))
 
 
 ## 트램펄린에서 안 눌러 맥없이 튀어 오르는 중 (내려설 때까지)

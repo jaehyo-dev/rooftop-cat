@@ -454,3 +454,8 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/restructure/hero/make_art.sh <장면> <차례> assets/concept/cartoon/hero_reference.png [지난 결과...] [-- 덧붙일 말]`, 게임 그림 만들기 `python3 tools/make_hero_frames.py`
 - 요청문 전문: `review/restructure/hero/prompts/common.txt` + `<장면>.txt`(run·air·flip·slide·hit·sit·dive). 다시 뽑을 때 덧붙인 말은 `review/restructure/hero/README.md`. 결과 `assets/concept/cartoon/hero/`.
 - 슬라이딩·피격은 1단계 시트(`assets/concept/cartoon/slide_1.png`·`hit_2.png`)를 둘째 첨부로 넘기고 디렉터 지적(목도리 토끼 귀, 일어나기 2, 네 발 휘청, 충격 별 크기, 눌림 머리 크기)을 요청문에 넣음.
+
+## 카툰 주인공 동작 다듬기 (2026-11-24, 맥 Codex, restructure 브랜치)
+- 계획: 달리기 8칸 1장 + 앞구르기 4칸 1장 + 목도리만 고친 슬라이딩(내리꽂기 포함)·피격·앉기 각 1장 = 5장, 장마다 최대 2번 다시. 결과: 5장 생성, 5장 모두 사용(`run_3`·`flip_3`·`slide_2`·`hit_2`·`sit_2`).
+- 요청문: 위와 같은 `common.txt` + `<장면>.txt` + 새 `scarf.txt`(모든 칸 목도리 통일: 가슴 앞 작은 매듭 + 목 뒤 짧은 두 가닥, 등 길이 1/3 이하). 요청문 파일은 이번 내용으로 바뀌었고 지난 요청문은 git 기록(커밋 9d967cf)에 있음.
+- 첨부: 모두 `hero_reference.png` 먼저. 달리기 = + `run_2.png`(생김새·목도리만 참고), 나머지 = + 지난 시트 + 새 `run_3.png`(목도리 기준).

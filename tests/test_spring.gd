@@ -81,7 +81,7 @@ func test_착지하면_고양이_그림이_실제로_납작해진다() -> void:
 	cat.queue_free()
 
 
-func test_달리기_몸_들썩임은_한_바퀴에_2번() -> void:
+func test_달리기_몸_들썩임은_한_바퀴에_1번() -> void:
 	var peaks := 0
 	var prev := CatPose.run_bob(0.0)
 	var rising := false
@@ -91,11 +91,12 @@ func test_달리기_몸_들썩임은_한_바퀴에_2번() -> void:
 			peaks += 1
 		rising = b > prev
 		prev = b
-	assert_eq(peaks, 2)
-	assert_true(absf(CatPose.run_bob(1.0 / 3.0) - Balance.CAT_RUN_BOB) < 0.01, "박차기 → 쭉 뻗기 사이에서 가장 높음")
-	assert_true(CatPose.run_bob(1.0 / 12.0) < 0.01, "모으기(run_0) 가운데에서 가장 낮음")
+	assert_eq(peaks, 1)
+	var air := (CatPose.RUN_UNTIL[0] + CatPose.RUN_UNTIL[1]) / 2.0
+	assert_true(absf(CatPose.run_bob(air) - Balance.CAT_RUN_BOB) < 0.01, "공중 장(run_1) 가운데에서 가장 높음")
+	assert_true(CatPose.run_bob(fposmod(air + 0.5, 1.0)) < 0.01, "반대편에서 가장 낮음")
 	var sim := RunnerSim.new(1)
-	sim.x = Balance.CAT_STRIDE / 3.0
+	sim.x = Balance.CAT_STRIDE * air
 	assert_true(absf(CatPose.pose(sim).bob - Balance.CAT_RUN_BOB) < 0.01, "달릴 때 자세에 들어감")
 
 

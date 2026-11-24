@@ -106,7 +106,7 @@ func test_왼쪽_터치는_슬라이딩_오른쪽은_점프() -> void:
 	DirAccess.remove_absolute("user://test_juice_tune.cfg")
 
 
-func test_부딪히면_멈칫하고_흔들리며_빨갛게_깜빡인다() -> void:
+func test_부딪히면_멈칫하고_흔들리며_하얗게_번쩍인다() -> void:
 	var main: Control = load("res://scenes/main.tscn").instantiate()
 	main.show_start = false  # 시작 화면 없이 바로 판 (v0.7.0 2c)
 	main.record_path = "user://test_juice_hit.cfg"
@@ -123,7 +123,9 @@ func test_부딪히면_멈칫하고_흔들리며_빨갛게_깜빡인다() -> voi
 	assert_eq(world._hitstop, Balance.HIT_STOP, "멈춤 시간")
 	world._process(0.01)
 	assert_true(world.position.length() > 0.5, "화면이 흔들림")
-	assert_true(world.cat.modulate.g < 0.9, "고양이 빨간 깜빡임")
+	var flash: ShaderMaterial = world.cat.get_node("Sprite").material
+	assert_eq(flash.get_shader_parameter("flash"), 1.0, "고양이 하얀 번쩍임 (카툰, 선은 그대로)")
+	assert_true(world.cat.modulate.g == 1.0 and world.cat.modulate.b == 1.0, "빨갛게 칠하지 않음")
 	world._process(0.5)
 	assert_eq(world.position, Vector2.ZERO, "흔들림이 끝나면 제자리")
 	main.queue_free()

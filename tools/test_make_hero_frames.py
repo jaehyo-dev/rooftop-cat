@@ -56,6 +56,21 @@ class HeroFramesTest(unittest.TestCase):
         self.assertEqual(tuple(o[52, 127, :3]), (0xFD, 0xB8, 0x65), "눈 위쪽(감은 눈 선 위)은 털 색으로 덮임")
         self.assertTrue((self.np.abs(o[40:75, 110:145, :3] - (0x33, 0x18, 0x06)).sum(2) < 10).any(), "감은 눈 선")
 
+    def test_달리기는_머리_높이가_거의_같다(self):
+        # 깡충거림 방지: 달리기 8장의 머리 꼭대기 높이 차이가 머리 너비의 15% 이하 (그림 파일에서 잼)
+        _, spread, head = self.h.run_heads()
+        self.assertGreater(head, 100, "머리를 찾음")
+        self.assertLessEqual(spread, head * 0.15)
+
+    def test_머리_너비와_꼭대기(self):
+        img = self.Image.new("RGBA", (300, 300), (0, 0, 0, 0))
+        d = self.Draw.Draw(img)
+        d.ellipse([50, 60, 250, 260], fill=(0xFD, 0xB8, 0x65, 255), outline=(0x33, 0x18, 0x06, 255), width=6)
+        d.ellipse([200, 140, 214, 156], fill=(0x33, 0x18, 0x06, 255))  # 오른쪽 점 눈
+        w, top = self.h.head_box(img)
+        self.assertEqual(top, 60)
+        self.assertAlmostEqual(w, 200, delta=4)
+
 
 if __name__ == "__main__":
     unittest.main()

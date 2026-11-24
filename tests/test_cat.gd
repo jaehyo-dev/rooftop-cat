@@ -17,14 +17,16 @@ func _sim_on_roofs(list: Array) -> RunnerSim:
 	return sim
 
 
-func test_달리기는_달린_거리로_6프레임을_차례로_돈다() -> void:
+func test_달리기는_달린_거리로_8프레임을_차례로_돌고_모으는_장은_짧다() -> void:
 	var sim := RunnerSim.new(1)
 	var n := CatPose.RUN_FRAMES.size()
 	var seen: Array[String] = []
 	for i in n * 2:
-		sim.x = Balance.CAT_STRIDE * (i + 0.5) / n
+		var from: float = 0.0 if i % n == 0 else CatPose.RUN_UNTIL[i % n - 1]
+		sim.x = Balance.CAT_STRIDE * (floorf(float(i) / n) + (from + CatPose.RUN_UNTIL[i % n]) / 2.0)
 		seen.append(CatPose.pose(sim).frame)
 	assert_eq(seen, CatPose.RUN_FRAMES + CatPose.RUN_FRAMES)
+	assert_true(CatPose.RUN_UNTIL[4] - CatPose.RUN_UNTIL[2] <= 0.2, "다리를 몸 아래에 둔 두 장(run_3·4)은 한 바퀴의 20% 이하")
 	sim.x = -Balance.CAT_STRIDE * 0.05
 	assert_eq(CatPose.pose(sim).frame, CatPose.RUN_FRAMES[-1], "음수 거리도 순서대로")
 	for i in n:
@@ -146,8 +148,8 @@ func test_고양이_그림은_충돌_판정_크기에_맞고_기준점이_발끝
 			continue
 		var used := texture.get_image().get_used_rect()
 		# 모든 프레임의 가장 아랫줄(발끝)이 기준점 높이에 있다 (정렬 도구가 맞춤, 반투명 가장자리 1~2픽셀 허용).
-		# 튕겨 뜬 장(hit_fly)만 시트에서 떠 있던 높이만큼 위 (tools/make_hero_frames.py LIFTED)
-		var lift := 0.0 if frame != "hit_fly" else 14.0
+		# 튕겨 뜬 장(hit_fly)·달리기 공중 장(run_1)만 시트에서 떠 있던 높이만큼 위 (tools/make_hero_frames.py LIFTED)
+		var lift: float = {"hit_fly": 14.0, "run_1": 24.0}.get(frame, 0.0)
 		assert_true(absf(used.end.y + lift - CatView.ANCHOR.y) <= 3.0, "%s 발끝 %d" % [frame, used.end.y])
 	cat.queue_free()
 
@@ -187,6 +189,35 @@ func test_상태에_맞는_그림과_투명화() -> void:
 	sim.ghost_time = 1.0
 	cat.show_state(sim, DT)
 	assert_true(cat.modulate.a < 0.6, "투명화 중 반투명")
+	cat.queue_free()
+
+
+func test_피격은_빨간_칠이_아니라_하얀_번쩍임_뒤_무적_깜빡임() -> void:
+	var cat := CatView.new()
+	add_child(cat)
+	await wait_frames(1)
+	var sim := RunnerSim.new(3)
+	var material: ShaderMaterial = cat.get_node("Sprite").material
+	sim.time_since_hit = 0.0
+	sim.invuln_time = 1.0
+	cat.show_state(sim, DT)
+	assert_eq(material.get_shader_parameter("flash"), 1.0, "맞는 순간 하얗게")
+	assert_eq(cat.modulate, Color.WHITE, "색을 곱하지 않고 꽉 찬 채로 (빨간 칠 없음)")
+	# 맞는 순간 멈춤(히트스톱)으로 time_since_hit가 0에 머물러도 그린 장 수로 2장만
+	var white := 1
+	for i in 30:
+		sim.time_since_hit = 0.0 if i < 5 else (i - 5) / 60.0
+		cat.show_state(sim, 0.0)
+		white += int(material.get_shader_parameter("flash") == 1.0)
+		assert_true(cat.modulate.r == 1.0 and cat.modulate.g == 1.0 and cat.modulate.b == 1.0, "%d장 색 그대로" % i)
+	assert_eq(white, CatView.HIT_FLASH_FRAMES, "하얀 장 수")
+	sim.time_since_hit = 0.0
+	cat.show_state(sim, 0.0)
+	assert_eq(material.get_shader_parameter("flash"), 1.0, "다시 맞으면 다시 하얗게")
+	sim.time_since_hit = 0.1
+	cat.show_state(sim, 0.0)
+	cat.show_state(sim, 0.0)  # 하얀 장 2장을 다 쓴 뒤
+	assert_true(cat.modulate.a < 1.0 or sim.invuln_time <= 0.0, "그 뒤는 무적 깜빡임(투명)")
 	cat.queue_free()
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 카툰 주인공 그림 (Codex 내장 이미지 생성). 사용: bash review/restructure/hero/make_art.sh <장면> <차례> <첨부...> [-- 덧붙일 말]
-# 요청문 = prompts/common.txt + prompts/<장면>.txt + 덧붙일 말. 첫 첨부는 기준 그림 assets/concept/cartoon/hero_reference.png.
+# 요청문 = prompts/common.txt + prompts/<장면>.txt + prompts/scarf.txt(목도리 통일) + 덧붙일 말. 첫 첨부는 기준 그림 assets/concept/cartoon/hero_reference.png.
 # 결과는 assets/concept/cartoon/<장면>_<차례>.png
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
@@ -15,6 +15,7 @@ LOG=logs/hero_${SC}_${TRY}.log
 echo "=== [$(date '+%F %T')] Codex 작업: 카툰 $SC $TRY ===" >> logs/codex.log
 REQ="$(cat $P/common.txt)
 $(cat $P/$SC.txt)
+$(cat $P/scarf.txt)
 $EXTRA
 
 내장 이미지 생성 도구만 사용하고, 스크립트를 만들거나 API를 호출하지 마"

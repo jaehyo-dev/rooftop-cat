@@ -1,6 +1,7 @@
 """카툰 주인공 동작 시트(마젠타 배경, Codex) → 게임 프레임 그림 (assets/sprites/cat_frames/).
 
 사용: python3 tools/make_hero_frames.py            # SHEETS 표의 시트를 모두 잘라 저장하고 프레임마다 크기·발끝을 출력
+      python3 tools/make_hero_frames.py --heads    # 달리기 장마다 머리 꼭대기 높이 표
 - 자르기: tools/cartoon_art.py의 cutout(마젠타 빼기)·cut_frames(바닥선 찾아 칸 나누기)를 그대로 쓴다.
 - 크기: 시트마다 머리 너비(눈 높이에서 뒤통수 ~ 볼 앞, 원본 px, 손으로 잼)를 HEAD_PX에 맞춘다.
   HEAD_PX = 예전 색연필 run_0의 같은 너비라 화면 크기·판정(Balance.CAT_BODY_SIZE)은 그대로다.
@@ -24,19 +25,22 @@ from cartoon_art import LINE, cut_frames, cutout, lum  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "assets/concept/cartoon/hero"
 OUT = ROOT / "assets/sprites/cat_frames"
+ART = 150 / (711 * 0.5)  # 게임 배율 (CatView.art_scale)
 HEAD_PX = 143.0  # 예전 run_0 머리 너비 (프레임 px, 눈 높이)
 # 시트: 파일, 줄마다 칸 수, 칸 이름(순서대로, None = 안 씀), 원본 머리 너비(px).
 # 머리 너비는 손으로 잰 뒤, 만든 프레임에서 눈 높이 머리 너비(뒤통수 선 ~ 얼굴 앞)를 재 시트끼리 같아지게(145px 안팎) 고친 값
 SHEETS = {
-    "run": ("run_2.png", [6], ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5"], 120),
+    "run": ("run_3.png", [8], [f"run_{i}" for i in range(8)], 96),  # run_2는 몸을 세운 칸이 절반이라 깡충거려 8칸 갤럽으로 다시 뽑음
     "air": ("air_2.png", [6], ["crouch", "takeoff", "rise", "fall", "land", "flail"], 136),  # air_1은 목도리가 앞 리본이라 달리기와 달라 다시 뽑음
-    "flip": ("flip_2.png", [4, 2], ["flip_tuck", "flip_curl", "flip_ball", "flip_open", "paw_0", "paw_1"], 154),
-    "slide": ("slide_1.png", [5, 2], ["slide_down", "slide_a", "slide_b", "slide_up1", "slide_up2", None, "slide_squash"], 114),
-    "dive": ("dive_1.png", [1], ["dive"], 215),  # 슬라이딩 시트의 내리꽂기는 목도리가 위로 솟아 따로 다시 뽑음
-    "hit": ("hit_1.png", [3], ["hit", "hit_fly", "hit_wobble"], 212),
-    "sit": ("sit_1.png", [4], ["sit_body", "tail_low", "tail_up", "sit_up"], 218),
+    # flip_3: 숙이기가 공중에 서서 인사하는 자세라 앞으로 몸을 마는 자세로 + 목도리 통일 (앞발 2칸은 flip_2 그대로)
+    "flip": ("flip_3.png", [4], ["flip_tuck", "flip_curl", "flip_ball", "flip_open"], 154),
+    "paw": ("flip_2.png", [4, 2], [None, None, None, None, "paw_0", "paw_1"], 154),
+    # slide_2·hit_2·sit_2: 자세는 그대로, 목도리를 달리기와 같은 "목 뒤 짧은 두 가닥"으로 (슬라이딩·내리꽂기의 등을 덮는 긴 띠도 짧게)
+    "slide": ("slide_2.png", [5, 2], ["slide_down", "slide_a", "slide_b", "slide_up1", "slide_up2", "dive", "slide_squash"], 114),
+    "hit": ("hit_2.png", [3], ["hit", "hit_fly", "hit_wobble"], 212),
+    "sit": ("sit_2.png", [4], ["sit_body", "tail_low", "tail_up", "sit_up"], 218),
 }
-LIFTED = {"hit_fly"}
+LIFTED = {"hit_fly", "run_1"}  # 튕겨 뜬 장, 달리기 공중 장(네 발 모두 뜸): 시트에서 떠 있던 높이 그대로
 THICKEN = 2  # 선을 양쪽으로 키우는 픽셀 (프레임 px). 게임 크기(x0.42)에서 바깥선이 2.0~2.5px로 14-1의 3.5±0.75보다 가늘어서 (2px로 3.0~3.5)
 SIT_TAILS = [("low", 0), ("low", -6), ("low", -12), ("low", -18), ("up", 8), ("up", 5), ("up", 2), ("up", 0)]
 
@@ -184,17 +188,65 @@ def sit_frames(parts):
     return out, eyes
 
 
+def head_box(im):
+    """머리 (눈 높이 너비, 꼭대기 y): 오른쪽 점 눈을 찾아 그 줄에서 뒤통수 선 바깥 ~ 얼굴 앞 끝, 그 사이 가장 높은 픽셀. 눈을 못 찾으면 None."""
+    a = np.asarray(im.convert("RGBA")).astype(int)
+    op = a[..., 3] > 128
+    ys = np.where(op.any(1))[0]
+    dark = (np.abs(a[..., :3] - LINE).sum(2) < 90) & (a[..., 3] > 200)
+    lab, n = ndi.label(dark)
+    eye = None
+    for i in range(1, n + 1):
+        yy, xx = np.where(lab == i)
+        h, w = np.ptp(yy) + 1, np.ptp(xx) + 1
+        if 40 <= len(yy) <= 900 and 0.6 <= h / w <= 2.0 and len(yy) > 0.55 * h * w and yy.mean() < ys[0] + 0.6 * np.ptp(ys):
+            if eye is None or xx.mean() > eye[1]:
+                eye = (int(yy.mean()), int(xx.mean()))
+    if eye is None:
+        return None
+    ey, ex = eye
+    row, d = op[ey], dark[ey]
+    left = ex
+    while left > 0 and d[left]:  # 눈 점 벗어나기
+        left -= 1
+    while left > 0 and not d[left] and row[left]:  # 털을 지나 뒤통수 선까지
+        left -= 1
+    while left > 0 and d[left - 1]:  # 선 바깥 끝
+        left -= 1
+    right = ex
+    while right < len(row) - 1 and row[right + 1]:
+        right += 1
+    top = int(np.where(op[:, left + (right - left) // 3:right].any(1))[0].min())
+    return right - left + 1, top
+
+
+def run_heads():
+    """달리기 장마다 머리 꼭대기 높이 표 (README용 마크다운)와 (최대 차이, 머리 너비 평균)."""
+    rows, tops, widths = [], [], []
+    for i in range(8):
+        w, top = head_box(Image.open(OUT / f"run_{i}.png"))
+        rows.append(f"| run_{i} | {BASELINE - top} | {(BASELINE - top) * ART:.1f} | {w} |")
+        tops.append(top)
+        widths.append(w)
+    spread, head = max(tops) - min(tops), float(np.mean(widths))
+    table = ["| 장 | 머리 꼭대기 높이 (발끝 위, 그림 px) | 게임 px | 머리 너비 (그림 px) |", "|---|---|---|---|"] + rows
+    table.append(f"최대 차이 {spread}px = 머리 너비의 {spread / head * 100:.1f}% (기준 15% 이하)")
+    return "\n".join(table), spread, head
+
+
 def shadow_row(im):
     """CatShadow.FRAME_BODY 값: 아래 30%의 [가운데 x, 너비] (게임 px, 발끝 기준). test_shadow.gd와 같은 방법."""
     a = np.asarray(im)[..., 3] > 127
     ys = np.where(a.any(1))[0]
     rows = [np.where(a[y])[0] for y in range(ys[-1] + 1 - int((ys[-1] + 1 - ys[0]) * 0.3), ys[-1] + 1, 3)]
     lo, hi = min(r.min() for r in rows if len(r)), max(r.max() for r in rows if len(r))
-    art = 150 / (711 * 0.5)
-    return f"[{((lo + hi) / 2 - ANCHOR_X) * art:.1f}, {(hi - lo) * art:.1f}]"
+    return f"[{((lo + hi) / 2 - ANCHOR_X) * ART:.1f}, {(hi - lo) * ART:.1f}]"
 
 
 def main():
+    if "--heads" in sys.argv:
+        print(run_heads()[0])
+        return
     OUT.mkdir(parents=True, exist_ok=True)
     for key in SHEETS:
         parts = cut_sheet(key)

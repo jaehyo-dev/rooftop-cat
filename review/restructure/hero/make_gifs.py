@@ -17,7 +17,7 @@ ART = 150 / (711 * 0.5)
 BG = (198, 224, 250)
 ONION = (40, 90, 230)
 # 동작: [(그림, 밀리초)] — 시간은 게임과 같게 (CatPose: 슬라이딩 낮추기 0.06, 눌림 0.1, 일어나기 0.08씩, 피격 0.08/0.18/0.22)
-RUN = [(f"run_{i}", 58) for i in range(6)]  # 처음 속도 430px/s, 한 바퀴 150px = 0.35초
+RUN = [(f"run_{i}", round(350 * w)) for i, w in enumerate([0.15, 0.16, 0.13, 0.08, 0.08, 0.13, 0.13, 0.14])]  # 처음 속도 430px/s, 한 바퀴 150px = 0.35초, 장 길이는 CatPose.RUN_UNTIL
 MOTIONS = {
     "run": RUN,
     "jump": RUN[:3] + [("crouch", 60), ("takeoff", 120), ("rise", 220), ("fall", 220), ("land", 120)] + RUN,
