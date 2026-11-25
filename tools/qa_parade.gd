@@ -29,6 +29,9 @@ func run(q: Node, mode: String) -> void:
 	if mode.begins_with("parade_alive"):
 		await _alive(mode.split("-").slice(1))
 		return
+	if mode.begins_with("parade_art"):
+		await _art(mode.ends_with("still"))
+		return
 	if mode.begins_with("parade_hero"):
 		await _hero(mode.split("-").slice(1))
 		return
@@ -480,3 +483,42 @@ func _hero_scene(scene: String) -> void:
 				if steps[0] == int(2.6 / STEP):
 					world.waiting = false
 				return [false, false]
+
+
+## v0.8.0 1부 카툰 그림 확인 (review/restructure/v0.8-art/): 정지 화면 art_still_<1~3>(적 미리보기 켬, 생선 길대로 달리다),
+## art_pencil_1(같은 자리 예전 배경), 평지 10초 art_flat_real(30장/초)·art_flat_slow(앞 2.5초를 0.25배)
+func _art(still_only: bool) -> void:
+	var world_script := preload("res://scripts/world_view.gd")
+	world_script.enemy_preview = true
+	await _start(7, 0)
+	for at in [5.0, 11.0, 18.0]:
+		await _run_until(func() -> bool: return sim.elapsed >= at)
+		await _still("art_still_%d" % (int(at)))
+		if at == 5.0:
+			BgArt.pencil = true
+			_advance()  # 월드를 꺼 두어 _still만으로는 다시 그리지 않음: 한 걸음(1/120초) 진행해 예전 화풍으로 다시 그림
+			await _still("art_pencil_%d" % int(at))
+			BgArt.pencil = false
+			_advance()
+	# 전봇대·트램펄린 (넓은 틈 지형): 화면 앞쪽에 들어오면 한 장씩
+	for kind in ["platform", "tramp"]:
+		var seen := func() -> bool:
+			if kind == "platform":
+				return sim.roofs.any(func(r: Dictionary) -> bool: return r.get("platform", false) and r.left > sim.x + 150.0 and r.left < sim.x + 700.0)
+			return sim.structures.any(func(st: Dictionary) -> bool: return st.kind == "tramp" and st.left > sim.x + 150.0 and st.left < sim.x + 700.0)
+		if await _run_until(seen, 120.0):
+			await _still("art_%s" % kind)
+	world_script.enemy_preview = false
+	if still_only:
+		return
+	_follow_hero = true
+	for speed in [["real", 4, 10.0], ["slow", 2, 2.5]]:
+		await _start(7, 0)
+		await _run_flat(8000.0)
+		sim.accelerate = false
+		sim.speed = SPEED
+		_pilot = func() -> Array: return [false, false]
+		for i in 60:
+			_advance()
+		await _clip("art_flat_%s" % speed[0], speed[2], speed[1])
+	_follow_hero = false

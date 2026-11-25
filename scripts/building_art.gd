@@ -6,6 +6,9 @@ extends RefCounted
 ## 아래로 이어지는 벽 색 (건물 그림 맨 아래 벽의 가운데값)
 const STYLE_NAMES := ["brick", "villa", "tile"]
 const FILL_COLORS := [Color("#fcc581"), Color("#fdecbf"), Color("#dce5d8")]
+## 카툰 그림의 벽 색 (tools/make_bg_art.py가 조각 맨 아랫줄에서 잰 값)과 벽 옆선 색 (ART_BIBLE 14-1)
+const CARTOON_FILLS := [Color("#f3785d"), Color("#fdecc8"), Color("#cce4ca")]
+const CARTOON_LINE := Color("#331806")
 ## 건물 그림이 끝나는 아래쪽을 채움 색으로 부드럽게 이어 주는 길이
 const FADE := 28.0
 ## 소품이 지붕 턱에 살짝 박히는 깊이 (떠 보이지 않게)
@@ -15,7 +18,7 @@ const PROP_SINK := 3.0
 const PROP_SCALE := 0.8
 const PROP_ALPHA := 0.6
 
-static var _styles: Array = []   # [{"left": Texture, "right": Texture, "mids": [Texture...]}]
+static var _styles: Array = []   # [{"left": Texture, "right": Texture, "mids": [Texture...]}] (카툰, 미리 읽음)
 static var _props: Dictionary = {}  # 이름 → Texture
 
 
@@ -38,7 +41,8 @@ static func _load() -> void:
 static func widths() -> Array:
 	_load()
 	var result: Array = []
-	for style in _styles:
+	for i in _styles.size():
+		var style := style_textures(i)
 		var mids: Array = []
 		for tex in style.mids:
 			mids.append(float(tex.get_width()))
@@ -46,11 +50,17 @@ static func widths() -> Array:
 	return result
 
 
+## 지금 화풍(BgArt)의 조각 그림
 static func style_textures(index: int) -> Dictionary:
 	_load()
-	return _styles[index]
+	var style: Dictionary = _styles[index]
+	return {"left": BgArt.of(style.left), "right": BgArt.of(style.right), "mids": style.mids.map(func(t: Texture2D) -> Texture2D: return BgArt.of(t))}
 
 
 static func prop_texture(kind: String) -> Texture2D:
 	_load()
-	return _props[kind]
+	return BgArt.of(_props[kind])
+
+
+static func fill_color(index: int) -> Color:
+	return FILL_COLORS[index] if BgArt.pencil else CARTOON_FILLS[index]

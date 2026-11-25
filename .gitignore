@@ -40,3 +40,5 @@ logs/
 
 # 카툰 2단계 게임 안 확인 영상 (다시 만들기: review/restructure/hero/README.md, 커밋하지 않음)
 review/restructure/hero/video/
+# v0.8.0 1부 평지 영상 (다시 만들기: review/restructure/v0.8-art/README.md, 커밋하지 않음)
+review/restructure/v0.8-art/*.mp4

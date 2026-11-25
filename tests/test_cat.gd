@@ -462,3 +462,14 @@ func test_예전_화풍_그림이_모두_있다() -> void:
 	cat.show_state(_sim_on_roofs([{"left": 0.0, "right": 4000.0, "top": 0.0}]), 0.0)
 	assert_eq(cat.frame_texture("slide_a").resource_path, CatView.FRAME_DIR + "slide_a.png", "단추를 다시 누르면 카툰")
 	cat.queue_free()
+
+
+func test_번쩍임_셰이더는_텍스처_색을_두_번_곱하지_않는다() -> void:
+	# Godot 4 canvas_item의 fragment COLOR는 이미 텍스처 색 x modulate. texture(TEXTURE, UV)를 또 곱하면 색이 제곱돼
+	# 주인공이 주황빨강·짙은 초록 목도리로 보였다 (2026-11-25). 헤드리스 테스트는 화면을 그리지 않아 코드로 확인
+	var code: String = load("res://scripts/cat_flash.gdshader").code
+	var reads := 0
+	for line in code.substr(code.find("void fragment")).split("\n"):
+		if not line.strip_edges().begins_with("//") and "TEXTURE" in line:
+			reads += 1
+	assert_eq(reads, 0, "fragment에서 TEXTURE를 다시 읽지 않음 (COLOR만 씀)")

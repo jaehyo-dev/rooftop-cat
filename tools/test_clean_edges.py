@@ -30,6 +30,8 @@ class CleanEdgesTest(unittest.TestCase):
         for path in files:
             if path.stem.endswith("_cream"):
                 continue  # 안개 원본(검사 제외 대상)의 색만 섞은 파일: 가장자리 분홍은 안개 고유색이고 원본과 같은 자리
+            if path.parent.name == "backdrop" and path.stem.startswith("cloud"):
+                continue  # 카툰 구름(v0.8.0)은 바깥선이 분홍 #EFA1BB (ART_BIBLE 14-1)이라 가장자리 분홍이 원래 색
             if path.stem.startswith("prop_soft_"):
                 continue  # 검사를 통과한 소품 원본의 채도만 줄인 파일: 옅어진 갈색이 분홍 판정에 걸릴 뿐 잔여물이 아님
             rgba = self.np.asarray(self.Image.open(path).convert("RGBA"))

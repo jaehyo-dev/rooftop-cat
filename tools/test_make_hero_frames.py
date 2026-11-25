@@ -71,6 +71,40 @@ class HeroFramesTest(unittest.TestCase):
         self.assertEqual(top, 60)
         self.assertAlmostEqual(w, 200, delta=4)
 
+    def test_주인공_그림은_모두_색표_안(self):
+        # 2026-11-25: 시트 색(짙은 초록 목도리·회갈색 먼 다리)이 그대로 들어간 일이 있어 그림 파일마다 14-2 색표 ±0x10을 확인
+        import cartoon_art as ca
+        frames = sorted((self.h.OUT).glob("*.png"))
+        self.assertGreater(len(frames), 30)
+        for f in frames:
+            a = self.np.asarray(self.Image.open(f).convert("RGBA"))
+            report = ca.palette_report(a, ca.HERO)
+            self.assertIn("body", report, f.name)
+            for name, (n, med, diff) in report.items():
+                self.assertLessEqual(diff, 0x10, f"{f.name} {name} #%02X%02X%02X ({n}px)" % med)
+            self.assertLessEqual(ca.dark_blobs(a), 30, f"{f.name}: 선이 아닌 검은 갈색 덩어리")
+
+    def test_시트_색을_색표로_옮기고_선은_그대로(self):
+        import cartoon_art as ca
+        a = self._blob(40, 20, (0x73, 0xD0, 0x97))  # 짙은 초록 목도리
+        a[:, :10, :3] = (0x33, 0x18, 0x06)
+        a[:, 10, :3] = (0x53, 0x74, 0x4E)  # 선과 반쯤 섞인 가장자리
+        out = ca.recolor(a, [((0x73, 0xD0, 0x97), "scarf")], ca.HERO).astype(int)
+        self.assertEqual(tuple(out[5, 30, :3]), ca.HERO["scarf"])
+        self.assertEqual(tuple(out[5, 2, :3]), (0x33, 0x18, 0x06), "선은 그대로")
+        mid = out[5, 10, :3]
+        self.assertTrue(all(0x33 < v < c for v, c in zip(mid, ca.HERO["scarf"])), "가장자리는 섞인 몫만큼")
+
+    def test_얇은_어두운_띠는_그늘색으로_바꾸지_않는다(self):
+        import cartoon_art as ca
+        a = self._blob(40, 40)
+        a[10:30, 10:30, :3] = (0x9D, 0x50, 0x1A)  # 덩어리 = 먼 쪽 다리
+        a[35, :, :3] = (0x9D, 0x50, 0x1A)          # 1px 띠 = 선과 섞인 가장자리
+        pairs = [((0xFD, 0xB8, 0x65), "body"), ((0x9D, 0x50, 0x1A), "body_shade")]
+        out = ca.recolor(a, pairs, {**ca.HERO, **ca.HERO_SHADE}).astype(int)
+        self.assertEqual(tuple(out[20, 20, :3]), ca.HERO_SHADE["body_shade"])
+        self.assertNotEqual(tuple(out[35, 20, :3]), ca.HERO_SHADE["body_shade"])
+
 
 if __name__ == "__main__":
     unittest.main()

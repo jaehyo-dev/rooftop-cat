@@ -134,12 +134,13 @@ static func edge_count(img: Image) -> int:
 func test_잘라_쓴_그림은_가장자리가_잘리지_않았다() -> void:
 	var checked := 0
 	for path in _files("res://assets/sprites", ".png"):
-		if EDGE_TILES.any(func(p: String) -> bool: return path.begins_with(p)) \
-				or ("/buildings/" in path and EDGE_TILE_NAMES.any(func(p: String) -> bool: return path.get_file().begins_with(p))):
+		var same := path.replace("_pencil/", "/")  # 예전 색연필 그림(<폴더>_pencil/, v0.8.0 배경 화풍 비교)은 원래 자리의 예외를 따름
+		if EDGE_TILES.any(func(p: String) -> bool: return same.begins_with(p)) \
+				or ("/buildings/" in same and EDGE_TILE_NAMES.any(func(p: String) -> bool: return same.get_file().begins_with(p))):
 			continue
 		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
 		var n := edge_count(img)
-		var allowed: int = EDGE_TIGHT.get(path.trim_prefix("res://assets/sprites/"), 0)
+		var allowed: int = EDGE_TIGHT.get(same.trim_prefix("res://assets/sprites/"), 0)
 		assert_true(n <= allowed, "%s 가장자리 불투명 %d (허용 %d)" % [path, n, allowed])
 		checked += 1
 	assert_true(checked > 50, "검사한 그림 수 %d" % checked)

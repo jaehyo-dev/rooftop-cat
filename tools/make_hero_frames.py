@@ -8,6 +8,8 @@
 - 위치: align_frames.py와 같은 캔버스·기준점. 가장 아랫줄 → BASELINE, 꼬리 쪽 30%를 뺀 무게중심 → ANCHOR_X.
   LIFTED 프레임(튕겨 뜬 장)은 시트 바닥선에서 떠 있던 높이를 그대로 둔다.
 - 선 색: #331806보다 어두운 픽셀은 #331806으로 올린다 (ART_BIBLE 14-1).
+- 색: Codex 시트는 목도리가 짙은 초록·먼 쪽 다리가 회갈색으로 나와서(2026-11-25 디렉터 확인) 시트 색을 k-means로 잡아
+  14-2 색표로 옮긴다 (cartoon_art.recolor). 먼 쪽 다리는 몸·크림의 그림자 한 단계.
 - 앉기: 몸 한 장 + 따로 그린 꼬리 2개를 돌려 8장, 눈 감은 몸은 눈을 덮고 감은 눈 선을 그려 만든다 (몸이 0px도 안 움직임).
 개발용 도구 (numpy, scipy, scikit-image, Pillow). 게임은 결과 PNG만 쓴다.
 """
@@ -20,7 +22,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from align_frames import ANCHOR_X, BASELINE, CANVAS, body_center_x  # noqa: E402
-from cartoon_art import LINE, cut_frames, cutout, lum  # noqa: E402
+from cartoon_art import HERO, HERO_SEEDS, HERO_SHADE, LINE, cut_frames, cutout, fit_seeds, lum, recolor  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "assets/concept/cartoon/hero"
@@ -108,6 +110,8 @@ def cut_sheet(key):
     """시트를 잘라 {이름: (RGBA 그림, 바닥선 위로 뜬 높이)} (배율 적용 뒤)."""
     file, counts, names, head = SHEETS[key]
     clean, boxes = cut_frames(cutout(Image.open(SRC / file)), counts)
+    clean = darken_fix(clean)
+    clean = recolor(clean, fit_seeds(clean, HERO_SEEDS, {**HERO, **HERO_SHADE}), {**HERO, **HERO_SHADE})
     k = HEAD_PX / head
     out = {}
     clean = clean.copy()
@@ -127,7 +131,7 @@ def cut_sheet(key):
         box = clean[y0:y1, x0:x1].astype(int)
         trapped = box[..., 1] < np.minimum(box[..., 0], box[..., 2]) - 40
         clean[y0:y1, x0:x1, 3][trapped] = 0
-        im = Image.fromarray(darken_fix(clean[y0:y1, x0:x1]))
+        im = Image.fromarray(clean[y0:y1, x0:x1])  # 선 색 올리기는 시트 전체에 이미 함
         im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
         im = Image.fromarray(thicken(np.pad(np.asarray(im), ((THICKEN, THICKEN), (THICKEN, THICKEN), (0, 0)))))
         out[name] = (im, max(0.0, (base - y1) * k - THICKEN))

@@ -4,7 +4,9 @@ shader_type canvas_item;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
-	vec4 c = texture(TEXTURE, UV) * COLOR;
+	// Godot 4의 fragment COLOR는 이미 "텍스처 색 x modulate"다. 예전에 texture()를 한 번 더 곱해 색이 제곱돼
+	// 주황 #FDB865가 #FA8429, 목도리가 짙은 초록, 먼 다리가 검은 갈색으로 보였다 (2026-11-25 디렉터 확인)
+	vec4 c = COLOR;
 	float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
 	c.rgb = mix(c.rgb, vec3(1.0), flash * smoothstep(0.18, 0.32, lum));
 	COLOR = c;

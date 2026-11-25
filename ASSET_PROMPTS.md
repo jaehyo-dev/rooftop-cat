@@ -465,3 +465,10 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 명령: `bash review/restructure/enemies/make_art.sh <crows|ground|boss|scene> <차례> <첨부...>`, 비교 그림 `python3 review/restructure/enemies/compose.py`
 - 첨부: 시트 = `assets/concept/cartoon/hero_reference.png`, 장면 = `hero_reference.png` + `assets/concept/restructure_style/s3_A.png` + `assets/concept/cartoon/enemies/ground_1.png` + `crows_1.png`.
 - 요청문 전문: 시트 = `review/restructure/enemies/prompts/common.txt` + `<장면>.txt`, 장면 = `scene.txt`만. 결과 `assets/concept/cartoon/enemies/`.
+
+## v0.8.0 1-1 카툰 배경·장애물·아이템·적 (2026-11-25, 맥 Codex, restructure 브랜치)
+- 계획: 7장(먼 배경 띠·구름 1, 건물 앞면 3종 1, 옥상 장애물·소품 1, 전봇대·트램펄린 1, 아이템 1, 까마귀 졸개 동작 1, 쥐 동작 1), 장마다 최대 2번 다시. 결과: 7장 생성, 다시 뽑기 0번.
+- 명령: `bash review/restructure/v0.8-art/make_art.sh <시트> <차례> <첨부...>` → `python3 tools/make_bg_art.py` (처음 한 번 `--pencil`)
+- 첨부: 모두 첫 첨부 `review/restructure/enemies/scene_1-1.png`. 건물 + `assets/raw/neighborhood_concept.png`, 장애물·전봇대·아이템 + `assets/concept/cartoon/v08/ref_old_objects.png`(예전 그림 모음), 까마귀 + `assets/concept/cartoon/enemies/crows_1.png` + `hero_reference.png`, 쥐 + `ground_1.png` + `hero_reference.png`.
+- 요청문 전문: `review/restructure/v0.8-art/prompts/common.txt` + `<시트>.txt`. 결과 `assets/concept/cartoon/v08/<시트>_1.png`.
+

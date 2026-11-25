@@ -27,6 +27,89 @@ def lum(a):
     return a[..., :3] @ np.array([0.299, 0.587, 0.114])
 
 
+def shade(rgb, k=(1.0, 0.86, 0.83)):
+    """캐릭터 그림자 한 단계 (14-3: base x #FFDBD4)."""
+    return tuple(int(round(c * m)) for c, m in zip(rgb, k))
+
+
+# 주인공 색표 (14-2) + 그림자 한 단계 (14-3). 먼 쪽 다리는 몸·크림의 그림자 값 (검은 갈색 금지)
+HERO = {"body": (0xFD, 0xB8, 0x65), "stripe": (0xF0, 0x80, 0x20), "cream": (0xFE, 0xF8, 0xEC),
+        "scarf": (0xA6, 0xDA, 0xAA), "cheek": (0xFD, 0x9B, 0x87)}
+HERO_SHADE = {"body_shade": shade(HERO["body"]), "cream_shade": shade(HERO["cream"])}
+# Codex 주인공 시트의 실제 색(run_3 k-means) → 맞출 색표 이름. 시트마다 이 값에서 시작해 k-means로 다시 잡는다.
+# 목도리 그늘은 따로 두지 않는다(회색 먼 발과 한 군집으로 섞임): 목도리 차이만큼 같이 옮겨진다
+HERO_SEEDS = [((0xFC, 0xAE, 0x51), "body"), ((0xF9, 0x7F, 0x1E), "stripe"), ((0xFC, 0xFA, 0xEF), "cream"),
+              ((0x73, 0xD0, 0x97), "scarf"), ((0xF6, 0x7B, 0x7E), "cheek"),
+              ((0xFC, 0x9A, 0x9C), "cheek"), ((0xFF, 0x7B, 0x7F), "cheek"),  # 분홍 볼(공중 시트), 발바닥 젤리도 볼 색으로
+              ((0xAC, 0x97, 0x7C), "cream_shade"), ((0x9D, 0x50, 0x1A), "body_shade"), ((0x63, 0x61, 0x44), "body_shade")]
+# 첫 동네 적 색표 (14-2, 2026-11-25 게임 그림 enemies/에서 잼). 두건은 일당 공통
+BANDANA = (0xE8, 0x46, 0x3A)
+CROW = {"feather": (0x63, 0x57, 0x5E), "belly": (0xBD, 0xAC, 0x9F), "beak": (0xFB, 0xD0, 0x41), "bandana": BANDANA}
+RAT = {"fur": (0xC9, 0xAA, 0x91), "pink": (0xF8, 0xB4, 0xA0), "bandana": BANDANA}
+SHADE_NAMES = {"cream_shade", "body_shade"}  # 선과 섞인 가장자리 색과 겹쳐서 덩어리일 때만 바꾸는 색
+
+
+def fit_seeds(rgba, seeds, palette, min_count=30, max_move=48):
+    """시트의 불투명·선 아닌 픽셀로 k-means를 돌려 seeds 색을 이 시트의 실제 색으로 옮긴다.
+    픽셀이 적은 색, 씨앗과 색표 둘 다에서 max_move(채널 차 합)보다 먼 색(다른 군집으로 샌 것)은 뺀다."""
+    from scipy.cluster.vq import kmeans2
+    a = rgba.astype(float)
+    p = a[..., :3][(a[..., 3] > 250) & (lum(a) > 70)][::5]
+    init = np.array([s for s, _ in seeds], float)
+    c, lab = kmeans2(p, init, minit="matrix", iter=20)
+    n = np.bincount(lab, minlength=len(seeds))
+    return [(tuple(c[i]), name) for i, (seed, name) in enumerate(seeds)
+            if n[i] >= min_count and min(np.abs(c[i] - seed).sum(), np.abs(c[i] - palette[name]).sum()) <= max_move]
+
+
+def recolor(rgba, pairs, palette, shade_names=SHADE_NAMES, blob=2):
+    """시트 색 → 색표: 픽셀마다 가장 가까운 시트 색(선 포함)을 찾아 그 색과 색표 차이만큼 옮긴다.
+    선과 섞인 가장자리는 섞인 몫(t)만큼만 옮겨 선이 번지지 않는다. 그늘 색은 blob px 열림을 견딘 덩어리만 (얇은 섞임 띠 제외)."""
+    a = rgba.astype(np.float32)
+    rgb = a[..., :3]
+    L = np.array(LINE, np.float32)
+    src = np.array([LINE] + [s for s, _ in pairs], np.float32)
+    tgt = np.array([LINE] + [palette[n] for _, n in pairs], np.float32)
+    d = ((rgb[..., None, :] - src) ** 2).sum(-1)
+    k = d.argmin(-1)
+    for i, (_, name) in enumerate(pairs, 1):
+        if name in shade_names:
+            m = k == i
+            keep = ndi.binary_dilation(ndi.binary_opening(m, iterations=blob), iterations=blob) & m
+            d[m & ~keep, i] = np.inf
+    k = d.argmin(-1)
+    s = src[k]
+    t = np.clip(((rgb - L) * (s - L)).sum(-1) / np.maximum(((s - L) ** 2).sum(-1), 1), 0, 1)
+    out = rgb + t[..., None] * (tgt[k] - s)
+    return np.dstack([np.clip(np.round(out), 0, 255), a[..., 3]]).astype(np.uint8)
+
+
+def palette_report(rgba, palette, min_count=80, near=60):
+    """색표 이름마다 (픽셀 수, 가운데값, 최대 채널 차이). 불투명 픽셀을 가장 가까운 색표 색(선 포함, 거리 near 안)으로 나누고,
+    다른 색과 섞인 가장자리를 빼려고 1px 깎은 속만 잰다 (작은 볼은 속이 적어 깎기 전 값)."""
+    a = rgba.astype(int)
+    names = list(palette)
+    c = np.array([palette[n] for n in names] + [LINE])
+    d = np.abs(a[..., None, :3] - c).sum(-1)
+    k, dm = d.argmin(-1), d.min(-1)
+    out = {}
+    for i, n in enumerate(names):
+        m = (k == i) & (dm < near) & (a[..., 3] > 250)
+        core = ndi.binary_erosion(m)
+        s = a[..., :3][core if core.sum() >= min_count else m]
+        if len(s) >= min_count:
+            med = tuple(int(v) for v in np.median(s, 0))
+            out[n] = (len(s), med, max(abs(x - y) for x, y in zip(med, palette[n])))
+    return out
+
+
+def dark_blobs(rgba, blob=2):
+    """선 색이 아닌데 어두운(밝기 < 120) 덩어리 픽셀 수: 먼 쪽 다리를 검은 갈색으로 칠한 곳 찾기."""
+    a = rgba.astype(float)
+    dark = (a[..., 3] > 250) & (lum(a) < 120) & (np.abs(a[..., :3] - LINE).sum(-1) > 60)
+    return int(ndi.binary_opening(dark, iterations=blob).sum())
+
+
 def magenta_amount(a):
     """0(마젠타 아님) ~ 1(순 마젠타)."""
     a = a.astype(float)

@@ -19,6 +19,11 @@ const MAX_STEPS_PER_FRAME := 12
 
 const SKY_TOP := Color("#cfe6f2")
 const SKY_BOTTOM := Color("#fbe9d4")
+## 카툰 하늘 (ART_BIBLE 14-2): 위는 평면, 지평선 띠(화면 높이 비율)에서만 두 색으로 넘어가고 그 아래는 평면
+const CARTOON_SKY := Color("#c3e0fd")
+const CARTOON_BAND := [Color("#dddbf0"), Color("#fef0db")]
+const CARTOON_BAND_Y := Vector2(0.35, 0.46)
+const TREES_TEXTURE := preload("res://assets/sprites/backdrop/trees.png")
 ## 먼 배경 그림 (assets/sprites/backdrop/)
 const TOWN_TEXTURE := preload("res://assets/sprites/backdrop/far_town.png")
 const CLOUD_TEXTURES := [
@@ -71,6 +76,13 @@ const LINE_BOUNCE_ANIM := 0.16   # 밟았을 때 줄이 출렁이는 시간 (초
 ## 고양이·그림자·아이템을 판정선보다 이만큼 아래에 그린다: 건물 3종 모두 지붕 턱 윗면이 그림 4줄(뒤 선)~29줄(앞 선)이라 그 가운데(16).
 ## 전봇대 판·트램펄린도 서는 자리가 이 높이에 오게 그린다
 const FOOT_SINK := 16.0
+## 적 미리보기 (시험 단추, v0.8.0 1부: 움직임·판정 없이 반복 동작만): 주인공 앞 옥상에 쥐 무리 셋, 머리 높이에 까마귀 졸개
+static var enemy_preview := false
+const PREVIEW_RATS := [250.0, 320.0, 390.0]  # 주인공 앞 거리 (로직 px)
+const PREVIEW_CROW := Vector2(520.0, 120.0)   # 앞 거리, 옥상 위 높이 (발 기준)
+var _enemy_tex := {}
+## 카툰 전봇대 그림(tools/make_bg_art.py가 잰 값): 통 폭, 뚜껑 윗면 줄, 머리(통·가로대·애자) 줄 수, 기둥 x·폭
+const CARTOON_POLE := {"drum_w": 183.0, "lid": 13.0, "head": 282.0, "trunk_x": 65.0, "trunk_w": 60.0}
 const POLE_FACE_MID := 10.5   # 전봇대 그림에서 판 윗면 가운데 줄 (판 윗면 7~14줄)
 ## 트램펄린 그림(216x100, 평소·밟음·튕김이 같은 캔버스): 테 왼쪽 끝 3, 테 너비 209, 다리 끝 97줄.
 ## 테 아래(TRAMP_SRC_LEG줄부터)는 세로로 TRAMP_LEG_STRETCH배 늘여 그린다: 다리가 길어져 꺼진 그물이 고양이 몸 아래로 보임
@@ -297,6 +309,7 @@ var _bursts: Array[Dictionary] = []  # 발밑 터짐 {"x", "y", "t", "stars"}
 var _sfx := {}                       # 효과음 이름 → AudioStreamPlayer
 var _fish_sound_at := -INF           # 마지막 생선 소리 시각 (sim.elapsed)
 var _fall_sounded := false           # 이번 떨어짐에 소리를 냈는지
+var _bg_pencil := false  # 지금 옥상 모습을 짠 화풍 (BgArt.pencil)
 var _roof_looks := {}  # 옥상 왼쪽 x → {"plan": 건물 계획, "props": 소품} (같은 옥상은 항상 같은 모습)
 var _shadow_texture := _make_shadow_texture()
 var _front_mist := Node2D.new()  # 가장 가까운 안개: 고양이보다 앞에 그려 떨어지면 안개 속으로 사라짐
@@ -358,7 +371,7 @@ func _ready() -> void:
 	move_child(cat, 0)  # 떠다니는·날아오는·날아가는 아기(요정)는 주인공 위 층
 	move_child(_stray_view, 0)  # 기다리는 길고양이는 예전처럼 주인공 뒤
 	_front_mist.name = "FrontMist"
-	_front_mist.draw.connect(func() -> void: _draw_mist(_front_mist, Backdrop.MISTS[-1], _view_size()))
+	_front_mist.draw.connect(func() -> void: if BgArt.pencil: _draw_mist(_front_mist, Backdrop.MISTS[-1], _view_size()))
 	add_child(_front_mist)
 	_tint.name = "DashTint"
 	_tint.top_level = true
@@ -781,10 +794,21 @@ func _draw() -> void:
 	var ground := _ground_y()  # 로직 높이 0 = 화면 맨 아래 (+ 세로 카메라)
 	var offset := cat_x() - sim.x  # 로직 x → 화면 x
 
-	# 하늘 (위아래 두 색). 화면이 멀어지면 y 0 위까지 보인다
+	if _bg_pencil != BgArt.pencil:  # 시험 단추로 화풍이 바뀌면 건물 조각 폭이 달라 옥상 모습을 다시 짠다
+		_bg_pencil = BgArt.pencil
+		_roof_looks.clear()
+	# 하늘. 화면이 멀어지면 y 0 위까지 보인다
 	var sky_top := size.y * (1.0 - 1.0 / _zoom)
-	draw_polygon([Vector2(0, sky_top), Vector2(size.x, sky_top), size, Vector2(0, size.y)],
-			[SKY_TOP, SKY_TOP, SKY_BOTTOM, SKY_BOTTOM])
+	if BgArt.pencil:  # 위아래 두 색
+		draw_polygon([Vector2(0, sky_top), Vector2(size.x, sky_top), size, Vector2(0, size.y)],
+				[SKY_TOP, SKY_TOP, SKY_BOTTOM, SKY_BOTTOM])
+	else:
+		var a := size.y * CARTOON_BAND_Y.x
+		var b := size.y * CARTOON_BAND_Y.y
+		draw_rect(Rect2(0, sky_top, size.x, a - sky_top), CARTOON_SKY)
+		draw_polygon([Vector2(0, a), Vector2(size.x, a), Vector2(size.x, b), Vector2(0, b)],
+				[CARTOON_BAND[0], CARTOON_BAND[0], CARTOON_BAND[1], CARTOON_BAND[1]])
+		draw_rect(Rect2(0, b, size.x, size.y - b), CARTOON_BAND[1])
 
 	_draw_backdrop(size)
 
@@ -808,6 +832,8 @@ func _draw() -> void:
 		_draw_obstacle(o, offset, ground)
 	for knocked in _knocked:
 		_draw_knocked(knocked, offset, ground)
+	if enemy_preview:
+		_draw_enemy_preview(offset, ground)
 
 	# 트램펄린을 밟고 있으면 그림자도 꺼진 그물 위에 (고양이 그림 높이 보정만큼 같이 올림)
 	var riding := sim.is_riding()
@@ -840,8 +866,9 @@ func _draw() -> void:
 		_draw_shard(shard, offset, ground)
 	if sim.rescuing:
 		# 고양이 발밑에서 상자가 받쳐 올린다 (고양이는 자식 노드라 상자 위에 그려짐)
-		var h := RESCUE_BOX_WIDTH * BOX_TEXTURE.get_height() / BOX_TEXTURE.get_width()
-		draw_texture_rect(BOX_TEXTURE, Rect2(cat_x() - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
+		var box := BgArt.of(BOX_TEXTURE)
+		var h := RESCUE_BOX_WIDTH * box.get_height() / box.get_width()
+		draw_texture_rect(box, Rect2(cat_x() - RESCUE_BOX_WIDTH * 0.5, ground - sim.y + FOOT_SINK - h * 0.35,
 				RESCUE_BOX_WIDTH, h), false)
 
 
@@ -875,13 +902,20 @@ func _draw_shard(shard: Dictionary, offset: float, ground: float) -> void:
 ## 먼 배경: 구름(가장 멀리) → 멀리 보이는 동네 띠 → 안개 겹들(건물 뒤). 모두 옥상보다 느리게 지나간다.
 func _draw_backdrop(size: Vector2) -> void:
 	for cloud in Backdrop.CLOUDS:
-		var tex: Texture2D = CLOUD_TEXTURES[cloud[0]]
+		var tex: Texture2D = BgArt.of(CLOUD_TEXTURES[cloud[0]])
 		var x := Backdrop.cloud_x(cloud[1], sim.x, sim.elapsed, tex.get_width())
 		draw_texture(tex, Vector2(x, size.y * cloud[2] + _cam_lift * Backdrop.CLOUD_PARALLAX))
-	var top := size.y * TOWN_BOTTOM - TOWN_TEXTURE.get_height() + _cam_lift * Backdrop.TOWN_PARALLAX
-	_draw_strip(self, TOWN_TEXTURE, top, Backdrop.TOWN_PARALLAX, size.x, Color.WHITE)
-	for mist in Backdrop.MISTS.slice(0, -1):
-		_draw_mist(self, mist, size)
+	var top := size.y * TOWN_BOTTOM - BgArt.of(TOWN_TEXTURE).get_height() + _cam_lift * Backdrop.TOWN_PARALLAX
+	_draw_strip(self, BgArt.of(TOWN_TEXTURE), top, Backdrop.TOWN_PARALLAX, size.x, Color.WHITE)
+	if BgArt.pencil:
+		for mist in Backdrop.MISTS.slice(0, -1):
+			_draw_mist(self, mist, size)
+		return
+	# 카툰: 안개(흐림) 대신 나무 머리 띠 한 겹(먼 안개 자리·시차), 띠 아래는 띠 맨 아랫줄 색 평면 (틈 아래가 비어 보이지 않게)
+	var tree_top: float = size.y * Backdrop.TREES[1] + _cam_lift * Backdrop.TREES[0]
+	_draw_strip(self, TREES_TEXTURE, tree_top, Backdrop.TREES[0], size.x, Color.WHITE)
+	var tree_bottom := tree_top + TREES_TEXTURE.get_height() - 1.0
+	draw_rect(Rect2(0.0, tree_bottom, size.x, size.y - tree_bottom), Backdrop.TREES_FILL)
 
 
 ## 띠 그림을 가로로 이어 붙여 그린다 (이웃 조각은 번갈아 뒤집음)
@@ -908,7 +942,7 @@ func _draw_mist(canvas: CanvasItem, mist: Array, size: Vector2) -> void:
 ## 건물·기둥 몸통을 아래로 갈수록 안개 색으로 덮는다 (옥상 윗면 기준이라 고양이가 서는 곳은 늘 또렷함)
 func _draw_body_mist(left: float, right: float, top: float, ground: float) -> void:
 	var from := top + BODY_MIST_FROM
-	if from >= ground:
+	if from >= ground or not BgArt.pencil:  # 카툰은 흐림이 없다 (14-4)
 		return
 	var to := minf(top + BODY_MIST_TO, ground)
 	var mist: Color = MIST_FILLS.mid
@@ -960,23 +994,33 @@ func _draw_star(center: Vector2, r: float, angle: float, alpha: float) -> void:
 func _draw_building(roof: Dictionary, offset: float, ground: float) -> void:
 	var look := _look_of(roof)
 	var style: Dictionary = BuildingArt.style_textures(look.plan.style)
-	var fill: Color = BuildingArt.FILL_COLORS[look.plan.style]
+	var fill: Color = BuildingArt.fill_color(look.plan.style)
 	var left: float = roof.left + offset
 	var right: float = roof.right + offset
 	var top: float = ground - roof.top
 	var art_h: float = style.left.get_height()
 	# 그림이 끝난 아래부터 화면 바닥까지: 벽 색 + 옆 테두리, 그림 아랫부분은 부드럽게 이어짐
 	var below := top + art_h
-	if below < ground:
+	if not BgArt.pencil:  # 카툰: 그림 맨 아랫줄 = 벽 색 평면이라 그대로 화면 바닥까지 (그라데이션·흐림 없음)
+		if below < ground:
+			draw_rect(Rect2(left, below - 1.0, right - left, ground - below + 1.0), fill)
+	elif below < ground:
 		var deep := fill.darkened(BELOW_DARKEN)  # 아래로 갈수록 살짝 어두워져 땅 쪽이 묵직해 보임
 		draw_polygon([Vector2(left, below), Vector2(right, below), Vector2(right, ground), Vector2(left, ground)], [fill, fill, deep, deep])
 	var fade := Color(fill, 0.0)
-	draw_polygon([Vector2(left, below - BuildingArt.FADE), Vector2(right, below - BuildingArt.FADE), Vector2(right, below), Vector2(left, below)],
-			[fade, fade, fill, fill])
+	if BgArt.pencil:
+		draw_polygon([Vector2(left, below - BuildingArt.FADE), Vector2(right, below - BuildingArt.FADE), Vector2(right, below), Vector2(left, below)],
+				[fade, fade, fill, fill])
 	var line := fill * WALL_LINE
 	line.a = 1.0
-	draw_line(Vector2(left, below), Vector2(left, ground), line, 2.0)
-	draw_line(Vector2(right, below), Vector2(right, ground), line, 2.0)
+	var line_w := 2.0
+	var inset := 0.0
+	if not BgArt.pencil:  # 카툰 벽 옆선 = 그림 속 벽 바깥선과 같은 선 색·굵기 (14-1 사물 3.0), 벽 안쪽에
+		line = BuildingArt.CARTOON_LINE
+		line_w = 3.0
+		inset = 1.5
+	draw_line(Vector2(left + inset, below - inset), Vector2(left + inset, ground), line, line_w)
+	draw_line(Vector2(right - inset, below - inset), Vector2(right - inset, ground), line, line_w)
 	# 건물 그림 (캡 → 가운데 → 캡). 조각 경계를 정수 픽셀에 맞춰 이음매에 선이 비치지 않게 함
 	var x := left - BuildingLayout.OVERHANG
 	draw_texture(style.left, Vector2(roundf(x), top))
@@ -1015,7 +1059,7 @@ func _look_of(roof: Dictionary) -> Dictionary:
 
 ## 장애물 그림 크기 (너비는 Balance, 높이는 그림 비율대로)
 static func _obstacle_size(kind: String) -> Vector2:
-	var tex: Texture2D = OBSTACLE_TEXTURES[kind]
+	var tex: Texture2D = BgArt.of(OBSTACLE_TEXTURES[kind])
 	var w: float = Balance.OBSTACLES[kind].art_w
 	return Vector2(w, w * tex.get_height() / tex.get_width())
 
@@ -1032,7 +1076,7 @@ func _draw_obstacle(o: Dictionary, offset: float, ground: float) -> void:
 		if not below.is_empty():
 			_draw_flat_shadow(Vector2(at, ground - below.top + FOOT_SINK), art_size.x, FLOCK_SHADOW_ALPHA)
 		var fly_y: float = ground - (o.y0 + o.y1) * 0.5 + 4.0 * sin(sim.elapsed * 7.0 + o.x)
-		draw_texture_rect(OBSTACLE_TEXTURES.flock, Rect2(at - art_size.x * 0.5, fly_y - art_size.y * 0.5, art_size.x, art_size.y), false)
+		draw_texture_rect(BgArt.of(OBSTACLE_TEXTURES.flock), Rect2(at - art_size.x * 0.5, fly_y - art_size.y * 0.5, art_size.x, art_size.y), false)
 		return
 	var feet: float = ground - o.base + FOOT_SINK
 	if o.kind == "sign":
@@ -1044,10 +1088,10 @@ func _draw_obstacle(o: Dictionary, offset: float, ground: float) -> void:
 			var rope_top := Vector2(rx, -position.y / scale.y - 20.0)  # 화면 위 끝 너머까지
 			draw_line(Vector2(rx, bottom - art_size.y + 6.0), rope_top, ROPE_LINE, 10.0, true)
 			draw_line(Vector2(rx, bottom - art_size.y + 6.0), rope_top, ROPE_COLOR, 5.0, true)
-		draw_texture_rect(OBSTACLE_TEXTURES.sign, Rect2(at - art_size.x * 0.5, bottom - art_size.y, art_size.x, art_size.y), false)
+		draw_texture_rect(BgArt.of(OBSTACLE_TEXTURES.sign), Rect2(at - art_size.x * 0.5, bottom - art_size.y, art_size.x, art_size.y), false)
 		return
 	_draw_flat_shadow(Vector2(at, feet), art_size.x, OBSTACLE_SHADOW_ALPHA)
-	draw_texture_rect(OBSTACLE_TEXTURES[o.kind], Rect2(at - art_size.x * 0.5, feet - art_size.y, art_size.x, art_size.y), false)
+	draw_texture_rect(BgArt.of(OBSTACLE_TEXTURES[o.kind]), Rect2(at - art_size.x * 0.5, feet - art_size.y, art_size.x, art_size.y), false)
 
 
 ## 납작한 그림자 (너비 width)
@@ -1063,7 +1107,7 @@ func _draw_knocked(k: Dictionary, offset: float, ground: float) -> void:
 	var art_size := _obstacle_size(k.kind)
 	var pos := Vector2(k.x + offset + KNOCK_VX * k.t, ground - k.y + FOOT_SINK - art_size.y * 0.5 - KNOCK_VY * k.t + 0.5 * Balance.GRAVITY * k.t * k.t)
 	draw_set_transform(pos, KNOCK_SPIN * k.t)
-	draw_texture_rect(OBSTACLE_TEXTURES[k.kind], Rect2(-art_size * 0.5, art_size), false, Color(1, 1, 1, 1.0 - u * u))
+	draw_texture_rect(BgArt.of(OBSTACLE_TEXTURES[k.kind]), Rect2(-art_size * 0.5, art_size), false, Color(1, 1, 1, 1.0 - u * u))
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -1073,26 +1117,73 @@ func _draw_pole(plate: Dictionary, offset: float, ground: float) -> void:
 	var cx: float = (plate.left + plate.right) * 0.5 + offset
 	if cx < -300.0 or cx > _view_size().x + 300.0:
 		return
+	if not BgArt.pencil:
+		_draw_pole_cartoon(plate, cx, ground)
+		return
+	var tex := BgArt.of(POLE_TEXTURE)
 	var k: float = (plate.right - plate.left) / POLE_PLATE_WIDTH
 	var top_y: float = ground - plate.top + FOOT_SINK - POLE_FACE_MID * k  # 판 윗면 가운데가 고양이 발 높이에
-	var w := POLE_TEXTURE.get_width() * k
+	var w := tex.get_width() * k
 	var slim := w * POLE_SLIM
 	# 기둥 몸통: 판 아래부터 화면 바닥까지 (먼저 그려 위 조각이 덮음)
 	var trunk_w := POLE_TRUNK_W * k * POLE_SLIM
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - trunk_w * 0.5, top_y + 14.0 * k, trunk_w, ground - top_y + 4.0),
+	draw_texture_rect_region(tex, Rect2(cx - trunk_w * 0.5, top_y + 14.0 * k, trunk_w, ground - top_y + 4.0),
 			Rect2(POLE_TRUNK_X, POLE_HEAD_ROWS, POLE_TRUNK_W, 200.0))
 	# 가로대: 받침 버팀대 바로 아래
 	var bar_h := (POLE_HEAD_ROWS - POLE_BAR_ROW) * k * POLE_SLIM
 	var bar_y := top_y + (POLE_TOP_ROWS + POLE_BAR_GAP) * k
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - slim * 0.5, bar_y, slim, bar_h),
-			Rect2(0, POLE_BAR_ROW, POLE_TEXTURE.get_width(), POLE_HEAD_ROWS - POLE_BAR_ROW))
+	draw_texture_rect_region(tex, Rect2(cx - slim * 0.5, bar_y, slim, bar_h),
+			Rect2(0, POLE_BAR_ROW, tex.get_width(), POLE_HEAD_ROWS - POLE_BAR_ROW))
 	# 받침 버팀대(가늘게) → 판(원래 너비)
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - slim * 0.5, top_y + POLE_PLATE_ROWS * k, slim, (POLE_TOP_ROWS - POLE_PLATE_ROWS) * k),
-			Rect2(0, POLE_PLATE_ROWS, POLE_TEXTURE.get_width(), POLE_TOP_ROWS - POLE_PLATE_ROWS))
-	draw_texture_rect_region(POLE_TEXTURE, Rect2(cx - w * 0.5, top_y, w, POLE_PLATE_ROWS * k),
-			Rect2(0, 0, POLE_TEXTURE.get_width(), POLE_PLATE_ROWS))
+	draw_texture_rect_region(tex, Rect2(cx - slim * 0.5, top_y + POLE_PLATE_ROWS * k, slim, (POLE_TOP_ROWS - POLE_PLATE_ROWS) * k),
+			Rect2(0, POLE_PLATE_ROWS, tex.get_width(), POLE_TOP_ROWS - POLE_PLATE_ROWS))
+	draw_texture_rect_region(tex, Rect2(cx - w * 0.5, top_y, w, POLE_PLATE_ROWS * k),
+			Rect2(0, 0, tex.get_width(), POLE_PLATE_ROWS))
 	# 기둥은 가로대 아래부터 안개에 묻힘 (가로대가 보이게)
 	_draw_body_mist(cx - trunk_w * 0.5, cx + trunk_w * 0.5, bar_y + bar_h - BODY_MIST_FROM, ground)
+
+
+func _draw_enemy_preview(offset: float, ground: float) -> void:
+	for i in PREVIEW_RATS.size():
+		var x: float = sim.x + PREVIEW_RATS[i]
+		var floor_top := _roof_top_at(x)
+		if not is_nan(floor_top):
+			_draw_enemy("rat", EnemyAnim.loop_frame("rat", sim.elapsed, EnemyAnim.pack_offset(i)), Vector2(x + offset, ground - floor_top + FOOT_SINK))
+	var cx: float = sim.x + PREVIEW_CROW.x
+	var top := _roof_top_at(cx)
+	if not is_nan(top):
+		_draw_enemy("crow", EnemyAnim.loop_frame("crow", sim.elapsed), Vector2(cx + offset, ground - top - PREVIEW_CROW.y))
+
+
+## 로직 x 아래 옥상 윗면 높이 (틈이면 NAN)
+func _roof_top_at(x: float) -> float:
+	for roof in sim.roofs:
+		if not roof.get("platform", false) and x >= roof.left and x <= roof.right:
+			return roof.top
+	return NAN
+
+
+## 적 그림 한 장: 발 기준점을 at에 (그림은 2배 크기라 반으로)
+func _draw_enemy(kind: String, frame: String, at: Vector2) -> void:
+	var key := kind + "/" + frame
+	if not _enemy_tex.has(key):
+		_enemy_tex[key] = load("res://assets/sprites/enemies/%s.png" % key)
+	var tex: Texture2D = _enemy_tex[key]
+	var k := 1.0 / EnemyAnim.FILE_SCALE
+	draw_texture_rect(tex, Rect2(at - EnemyAnim.FOOT[kind] * k, tex.get_size() * k), false)
+
+
+## 카툰 전봇대: 꼭대기 원통 변압기 통(폭 = 발판 판정 폭, 뚜껑 윗면 = 고양이 발 높이) + 가로대·애자 = 머리 그림 한 덩어리,
+## 그 아래 기둥은 머리 아래 기둥 줄을 화면 바닥까지 늘인다 (예전 넓은 판 + 받침이 T자 탁자처럼 보이던 것을 고침)
+func _draw_pole_cartoon(plate: Dictionary, cx: float, ground: float) -> void:
+	var tex := POLE_TEXTURE
+	var k: float = (plate.right - plate.left) / CARTOON_POLE.drum_w
+	var top_y: float = ground - plate.top + FOOT_SINK - CARTOON_POLE.lid * k
+	var w := tex.get_width() * k
+	var head_h: float = CARTOON_POLE.head * k
+	var trunk := Rect2(CARTOON_POLE.trunk_x, CARTOON_POLE.head, CARTOON_POLE.trunk_w, 60.0)
+	draw_texture_rect_region(tex, Rect2(cx - trunk.size.x * k * 0.5, top_y + head_h - 2.0, trunk.size.x * k, ground - top_y - head_h + 6.0), trunk)
+	draw_texture_rect_region(tex, Rect2(cx - w * 0.5, top_y, w, head_h), Rect2(0, 0, tex.get_width(), CARTOON_POLE.head))
 
 
 ## 빨래줄: 틈 양쪽 옥상 끝에 기둥, 그 사이에 줄과 빨래를 틈 너비만큼 이어 붙인다 (줄이 발판 높이에 오게)
@@ -1130,7 +1221,7 @@ func _draw_tramp(tramp: Dictionary, offset: float, ground: float) -> void:
 	if left > _view_size().x + 100.0 or left + Balance.TRAMP_WIDTH < -100.0:
 		return
 	var look := tramp_look(sim, tramp)
-	var tex: Texture2D = TRAMP_TEXTURES[look.frame]
+	var tex: Texture2D = BgArt.of(TRAMP_TEXTURES[look.frame])
 	var k := Balance.TRAMP_WIDTH / TRAMP_SRC_WIDTH
 	var feet: float = ground - tramp.base + FOOT_SINK
 	# 테까지와 다리를 따로 그려 다리만 길게. 다리 끝을 기준으로 세로로 늘이고 줄인다
@@ -1199,7 +1290,9 @@ static func tramp_look(state: RunnerSim, tramp: Dictionary) -> Dictionary:
 func _draw_item(kind: String, pos: Vector2, zoom: float, alpha: float) -> void:
 	if pos.x < -100.0 or pos.x > _view_size().x + 100.0:
 		return
-	var texture: Texture2D = FISH_LOOKS[sim.perks.fish_look()] if kind == "fish" else ITEM_TEXTURES[kind]
+	var texture: Texture2D = BgArt.of(ITEM_TEXTURES[kind])
+	if kind == "fish" and BgArt.pencil:  # 생선 강화 단계 그림(예전 4단계)은 색연필만. 카툰은 한 가지 (상점은 v0.10에서 다시)
+		texture = BgArt.of(FISH_LOOKS[sim.perks.fish_look()])
 	var w: float = ITEM_WIDTHS[kind] * zoom
 	var h := w * texture.get_height() / texture.get_width()
 	draw_texture_rect(texture, Rect2(pos - Vector2(w, h) * 0.5, Vector2(w, h)), false, Color(1, 1, 1, alpha))
@@ -1381,7 +1474,7 @@ func _draw_halves(tex: Texture2D, rect: Rect2, k: float, spread: float, rise: fl
 
 ## 방울 HUD: 가지고 있으면 하트 오른쪽에, 막은 직후에는 두 쪽으로 갈라져 떨어진다
 func _draw_bell(at: Vector2) -> void:
-	var tex: Texture2D = ITEM_TEXTURES.bell
+	var tex: Texture2D = BgArt.of(ITEM_TEXTURES.bell)
 	var box := Vector2(BELL_HUD_SIZE, BELL_HUD_SIZE)
 	if sim.has_bell:
 		_overlay.draw_texture_rect(tex, Rect2(at, box), false)
@@ -1399,7 +1492,7 @@ func _draw_status() -> void:
 	var row_w := STATUS_ICON + 6.0 + STATUS_BAR.x
 	var x := (get_viewport_rect().size.x - rows.size() * row_w - (rows.size() - 1) * HEART_GAP * 2.0) * 0.5
 	for row: Array in rows:
-		_overlay.draw_texture_rect(ITEM_TEXTURES[row[0]], Rect2(x, STATUS_Y, STATUS_ICON, STATUS_ICON), false)
+		_overlay.draw_texture_rect(BgArt.of(ITEM_TEXTURES[row[0]]), Rect2(x, STATUS_Y, STATUS_ICON, STATUS_ICON), false)
 		var bar := Rect2(x + STATUS_ICON + 6.0, STATUS_Y + 10.0, STATUS_BAR.x, STATUS_BAR.y)
 		_overlay.draw_rect(bar, HUD_CREAM)
 		_overlay.draw_rect(Rect2(bar.position, Vector2(STATUS_BAR.x * row[1], STATUS_BAR.y)), DASH_GLOW)
@@ -1502,7 +1595,7 @@ func _build_parade() -> void:
 			holder.name = "Kitten%d" % i
 			var rim := Sprite2D.new()
 			rim.name = "CloudRim"
-			rim.texture = CLOUD_TEXTURES[0]
+			rim.texture = CLOUD_TEXTURES[0]  # 아기 구름 방석은 배경 화풍과 상관없이 같은 그림
 			rim.modulate = CUSHION_RIM
 			holder.add_child(rim)
 			var cloud := Sprite2D.new()

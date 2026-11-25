@@ -652,13 +652,13 @@ static func is_local_build() -> bool:
 	return not OS.has_feature("web") or not str(JavaScriptBridge.eval("location.hostname")).ends_with("github.io")
 
 
-## 왼쪽 아래 "시험판 임시" (한곳에 모음): 아기 6마리로 시작, 능력 다시 채우기, 아기 바로 나오기, 아기 크기, 아기 배치, 아기 타기, 주인공 화풍 (이 자리 터치는 점프가 아님)
+## 왼쪽 아래 "시험판 임시" (한곳에 모음): 아기 6마리로 시작, 능력 다시 채우기, 아기 바로 나오기, 아기 크기, 아기 배치, 아기 타기, 주인공 화풍, 배경 화풍, 적 미리보기 (이 자리 터치는 점프가 아님)
 func _build_parade_dev() -> void:
 	var dev := VBoxContainer.new()
 	dev.name = "ParadeDev"
 	dev.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	dev.offset_left = 16
-	dev.offset_top = -350  # 버튼 7개를 지붕 아래 건물 쪽에 (떠다니는 아기를 안 가리게)
+	dev.offset_top = -438  # 버튼 9개를 지붕 아래 건물 쪽에 (떠다니는 아기를 안 가리게)
 	dev.offset_right = 248
 	dev.offset_bottom = -12
 	dev.add_theme_constant_override("separation", 4)
@@ -686,7 +686,15 @@ func _build_parade_dev() -> void:
 	style_btn.pressed.connect(func() -> void:  # 카툰 ↔ 예전 색연필 (restructure 비교용)
 		CatView.pencil = not CatView.pencil
 		style_btn.text = "주인공 화풍: " + CatView.STYLES[int(CatView.pencil)])
-	for b: Control in [fill, refill, summon, size_btn, mode_btn, ride_btn, style_btn]:
+	var bg_btn := UiKit.button("배경 화풍: " + BgArt.STYLES[int(BgArt.pencil)], "cream", null, UiKit.FONT_MIN)
+	bg_btn.pressed.connect(func() -> void:  # 카툰 ↔ 예전 색연필 배경·건물·장애물·아이템 (v0.8.0 비교용)
+		BgArt.pencil = not BgArt.pencil
+		bg_btn.text = "배경 화풍: " + BgArt.STYLES[int(BgArt.pencil)])
+	var enemy_btn := UiKit.button("적 미리보기: " + ("켬" if WORLD.enemy_preview else "끔"), "cream", null, UiKit.FONT_MIN)
+	enemy_btn.pressed.connect(func() -> void:  # 옥상에 쥐 무리·까마귀 졸개를 세워 반복 동작 확인 (v0.8.0 1부, 판정 없음)
+		WORLD.enemy_preview = not WORLD.enemy_preview
+		enemy_btn.text = "적 미리보기: " + ("켬" if WORLD.enemy_preview else "끔"))
+	for b: Control in [fill, refill, summon, size_btn, mode_btn, ride_btn, style_btn, bg_btn, enemy_btn]:
 		b.custom_minimum_size = Vector2(232, 40)
 		dev.add_child(b)
 	dev.visible = false
