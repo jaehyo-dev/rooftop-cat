@@ -459,3 +459,9 @@ Codex 내장 이미지 생성으로 만든 그림의 요청문입니다. 명령:
 - 계획: 달리기 8칸 1장 + 앞구르기 4칸 1장 + 목도리만 고친 슬라이딩(내리꽂기 포함)·피격·앉기 각 1장 = 5장, 장마다 최대 2번 다시. 결과: 5장 생성, 5장 모두 사용(`run_3`·`flip_3`·`slide_2`·`hit_2`·`sit_2`).
 - 요청문: 위와 같은 `common.txt` + `<장면>.txt` + 새 `scarf.txt`(모든 칸 목도리 통일: 가슴 앞 작은 매듭 + 목 뒤 짧은 두 가닥, 등 길이 1/3 이하). 요청문 파일은 이번 내용으로 바뀌었고 지난 요청문은 git 기록(커밋 9d967cf)에 있음.
 - 첨부: 모두 `hero_reference.png` 먼저. 달리기 = + `run_2.png`(생김새·목도리만 참고), 나머지 = + 지난 시트 + 새 `run_3.png`(목도리 기준).
+
+## 첫 동네 적·보스 시안 (2026-11-25, 맥 Codex, restructure 브랜치)
+- 계획: 적 시트 2장(까마귀 2종, 땅 적 2종) + 보스 시트 1장 + 장면 1장 = 4장, 장마다 최대 2번 다시. 결과: 4장 생성, 다시 뽑기 0번.
+- 명령: `bash review/restructure/enemies/make_art.sh <crows|ground|boss|scene> <차례> <첨부...>`, 비교 그림 `python3 review/restructure/enemies/compose.py`
+- 첨부: 시트 = `assets/concept/cartoon/hero_reference.png`, 장면 = `hero_reference.png` + `assets/concept/restructure_style/s3_A.png` + `assets/concept/cartoon/enemies/ground_1.png` + `crows_1.png`.
+- 요청문 전문: 시트 = `review/restructure/enemies/prompts/common.txt` + `<장면>.txt`, 장면 = `scene.txt`만. 결과 `assets/concept/cartoon/enemies/`.
